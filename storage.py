@@ -9,7 +9,7 @@ class Row(dict):
 
 
 def row_factory(cursor):
-    names = [col.name for col in cursor.description]
+    names = [col.name for col in cursor.description] if cursor.description else []
     return lambda values: Row(zip(names, values))
 
 
