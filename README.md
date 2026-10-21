@@ -14,7 +14,19 @@ Jedna instancja procesu obsługuje wspólną symulację pokoi.
 - `TRUST_PREVIEW_PROXY` pozostaje wyłączone na Render.
 - Bez `DATABASE_URL` tryb lokalny używa SQLite; na Render brak tej zmiennej przerywa start, zamiast tworzyć nietrwałą bazę.
 
-## Ograniczenia i bezpieczeństwo
+## Studio Beta (11.1)
+
+Zakładka „Twórz gry · Beta” zawiera edytor map 2D 24 × 14 oraz dwa szablony: obby i zbieranie monet.
+Można ustawiać platformy, monety, lawę, start i metę, cofać zmiany oraz testować grę klawiaturą i dotykiem.
+Do 20 projektów jest zapisywanych lokalnie w przeglądarce, oddzielnie dla profilu.
+Eksport/import JSON służy do przenoszenia map między urządzeniami; import nie wykonuje kodu.
+Beta nie obejmuje publicznego katalogu gier, chmury ani multiplayera własnych map.
+Bezpośredni adres `/#studio` otwiera Studio i tworzy pierwszy szablon, jeżeli biblioteka jest pusta.
+
+Na poziomie strony blokowane są gesty zoomu, Ctrl/Cmd z +/−/0 oraz Ctrl z kółkiem.
+Nie zastępuje to systemowych ustawień dostępności ani uprawnień przeglądarki.
+
+## Przechowywanie i limity
 
 Znajomi, zaproszenia, konta online i wiadomości są przechowywane w PostgreSQL.
 Pokoje i trwające rundy pozostają w pamięci, więc znikają po restarcie.

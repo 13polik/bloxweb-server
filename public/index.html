@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BloxWeb 11.0 | Graj razem</title>
     <meta name="description" content="BloxWeb: Castle Defense i strzelanka 3D. Rozwijaj awatara, wykonuj misje i graj na komputerze lub telefonie.">
     <link rel="icon" href="data:,">
@@ -5646,7 +5646,7 @@ function normalizeAvatar(value) {
 // === PATCH v9.6: CROSS-INTERNET TURNS 443 + GLOBALNICK + CLEAN MOBILE ===
 (function applyBloxWebV96Patch() {
     var metaVp = document.querySelector('meta[name="viewport"]');
-    if (metaVp) metaVp.setAttribute('content', 'width=device-width, initial-scale=1.0');
+    if (metaVp) metaVp.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
     document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
 
     var style96 = document.createElement('style');
@@ -7720,6 +7720,358 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   for(const card of defaultGames){if(card.id==='castle_defense')card.desc+=' Wersja 11: wspólna obrona online do 6 graczy przez pokój.';if(card.id==='cs2')card.desc+=' Wersja 11: kooperacja online przeciw botom, wspólne 20 eliminacji.';}
   setupFriends();renderFriendsAll();renderMessagesTab();renderPublicRooms();renderProfileOnline();
   renderGames(getFilteredGamesList());connect();
+})();
+</script>
+<style id="studio-styles">/* Studio Beta shares the existing BloxWeb identity. */
+html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
+#nav-studio{background:transparent;text-align:left}
+.studio-shell{--studio-space:16px;max-width:1240px}
+.studio-shell h1{font-size:clamp(26px,3vw,34px);letter-spacing:-1px;line-height:1.2;margin:0}
+.studio-head{display:flex;gap:20px;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
+.studio-head p{color:var(--hub-muted);line-height:1.7;max-width:620px;margin:12px 0}
+.studio-beta{display:inline-block;font-size:12px;letter-spacing:1px;color:#cff7db;background:#2a4935;border:1px solid #567a60;border-radius:5px;padding:4px 7px;vertical-align:middle}
+.studio-note{font-size:13px;line-height:1.7;color:#c1d5c7;border-left:3px solid var(--hub-accent);padding:10px 16px;background:#1c3024;margin-bottom:20px}
+.studio-templates{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+.studio-template{text-align:left;display:flex;flex-direction:column;gap:10px;background:#1b2d22;border:1px solid #4b6955;border-radius:14px;padding:24px;color:var(--hub-text);cursor:pointer;min-height:144px}
+.studio-template:hover{border-color:var(--hub-accent);background:#243c2d}
+.studio-template strong{font-size:20px;letter-spacing:-.4px}
+.studio-template span{font-size:14px;color:#bcd1c3;line-height:1.6}
+.studio-template small{font-size:12px;color:#a6d6b7}
+.studio-workbench{display:grid;grid-template-columns:208px minmax(0,1fr);gap:18px;margin:20px 0}
+.studio-tools,.studio-map-panel,.studio-library{background:var(--hub-panel);border:1px solid var(--hub-border);border-radius:14px;padding:18px;min-width:0}
+.studio-tools h2,.studio-library h2{font-size:18px;margin:0 0 14px}
+.studio-tool-list{display:grid;gap:8px}
+.studio-tool{display:flex;gap:12px;align-items:center;min-height:44px;border:1px solid #425c4b;border-radius:8px;background:#203128;color:#dcebe1;padding:10px;text-align:left;font-size:14px;cursor:pointer}
+.studio-tool[aria-pressed=true]{border-color:#88e9ae;background:#31583e;color:#effff4;box-shadow:inset 3px 0 #9cf6c0}
+.studio-swatch{width:20px;height:20px;flex:0 0 20px;border-radius:4px;border:1px solid #91b29c}
+.studio-tools p,.studio-map-caption{font-size:12px;color:var(--hub-muted);line-height:1.7}
+.studio-fields{display:grid;grid-template-columns:minmax(0,1fr) 140px 140px;gap:12px;margin-bottom:16px}
+.studio-fields label{display:block;font-size:12px;color:#c5d9cd;min-width:0}
+.studio-fields input,.studio-fields select{display:block;width:100%;margin-top:6px;padding:10px;background:#101a14;border:1px solid #52705c;border-radius:8px;color:#f2f8f4;min-height:44px;font-size:15px;min-width:0}
+.studio-canvas{width:100%;display:block;border-radius:9px;border:1px solid #506758;aspect-ratio:12/7;touch-action:none;cursor:crosshair;image-rendering:auto;background:#101c15}
+.studio-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.studio-actions button{min-height:40px!important;padding:8px 12px!important;font-size:13px!important}
+.studio-status{color:#c5efcf;font-size:13px;line-height:1.7;min-height:24px;overflow-wrap:anywhere}
+.studio-status.error{color:#ffb7ab}
+.studio-library{margin-top:24px}
+.studio-projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.studio-project-card{border:1px solid #425c4b;background:#16251c;border-radius:10px;padding:12px;min-width:0}
+.studio-project-card.active{border-color:#96e9b2}
+.studio-project-card canvas{display:block;width:100%;aspect-ratio:12/7;border-radius:6px;background:#102016}
+.studio-project-card strong{display:block;font-size:15px;margin:12px 0 6px;overflow-wrap:anywhere}
+.studio-project-card small{color:var(--hub-muted);font-size:12px}
+.studio-project-card .studio-actions button{flex:1}
+.studio-home-entry{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:20px 24px;margin:24px 0;border:1px dashed #658b70;border-radius:14px;background:#182a1f}
+.studio-home-entry h3{font-size:18px;margin:0 0 8px}
+.studio-home-entry p{font-size:14px;color:var(--hub-muted);line-height:1.6;margin:0}
+.studio-overlay{position:fixed;inset:0;z-index:30000;background:#07100ceF;display:grid;place-items:center;padding:20px;overflow:auto;overscroll-behavior:contain}
+.studio-overlay[hidden],.studio-overlay [hidden],.studio-shell [hidden]{display:none!important}
+.studio-dialog,.studio-runner{width:min(100%,1040px);max-height:calc(100dvh - 40px);overflow:auto;background:#17261d;border:1px solid #6e947b;border-radius:16px;padding:20px;box-shadow:0 24px 80px #0008;color:#f0faf3}
+.studio-dialog{max-width:640px}
+.studio-dialog h2{font-size:24px;margin:0 0 14px}
+.studio-dialog p{font-size:14px;line-height:1.7;color:#c0d5c7}
+.studio-dialog textarea{display:block;box-sizing:border-box;width:100%;min-height:220px;max-height:50dvh;background:#0d1811;color:#e0f4e7;border:1px solid #688b73;border-radius:9px;padding:14px;font:13px/1.7 monospace;resize:vertical;user-select:text;touch-action:pan-x pan-y}
+.studio-runbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.studio-runbar h2{margin:0;font-size:20px;overflow-wrap:anywhere}
+.studio-runbar p{font-size:13px;color:#c1dbc9;margin:6px 0 0}
+.studio-stage{position:relative;min-width:0}
+.studio-stage canvas{display:block;width:100%;aspect-ratio:12/7;border:1px solid #56755e;border-radius:10px;touch-action:none}
+.studio-result{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;background:#0a1711ed;border-radius:10px;padding:20px}
+.studio-result[hidden]{display:none}
+.studio-result h3{font-size:clamp(22px,4vw,38px);margin:0 0 12px;letter-spacing:-1px}
+.studio-result p{font-size:14px;color:#d0e8d7;line-height:1.6;max-width:380px;margin:0 0 16px}
+.studio-controls{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:14px;flex-wrap:wrap}
+.studio-movement{display:flex;gap:8px}
+.studio-hold{width:64px;min-height:52px;border-radius:10px;border:1px solid #7db58d;background:#2b4a35;color:#effff4;font-size:22px;touch-action:none;user-select:none;cursor:pointer}
+.studio-hold[data-key=jump]{width:112px;font-size:16px;font-weight:700;background:#6de6a7;color:#102a1b}
+.studio-hold[aria-pressed=true]{background:#a8f5c4;color:#102a1b}
+.studio-shortcuts{font-size:12px;line-height:1.7;color:#bacfc1}
+.studio-shell button:focus-visible,.studio-overlay button:focus-visible,.studio-canvas:focus-visible{outline:3px solid #9df4bd;outline-offset:3px}
+@media(max-width:1000px){.studio-workbench{grid-template-columns:1fr}.studio-tool-list{grid-template-columns:repeat(3,minmax(0,1fr))}.studio-fields{grid-template-columns:minmax(0,1fr) 130px 130px}.studio-tools p{margin-bottom:0}}
+@media(max-width:600px){.studio-head{flex-direction:column;gap:8px}.studio-templates{grid-template-columns:1fr}.studio-template{padding:18px;min-height:126px}.studio-map-panel,.studio-tools,.studio-library{padding:12px}.studio-tool-list{grid-template-columns:repeat(2,minmax(0,1fr))}.studio-fields{grid-template-columns:1fr 1fr}.studio-fields label:first-child{grid-column:1/-1}.studio-fields input,.studio-fields select{font-size:16px}.studio-home-entry{padding:18px;align-items:flex-start;flex-direction:column}.studio-canvas{border-radius:5px}.studio-map-caption{margin-bottom:0}.studio-overlay{padding:8px}.studio-dialog,.studio-runner{max-height:calc(100dvh - 16px);padding:12px;border-radius:12px}.studio-runbar h2{font-size:18px}.studio-runbar .studio-actions{margin-top:0}.studio-shortcuts{width:100%;order:3}.studio-hold{width:56px;min-height:52px}.studio-result{padding:12px}.studio-result h3{font-size:24px;margin-bottom:6px}.studio-result p{font-size:12px;margin-bottom:8px}.studio-result .v11-primary{min-height:36px!important;padding:6px 12px!important}.studio-status{min-height:22px}.studio-head .studio-actions button{flex:1}}
+@media(pointer:coarse){input,select,textarea{font-size:16px!important}}
+</style>
+<script>/* BloxWeb Studio Beta: bounded data-only maps, local saves, no executable imports. */
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const node=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;};
+  const button=(text,fn,primary=false)=>{const b=node('button',primary?'v11-primary':'v11-button',text);b.type='button';b.onclick=fn;return b;};
+  // Browser/OS accessibility settings can override these requests.
+  document.querySelector('meta[name=viewport]')?.setAttribute('content','width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+  const stopZoom=e=>e.preventDefault();
+  for(const name of ['gesturestart','gesturechange','gestureend'])document.addEventListener(name,stopZoom,{passive:false});
+  document.addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault();},{passive:false,capture:true});
+  document.addEventListener('touchstart',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
+  document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
+  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(['+','=','-','_','0','NumpadAdd','NumpadSubtract'].includes(e.key)||['NumpadAdd','NumpadSubtract','Digit0'].includes(e.code)))e.preventDefault();},{capture:true});
+
+  const W=24,H=14,S=40,VALID=new Set([0,1,2,3,4,5]);
+  const THEMES={forest:{sky:'#10271d',far:'#183d2b',block:'#4eae79',edge:'#a4f1bf',grid:'#244536'},
+    night:{sky:'#171d32',far:'#283554',block:'#697fbd',edge:'#c0d1ff',grid:'#2d3956'},
+    sand:{sky:'#302719',far:'#50402a',block:'#b89559',edge:'#f5deb1',grid:'#5b4930'}};
+  const TOOLS=[{id:1,name:'Platforma',color:'#4eae79'},{id:2,name:'Moneta',color:'#edc861'},
+    {id:3,name:'Lawa',color:'#f47f6c'},{id:4,name:'Start',color:'#70c6ff'},
+    {id:5,name:'Meta',color:'#e4f1e8'},{id:0,name:'Gumka',color:'#1b2e23'}];
+  const storeKey='blox_studio_beta_v1_'+myPlayerId;
+  const clone=value=>JSON.parse(JSON.stringify(value));
+  const uid=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2);
+  let projects=[],current=null,tool=1,undo=[],redo=[],pointer=null,previousCell=null,cursor={x:1,y:12};
+  let saveTimer=0,run=null,frame=0,lastTime=0,accumulator=0,returnFocus=null,modal=null,clearPending=false;
+  const keys=new Set();
+  function validate(value){
+    if(!value||value.format!=='bloxweb-studio'||value.version!==1||!['obby','coins'].includes(value.kind)||!THEMES[value.theme]||
+      !Array.isArray(value.tiles)||value.tiles.length!==W*H||!value.tiles.every(v=>Number.isInteger(v)&&VALID.has(v))||
+      typeof value.name!=='string'||!value.name.trim()||value.name.length>48)throw Error('Nieprawidłowy projekt. Użyj kodu gry wyeksportowanego ze Studio Beta.');
+    return {format:'bloxweb-studio',version:1,id:typeof value.id==='string'?value.id.slice(0,80):uid(),
+      name:value.name.trim(),kind:value.kind,theme:value.theme,tiles:[...value.tiles],updated:Number.isFinite(value.updated)?value.updated:Date.now()};
+  }
+  try{const saved=JSON.parse(accountStore.getItem(storeKey)||'[]');if(Array.isArray(saved))for(const raw of saved.slice(0,20)){try{projects.push(validate(raw));}catch{}}}catch{}
+  const section=node('section','view-section studio-shell');section.id='view-studio';
+  section.innerHTML=`
+    <header class="studio-head"><div><div class="v11-eyebrow">BloxWeb / narzędzia twórcy</div>
+      <h1>Twoja wyobraźnia.<br>Twoja gra. <span class="studio-beta">BETA</span></h1>
+      <p>Zbuduj mały świat, ustaw zasady i od razu wskocz do gry. Bez pisania kodu.</p></div>
+      <div class="studio-actions" id="studioHeaderActions"></div></header>
+    <div class="studio-note">Beta lokalna: projekty zapisują się w tej przeglądarce. W podglądzie bez trwałego zapisu użyj eksportu. Własne mapy są na razie jednoosobowe, bez publicznego publikowania.</div>
+    <div id="studioTemplates" class="studio-templates"></div>
+    <div class="studio-status" id="studioStatus" role="status" aria-live="polite"></div>
+    <div id="studioWorkbench" class="studio-workbench" hidden>
+      <aside class="studio-tools"><h2>Przybornik</h2><div class="studio-tool-list" id="studioTools"></div>
+        <p>Kliknij lub przeciągnij po mapie. Start i meta mogą występować tylko raz.</p></aside>
+      <div class="studio-map-panel"><div class="studio-fields">
+        <label>Nazwa gry<input id="studioName" maxlength="48" autocomplete="off"></label>
+        <label>Tryb<select id="studioKind"><option value="obby">Obby</option><option value="coins">Wszystkie monety</option></select></label>
+        <label>Motyw<select id="studioTheme"><option value="forest">Zielony szlak</option><option value="night">Nocny świat</option><option value="sand">Piaskowy świat</option></select></label>
+      </div><canvas class="studio-canvas" id="studioMap" width="960" height="560" tabindex="0" aria-label="Edytor mapy, 24 kolumny i 14 wierszy. Strzałki przesuwają kursor, spacja maluje."></canvas>
+      <p class="studio-map-caption">Mapa 24 × 14 · strzałki: kursor · spacja: postaw kafelek · Ctrl/Cmd+Z: cofnij</p>
+      <div class="studio-actions" id="studioEditActions"></div>
+      <div id="studioClearConfirm" class="studio-actions" hidden></div></div>
+    </div>
+    <section class="studio-library"><h2>Moje gry <span id="studioCount" class="v11-mini-count"></span></h2>
+      <div id="studioProjects" class="studio-projects"></div></section>`;
+  document.querySelector('.content').append(section);
+  const nav=button('Twórz gry · Beta',()=>switchTab('studio'));
+  nav.id='nav-studio';nav.className='nav-btn';nav.setAttribute('aria-label','Twórz gry · Beta');
+  $('nav-settings').before(nav);
+  const oldSwitch=switchTab;
+  switchTab=function(name){oldSwitch(name);document.querySelectorAll('.sidebar .nav-btn').forEach(b=>b.classList.toggle('active',b.id==='nav-'+name));if(name==='studio'){drawEditor();renderLibrary();}};
+  const home=node('section','studio-home-entry');
+  const homeText=node('div');homeText.append(node('h3','','Z gracza w twórcę'),node('p','','Studio Beta: układaj mapy, zbieraj pomysły i testuj własne gry.'));
+  const openStudio=button('Otwórz Studio · Beta',()=>{switchTab('studio');if(!current&&!projects.length)create('obby');},true);openStudio.id='studioHomeOpen';
+  home.append(homeText,openStudio);$('v11Lobby').after(home);
+  document.querySelectorAll('.ver-badge').forEach(e=>e.textContent='v11.1');
+  document.title='BloxWeb 11.0 | Studio Beta';
+
+  function feedback(text,error=false){$('studioStatus').textContent=text;$('studioStatus').classList.toggle('error',error);}
+  function persist(message){
+    clearTimeout(saveTimer);saveTimer=0;
+    if(current){current.updated=Date.now();const i=projects.findIndex(p=>p.id===current.id);if(i>=0)projects[i]=clone(current);}
+    try{accountStore.setItem(storeKey,JSON.stringify(projects));if(message)feedback(window.bloxVolatileSave?'Projekt jest w pamięci tej sesji. Wyeksportuj kod, aby go zachować.':message);}
+    catch{feedback('Nie udało się zapisać projektu. Wyeksportuj kod gry.',true);}
+    renderLibrary();
+  }
+  function changed(){feedback('Niezapisane zmiany…');clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist('Zapisano automatycznie.'),450);drawEditor();updateUndo();}
+  function snapshot(){undo.push(clone(current.tiles));if(undo.length>40)undo.shift();redo=[];updateUndo();}
+  function updateUndo(){if($('studioUndo'))$('studioUndo').disabled=!undo.length;if($('studioRedo'))$('studioRedo').disabled=!redo.length;}
+  function template(kind){
+    const tiles=Array(W*H).fill(0);for(let x=0;x<W;x++)tiles[(H-1)*W+x]=1;
+    for(const [row,start,end] of [[11,4,7],[9,10,13],[11,16,19]])for(let x=start;x<=end;x++)tiles[row*W+x]=1;
+    for(const [x,y] of [[5,10],[11,8],[17,10],[20,12]])tiles[y*W+x]=2;
+    if(kind==='obby'){tiles[12*W+7]=3;tiles[12*W+8]=3;}
+    tiles[12*W+1]=4;tiles[12*W+22]=5;
+    return {format:'bloxweb-studio',version:1,id:uid(),name:kind==='obby'?'Mój pierwszy obby':'Moja wyprawa po monety',kind,theme:'forest',tiles,updated:Date.now()};
+  }
+  function select(project){persist();current=clone(projects.find(p=>p.id===project.id)||project);undo=[];redo=[];clearPending=false;$('studioClearConfirm').hidden=true;
+    $('studioWorkbench').hidden=false;$('studioTemplates').hidden=true;
+    $('studioName').value=current.name;$('studioKind').value=current.kind;$('studioTheme').value=current.theme;updateUndo();drawEditor();renderLibrary();}
+  function create(kind){
+    if(projects.length>=20){feedback('Limit beta to 20 projektów. Zrób eksport i usuń niepotrzebny projekt.',true);return;}
+    persist();const p=template(kind);projects.push(p);select(p);persist('Utworzono grę. Możesz już edytować mapę i nacisnąć „Testuj grę”.');
+  }
+  for(const [kind,title,desc] of [['obby','Obby / tor przeszkód','Platformy, skoki i lawa. Dotrzyj do mety własną drogą.'],['coins','Wyprawa po monety','Schowaj monety w świecie. Zbierz wszystkie, aby odblokować metę.']]){
+    const b=button('',()=>create(kind));b.className='studio-template';b.id=kind==='obby'?'studioCreateObby':'studioCreateCoins';
+    b.append(node('small','','SZABLON STARTOWY'),node('strong','',title),node('span','',desc));$('studioTemplates').append(b);
+  }
+  $('studioHeaderActions').append(button('Nowa gra',()=>{$('studioTemplates').hidden=false;$('studioTemplates').scrollIntoView({block:'nearest'});}),button('Importuj kod',()=>codeDialog('import')));
+  for(const item of TOOLS){const b=button('',()=>{tool=item.id;renderTools();drawEditor();});b.className='studio-tool';b.dataset.tool=item.id;b.setAttribute('aria-pressed',String(tool===item.id));const sw=node('span','studio-swatch');sw.style.background=item.color;b.append(sw,document.createTextNode(item.name));$('studioTools').append(b);}
+  function renderTools(){$('studioTools').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.tool)===tool)));}
+  const undoButton=button('Cofnij',()=>{if(!undo.length)return;redo.push(clone(current.tiles));current.tiles=undo.pop();changed();});undoButton.id='studioUndo';
+  const redoButton=button('Ponów',()=>{if(!redo.length)return;undo.push(clone(current.tiles));current.tiles=redo.pop();changed();});redoButton.id='studioRedo';
+  const testButton=button('Testuj grę',startTest,true);testButton.id='studioTest';
+  $('studioEditActions').append(testButton,button('Zapisz projekt',()=>{if(!$('studioName').value.trim()){feedback('Nadaj grze nazwę.',true);$('studioName').focus();return;}persist('Zapisano projekt w tej przeglądarce.');}),undoButton,redoButton,
+    button('Eksportuj kod',()=>codeDialog('export')),button('Wyczyść mapę',()=>{$('studioClearConfirm').hidden=false;clearPending=true;}));
+  $('studioClearConfirm').append(node('span','studio-status','Usunąć wszystkie kafelki? Możesz cofnąć tę zmianę.'),
+    button('Potwierdź wyczyszczenie',()=>{if(!current||!clearPending)return;snapshot();current.tiles.fill(0);clearPending=false;$('studioClearConfirm').hidden=true;changed();}),
+    button('Anuluj',()=>{clearPending=false;$('studioClearConfirm').hidden=true;}));
+  $('studioName').addEventListener('input',()=>{if(!current)return;const name=$('studioName').value.trim();if(name)current.name=name;changed();});
+  for(const field of ['Kind','Theme'])$('studio'+field).addEventListener('change',()=>{if(!current)return;current[field.toLowerCase()]=$('studio'+field).value;changed();});
+
+  function renderLibrary(){
+    const list=$('studioProjects');list.replaceChildren();$('studioCount').textContent=projects.length+'/20';
+    if(!projects.length){list.append(node('p','v11-muted','Tu pojawią się Twoje projekty. Wybierz szablon powyżej, aby stworzyć pierwszą grę.'));return;}
+    for(const project of projects){
+      const card=node('article','studio-project-card'+(project.id===current?.id?' active':''));
+      const thumb=node('canvas');thumb.width=240;thumb.height=140;thumb.setAttribute('aria-label','Podgląd mapy '+project.name);drawMap(thumb,project,false);
+      card.append(thumb,node('strong','',project.name),node('small','',project.kind==='obby'?'Obby · projekt lokalny':'Monety · projekt lokalny'));
+      const actions=node('div','studio-actions');actions.append(button('Edytuj',()=>{select(project);$('studioWorkbench').scrollIntoView({block:'start'});}),
+        button('Usuń',()=>deleteDialog(project)));card.append(actions);list.append(card);
+    }
+  }
+  function closeModal(){if(!modal)return;modal.remove();modal=null;returnFocus?.focus();}
+  function makeModal(title){
+    if(modal)closeModal();returnFocus=document.activeElement;
+    modal=node('div','studio-overlay');const box=node('section','studio-dialog');box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');
+    const h=node('h2','',title);h.id='studioDialogTitle';box.setAttribute('aria-labelledby',h.id);box.append(h);modal.append(box);document.body.append(modal);return box;
+  }
+  function deleteDialog(project){
+    const box=makeModal('Usunąć projekt?');box.append(node('p','','Usuniesz „'+project.name+'” z tej przeglądarki. Najpierw wyeksportuj kod, jeśli chcesz zachować kopię.'));
+    const row=node('div','studio-actions');row.append(button('Anuluj',closeModal),button('Usuń projekt',()=>{
+      clearTimeout(saveTimer);projects=projects.filter(p=>p.id!==project.id);if(current?.id===project.id){current=null;undo=[];redo=[];$('studioWorkbench').hidden=true;$('studioTemplates').hidden=false;}persist('Usunięto projekt.');closeModal();
+    }));box.append(row);row.firstChild.focus();
+  }
+  function codeDialog(kind){
+    if(kind==='export'&&!current)return;persist();
+    const box=makeModal(kind==='export'?'Kod Twojej gry':'Importuj grę');
+    box.append(node('p','',kind==='export'?'Skopiuj cały kod do notatki lub wyślij go znajomemu. Druga osoba może wkleić go w „Importuj kod”. Kod zawiera tylko mapę i ustawienia, bez danych konta.':'Wklej kod wyeksportowany ze Studio Beta. Import utworzy osobny projekt, nie nadpisze istniejących gier.'));
+    const area=node('textarea');area.id='studioCode';area.setAttribute('aria-label',kind==='export'?'Kod gry':'Wklej kod gry');area.maxLength=60000;area.spellcheck=false;
+    if(kind==='export'){area.value=JSON.stringify(current);area.readOnly=true;}
+    const status=node('p','studio-status');status.setAttribute('role','status');
+    const row=node('div','studio-actions');row.append(button('Zamknij',closeModal),button(kind==='export'?'Kopiuj kod':'Importuj grę',async()=>{
+      if(kind==='export'){try{await navigator.clipboard.writeText(area.value);status.textContent='Skopiowano kod gry.';}catch{area.focus();area.select();status.textContent='Kod zaznaczony. Użyj opcji Kopiuj lub Ctrl/Cmd+C.';}return;}
+      try{if(projects.length>=20)throw Error('Limit beta to 20 projektów.');if(area.value.length>60000)throw Error('Kod jest zbyt długi.');
+        const p=validate(JSON.parse(area.value));p.id=uid();projects.push(p);select(p);persist('Zaimportowano nowy projekt.');closeModal();
+      }catch(error){status.textContent=error instanceof SyntaxError?'To nie jest poprawny kod JSON.':error.message;status.classList.add('error');}
+    },true));box.append(area,status,row);area.focus();if(kind==='export')area.select();
+  }
+  function gridIndex(x,y){return y*W+x;}
+  function drawMap(canvas,project,grid,playing=false){
+    const ctx=canvas.getContext('2d'),t=THEMES[project.theme],sx=canvas.width/W,sy=canvas.height/H;
+    ctx.fillStyle=t.sky;ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle=t.far;ctx.beginPath();ctx.moveTo(0,canvas.height);for(let x=0;x<=W;x+=2)ctx.lineTo(x*sx,(8+Math.sin(x*.8)*1.6)*sy);ctx.lineTo(canvas.width,canvas.height);ctx.fill();
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const id=project.tiles[gridIndex(x,y)],px=x*sx,py=y*sy;
+      if(playing&&id===2&&run?.collected.has(gridIndex(x,y)))continue;
+      if(id===1){ctx.fillStyle=t.block;ctx.fillRect(px,py,sx,sy);ctx.fillStyle=t.edge;ctx.fillRect(px,py,sx,sy*.12);ctx.fillStyle='#0002';ctx.fillRect(px+sx*.7,py+sy*.35,sx*.2,sy*.2);}
+      if(id===2){ctx.fillStyle='#f5ce67';ctx.beginPath();ctx.arc(px+sx/2,py+sy/2,sx*.22,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff0b5';ctx.lineWidth=sx*.06;ctx.stroke();}
+      if(id===3){ctx.fillStyle='#f0806c';ctx.beginPath();ctx.moveTo(px+sx*.06,py+sy);ctx.lineTo(px+sx*.5,py+sy*.15);ctx.lineTo(px+sx*.94,py+sy);ctx.fill();}
+      if(id===4){ctx.strokeStyle='#75c6f3';ctx.lineWidth=sx*.06;ctx.strokeRect(px+sx*.12,py+sy*.08,sx*.76,sy*.84);if(!playing){ctx.fillStyle='#80d5ff';ctx.fillRect(px+sx*.36,py+sy*.34,sx*.28,sy*.4);}}
+      if(id===5){ctx.fillStyle='#c4ecd2';ctx.fillRect(px+sx*.2,py+sy*.05,sx*.08,sy*.95);for(let cy=0;cy<3;cy++)for(let cx=0;cx<3;cx++){ctx.fillStyle=(cx+cy)%2?'#20452e':'#edfff3';ctx.fillRect(px+sx*(.28+cx*.19),py+sy*(.06+cy*.18),sx*.19,sy*.18);}}
+      if(grid){ctx.strokeStyle=t.grid;ctx.lineWidth=.7;ctx.strokeRect(px,py,sx,sy);}
+    }
+  }
+  function drawEditor(){if(!current)return;const canvas=$('studioMap');drawMap(canvas,current,true);const ctx=canvas.getContext('2d');ctx.strokeStyle='#fff5c4';ctx.lineWidth=2;ctx.strokeRect(cursor.x*S+2,cursor.y*S+2,S-4,S-4);}
+  function paint(x,y){if(!current||x<0||x>=W||y<0||y>=H)return;
+    if(tool===4||tool===5)current.tiles=current.tiles.map(id=>id===tool?0:id);
+    current.tiles[gridIndex(x,y)]=tool;cursor={x,y};drawEditor();
+  }
+  function cellFromEvent(e){const r=$('studioMap').getBoundingClientRect();return{x:Math.max(0,Math.min(W-1,Math.floor((e.clientX-r.left)*W/r.width))),y:Math.max(0,Math.min(H-1,Math.floor((e.clientY-r.top)*H/r.height)))};}
+  const mapCanvas=$('studioMap');
+  mapCanvas.addEventListener('pointerdown',e=>{if(!current||e.button!==0||pointer!==null)return;e.preventDefault();mapCanvas.focus({preventScroll:true});pointer=e.pointerId;mapCanvas.setPointerCapture(pointer);snapshot();previousCell=cellFromEvent(e);paint(previousCell.x,previousCell.y);});
+  mapCanvas.addEventListener('pointermove',e=>{if(e.pointerId!==pointer)return;const next=cellFromEvent(e);const steps=Math.max(Math.abs(next.x-previousCell.x),Math.abs(next.y-previousCell.y));
+    for(let i=1;i<=steps;i++)paint(Math.round(previousCell.x+(next.x-previousCell.x)*i/steps),Math.round(previousCell.y+(next.y-previousCell.y)*i/steps));previousCell=next;});
+  const endPaint=e=>{if(e.pointerId!==pointer)return;pointer=null;previousCell=null;changed();};
+  for(const name of ['pointerup','pointercancel','lostpointercapture'])mapCanvas.addEventListener(name,endPaint);
+  mapCanvas.addEventListener('keydown',e=>{
+    if(!current)return;
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)){e.preventDefault();e.stopPropagation();
+      if(e.key===' '){snapshot();paint(cursor.x,cursor.y);changed();}
+      else{cursor.x=Math.max(0,Math.min(W-1,cursor.x+(e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0)));cursor.y=Math.max(0,Math.min(H-1,cursor.y+(e.key==='ArrowDown'?1:e.key==='ArrowUp'?-1:0)));drawEditor();}
+    }
+  });
+
+  const runner=node('div','studio-overlay');runner.id='studioPlayer';runner.hidden=true;
+  runner.innerHTML=`<section class="studio-runner" role="dialog" aria-modal="true" aria-labelledby="studioRunTitle">
+    <header class="studio-runbar"><div><h2 id="studioRunTitle"></h2><p id="studioRunHud" role="status"></p></div><div id="studioRunActions" class="studio-actions"></div></header>
+    <div class="studio-stage"><canvas id="studioGame" width="1200" height="700" aria-label="Test Twojej gry" tabindex="0"></canvas>
+      <div id="studioResult" class="studio-result" hidden><h3 id="studioResultTitle"></h3><p id="studioResultText"></p><div id="studioResultActions" class="studio-actions"></div></div></div>
+    <div class="studio-controls"><div class="studio-movement" id="studioMovement"></div><div class="studio-shortcuts">A/D lub strzałki: ruch · spacja/W: skok<br>R: restart · Esc: pauza. Na telefonie użyj przycisków.</div></div>
+  </section>`;document.body.append(runner);
+  const pauseButton=button('Pauza',togglePause);pauseButton.id='studioPause';
+  $('studioRunActions').append(pauseButton,button('Restart',restartRun),button('Wróć do edytora',stopTest));
+  $('studioResultActions').append(button('Spróbuj ponownie',restartRun,true),button('Do edytora',stopTest));
+  for(const [key,label,aria] of [['left','←','Idź w lewo'],['right','→','Idź w prawo'],['jump','Skok','Skok']]){
+    const b=node('button','studio-hold',label);b.type='button';b.dataset.key=key;b.setAttribute('aria-label',aria);b.setAttribute('aria-pressed','false');
+    b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(key);b.setAttribute('aria-pressed','true');});
+    for(const name of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(name,()=>{keys.delete(key);b.setAttribute('aria-pressed','false');});
+    $('studioMovement').append(b);
+  }
+  function playable(p){const starts=p.tiles.reduce((a,v)=>a+(v===4),0),goals=p.tiles.reduce((a,v)=>a+(v===5),0);
+    if(starts!==1||goals!==1)throw Error('Dodaj dokładnie jeden Start i jedną Metę.');
+    if(p.kind==='coins'&&!p.tiles.includes(2))throw Error('W trybie monet dodaj co najmniej jedną monetę.');
+  }
+  function startTest(){
+    if(!current)return;
+    try{if(!$('studioName').value.trim())throw Error('Nadaj grze nazwę.');playable(current);}catch(e){feedback(e.message,true);return;}
+    if(typeof currentPlayingGame!=='undefined'&&currentPlayingGame){feedback('Najpierw wyjdź z uruchomionej gry.',true);return;}
+    persist('Projekt zapisany. Trwa test gry.');returnFocus=document.activeElement;
+    run={project:clone(current),state:'playing'};runner.hidden=false;document.body.classList.add('studio-testing');restartRun();$('studioGame').focus({preventScroll:true});
+    cancelAnimationFrame(frame);lastTime=performance.now();accumulator=0;frame=requestAnimationFrame(loop);
+  }
+  function restartRun(){
+    if(!run)return;const start=run.project.tiles.indexOf(4);
+    Object.assign(run,{state:'playing',x:start%W+.2,y:Math.floor(start/W)+.12,vx:0,vy:0,w:.6,h:.86,grounded:false,coyote:0,jumpBuffer:0,wasJump:false,collected:new Set(),elapsed:0});
+    keys.clear();$('studioMovement').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));$('studioResult').hidden=true;pauseButton.textContent='Pauza';$('studioRunTitle').textContent=run.project.name;drawGame();
+  }
+  function stopTest(){cancelAnimationFrame(frame);frame=0;run=null;keys.clear();runner.hidden=true;document.body.classList.remove('studio-testing');drawEditor();returnFocus?.focus();}
+  function togglePause(){if(!run||!['playing','paused'].includes(run.state))return;run.state=run.state==='playing'?'paused':'playing';keys.clear();pauseButton.textContent=run.state==='paused'?'Wznów':'Pauza';
+    if(run.state==='paused'){showResult('Pauza','Test jest zatrzymany. Naciśnij „Wznów” lub Esc, aby wrócić do gry.',false);}
+    else $('studioResult').hidden=true;
+    drawGame();
+  }
+  function showResult(title,description,retry=true){$('studioResultTitle').textContent=title;$('studioResultText').textContent=description;$('studioResult').hidden=false;$('studioResultActions').hidden=!retry;}
+  function finish(state){if(!run||run.state!=='playing')return;run.state=state;keys.clear();pauseButton.disabled=true;
+    showResult(state==='won'?'Udało się!':'Jeszcze jedna próba?',state==='won'?'Twoja mapa działa. Czas: '+run.elapsed.toFixed(1)+' s. Wróć do edytora albo zagraj ponownie.':'Lawa lub upadek zakończyły test. Spróbuj ponownie albo zmień układ platform.');
+  }
+  function solids(x,y,w,h){const boxes=[];for(let cy=Math.max(0,Math.floor(y));cy<=Math.min(H-1,Math.floor(y+h-.001));cy++)for(let cx=Math.max(0,Math.floor(x));cx<=Math.min(W-1,Math.floor(x+w-.001));cx++)if(run.project.tiles[gridIndex(cx,cy)]===1)boxes.push({x:cx,y:cy});return boxes;}
+  function tick(dt){
+    if(!run||run.state!=='playing')return;run.elapsed+=dt;run.vx=(Number(keys.has('right'))-Number(keys.has('left')))*6;
+    const jump=keys.has('jump');if(jump&&!run.wasJump)run.jumpBuffer=.12;run.wasJump=jump;
+    run.coyote=run.grounded?.10:Math.max(0,run.coyote-dt);run.jumpBuffer=Math.max(0,run.jumpBuffer-dt);
+    if(run.jumpBuffer>0&&run.coyote>0){run.vy=-12;run.grounded=false;run.coyote=0;run.jumpBuffer=0;}
+    run.x=Math.max(0,Math.min(W-run.w,run.x+run.vx*dt));
+    for(const b of solids(run.x,run.y,run.w,run.h)){if(run.vx>0)run.x=b.x-run.w;else if(run.vx<0)run.x=b.x+1;}
+    run.vy=Math.min(18,run.vy+28*dt);run.y+=run.vy*dt;run.grounded=false;
+    for(const b of solids(run.x,run.y,run.w,run.h)){if(run.vy>0){run.y=b.y-run.h;run.grounded=true;}else if(run.vy<0)run.y=b.y+1;run.vy=0;}
+    if(run.y>H+1){finish('failed');return;}
+    for(let y=Math.max(0,Math.floor(run.y));y<=Math.min(H-1,Math.floor(run.y+run.h-.001));y++)for(let x=Math.max(0,Math.floor(run.x));x<=Math.min(W-1,Math.floor(run.x+run.w-.001));x++){
+      const i=gridIndex(x,y),tile=run.project.tiles[i];
+      if(tile===3){finish('failed');return;}
+      if(tile===2)run.collected.add(i);
+      if(tile===5&&(run.project.kind==='obby'||run.collected.size===run.project.tiles.filter(t=>t===2).length)){finish('won');return;}
+    }
+  }
+  function drawGame(){if(!run)return;const c=$('studioGame'),ctx=c.getContext('2d');drawMap(c,run.project,false,true);ctx.save();ctx.scale(c.width/(W*S),c.height/(H*S));
+    const x=run.x*S,y=run.y*S;ctx.fillStyle='#63b8eb';ctx.fillRect(x+3,y+13,18,15);ctx.fillStyle='#f4d84d';ctx.fillRect(x+5,y,14,14);ctx.fillStyle='#153329';ctx.fillRect(x+8,y+5,2,2);ctx.fillRect(x+15,y+5,2,2);ctx.fillRect(x+10,y+10,5,1);ctx.fillStyle='#8bd178';ctx.fillRect(x+3,y+28,8,7);ctx.fillRect(x+13,y+28,8,7);
+    ctx.restore();const total=run.project.tiles.filter(t=>t===2).length;$('studioRunHud').textContent=(run.project.kind==='coins'?'Zbierz wszystkie monety i dotrzyj do mety':'Dotrzyj do flagi')+' · Monety '+run.collected.size+'/'+total+' · '+run.elapsed.toFixed(1)+' s';pauseButton.disabled=!['playing','paused'].includes(run.state);
+  }
+  function loop(time){if(!run)return;accumulator+=Math.min(.1,(time-lastTime)/1000);lastTime=time;while(accumulator>=1/60){tick(1/60);accumulator-=1/60;}drawGame();frame=requestAnimationFrame(loop);}
+  const keyMap={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',' ':'jump',ArrowUp:'jump',w:'jump',W:'jump'};
+  document.addEventListener('keydown',e=>{
+    if(modal){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeModal();}return;}
+    if(run){const key=keyMap[e.key];if(key||['Escape','r','R'].includes(e.key)){e.preventDefault();e.stopImmediatePropagation();if(key)keys.add(key);else if(!e.repeat){if(e.key==='Escape')togglePause();else restartRun();}}return;}
+    if($('view-studio').classList.contains('active')&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){e.preventDefault();e.shiftKey?redoButton.click():undoButton.click();}
+  },true);
+  document.addEventListener('keyup',e=>{if(run&&keyMap[e.key]){e.preventDefault();e.stopImmediatePropagation();keys.delete(keyMap[e.key]);}},true);
+  window.addEventListener('blur',()=>{keys.clear();if(run?.state==='playing')togglePause();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&run?.state==='playing')togglePause();});
+  document.addEventListener('keydown',e=>{
+    const overlay=modal||(!runner.hidden?runner:null);if(!overlay||e.key!=='Tab')return;
+    const candidates=[...overlay.querySelectorAll('button,textarea,[tabindex="0"]')].filter(e=>!e.disabled&&e.getClientRects().length);
+    if(!candidates.length)return;const first=candidates[0],last=candidates.at(-1);
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  });
+  const oldRender=window.render_game_to_text;
+  window.render_game_to_text=()=>{let state={};try{state=JSON.parse(oldRender?.()||'{}');}catch{}state.studio={beta:true,editor:$('view-studio').classList.contains('active'),projects:projects.length,
+    project:current?{id:current.id,name:current.name,kind:current.kind,theme:current.theme,tiles:[...current.tiles]}:null,
+    play:run?{state:run.state,x:run.x,y:run.y,vx:run.vx,vy:run.vy,grounded:run.grounded,coins:run.collected.size,elapsed:run.elapsed}:null};return JSON.stringify(state);};
+  const oldAdvance=window.advanceTime;
+  window.advanceTime=ms=>{if(run){for(let i=0;i<Math.min(600,Math.ceil(Math.max(0,ms)/(1000/60)));i++)tick(1/60);drawGame();return window.render_game_to_text();}return oldAdvance?.(ms);};
+  window.addEventListener('pagehide',()=>persist());
+  renderTools();renderLibrary();updateUndo();if(projects.length)select(projects[0]);
+  // A bookmark to #studio opens a starter map when the library is empty.
+  if(location.hash==='#studio'){switchTab('studio');if(!current)create('obby');}
 })();
 </script>
 </body>
