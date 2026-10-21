@@ -1,6 +1,7 @@
 """BloxWeb 11: anonymous authenticated social API and server-run co-op rooms.
 
-Run: python3 server.py. Data is stored in DATA_DIR (default ./data).
+Run: python3 server.py. DATABASE_URL enables durable PostgreSQL storage.
+Without it, local development stores SQLite in DATA_DIR (default ./data).
 The simulation is deliberately lightweight; accounts/economy from the old HTML
 remain local. Production needs TLS, backups and process supervision.
 """
@@ -13,7 +14,6 @@ import os
 import random
 import re
 import secrets
-import sqlite3
 import time
 from pathlib import Path
 from collections import defaultdict, deque
@@ -22,32 +22,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse
+from storage import open_database
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
 DATA.mkdir(parents=True, exist_ok=True)
-db = sqlite3.connect(DATA / "bloxweb.sqlite3", check_same_thread=False)
-db.row_factory = sqlite3.Row
-db.create_function("fold", 1, lambda value: str(value or "").casefold(), deterministic=True)
-db.execute("PRAGMA journal_mode=WAL")
-db.execute("PRAGMA foreign_keys=ON")
-# New database. Every statement is additive and older records remain intact.
-db.executescript("""
-CREATE TABLE IF NOT EXISTS users(
- id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, visitor_hash TEXT UNIQUE,
- name TEXT NOT NULL, avatar TEXT NOT NULL, created REAL NOT NULL);
-CREATE TABLE IF NOT EXISTS friends(
- a TEXT NOT NULL REFERENCES users(id), b TEXT NOT NULL REFERENCES users(id),
- PRIMARY KEY(a,b));
-CREATE TABLE IF NOT EXISTS requests(
- sender TEXT NOT NULL REFERENCES users(id), target TEXT NOT NULL REFERENCES users(id),
- created REAL NOT NULL, PRIMARY KEY(sender,target));
-CREATE TABLE IF NOT EXISTS messages(
- id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT NOT NULL REFERENCES users(id),
- target TEXT NOT NULL REFERENCES users(id), text TEXT NOT NULL, created REAL NOT NULL);
-CREATE INDEX IF NOT EXISTS messages_pair ON messages(sender,target,id);
-""")
-db.commit()
+db = open_database(DATA)
 secret_file = DATA / "server-secret"
 if not secret_file.exists():
     secret_file.write_text(secrets.token_hex(32))
@@ -511,7 +492,14 @@ async def error_response(request, exc):
 
 @app.get("/health")
 async def health():
-    return dict(ok=True, version=11, rooms=len(rooms))
+    db.execute("SELECT 1").fetchone()
+    return dict(ok=True, version=11, rooms=len(rooms),
+                storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
+
+
+@app.get("/")
+async def homepage():
+    return FileResponse(ROOT / "public" / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.post("/api/{operation}")
