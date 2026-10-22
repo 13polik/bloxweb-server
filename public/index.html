@@ -8437,7 +8437,7 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
       data.lastAmmo=wpn.ammo;data.kick=Math.max(0,data.kick-dt*10);
       const moved=previousPosition?playerGroup.position.distanceTo(previousPosition):0;previousPosition=playerGroup.position.clone();
       const bob=Math.min(1,moved*12),reload=cs2.reloading?Math.sin(Math.PI*Math.max(0,Math.min(1,1-cs2.reloadRemaining/CS16_WEAPONS[wpn.id].reload))):0;
-      root.position.set(.27+Math.sin(clock*8)*.008*bob,-.24-Math.abs(Math.cos(clock*8))*.01*bob-reload*.26,-.80+data.kick*.065);
+      root.position.set(Math.min(.27,camera.aspect*.24)+Math.sin(clock*8)*.008*bob,-.24-Math.abs(Math.cos(clock*8))*.01*bob-reload*.26,-.80+data.kick*.065);
       root.rotation.set(data.kick*.18-reload*.55,.04+reload*.25,-.06-reload*.35);
       data.parts.slide.position.z=-.15+data.kick*.05;data.parts.flash.visible=clock<(data.flash||0);
     }
