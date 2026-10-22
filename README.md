@@ -1,5 +1,12 @@
 # BloxWeb 13: serwer i strona
 
+## Historia ostatnio granych
+
+Sekcja „Ostatnio grane” przechowuje do sześciu różnych dostępnych gier, od najnowszej.
+Ponowne uruchomienie przesuwa tytuł na początek bez duplikatu. Aktualnie katalog zawiera trzy gry.
+Historia jest lokalna dla profilu i przeglądarki; dotychczasowy pojedynczy zapis jest automatycznie odczytywany.
+W podglądzie Computer pamięć jest sesyjna, tak jak pozostałe lokalne dane tego podglądu.
+
 ## Logo i pozostałe gry (13.0)
 
 Nowy autorski znak „B”, wordmark i favicon zastępują pochylony kwadrat.
