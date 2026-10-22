@@ -18,8 +18,8 @@ Mecz trwa do 5 goli lub 180 sekund aktywnej gry, z 2-sekundowymi wznowieniami po
 Wygrana daje 200 lokalnych BloxBux raz na mecz; pełny mecz bez wygranej daje 30 po co najmniej 60 s aktywnej gry. Nagrody i portfel pozostają lokalne, niechronione przed ręczną edycją.
 Piłka nie jest przyjmowana przez API pokoi i nie jest przedstawiana jako multiplayer.
 
-To przygotowana aktualizacja podglądu. W tej iteracji nie wykonano push do GitHuba ani wdrożenia na Render.
-Do udostępnienia nowych funkcji na Render potrzebny jest jednoczesny upload klienta 13 i serwera z obsługą `sell`.
+Wydanie 13 zawiera klienta i serwer z obsługą `sell`; należy wdrażać je razem.
+Użytkownik zatwierdził publikację po zakończeniu testów. Podgląd przeszedł 9 grup nowych funkcji i 3 grupy synchronizacji dwóch niezależnych kont. Testy backendu: 34 regresyjne, 17 botów, 10 sprzedaży wież oraz reset rundy CS. Wcześniejsze pełne testy klienta: 19 grup solo, 16 sieciowych i 8 Studio.
 
 Serwer FastAPI udostępnia grę na `/`, API na `/api/*` i kontrolę stanu na `/health`.
 Jedna instancja procesu obsługuje wspólną symulację pokoi.
