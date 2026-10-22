@@ -1,5 +1,15 @@
 # BloxWeb 13: serwer i strona
 
+## Awatar i sklep
+
+Zakładka Awatar ma podgląd rzeczywistego modelu R6 3D, obracany myszą/dotykiem lub przyciskami.
+Kategorie, wyszukiwanie, filtry posiadanych/założonych/dostępnych cenowo przedmiotów oraz sortowanie ułatwiają wybór.
+Przymierzanie nie zmienia monet, posiadanych rzeczy ani zapisanego stroju. Zakup wymaga osobnego potwierdzenia; ponowne zakładanie posiadanej rzeczy jest darmowe.
+Zachowano identyfikatory i ceny. Wszystkie 15 czapek i 11 dodatków mają dodatkowe detale, współdzielone przez podgląd oraz gry z klasycznym modelem R6. Miniatury sklepu wyrenderowano z tych samych modeli.
+Ubrania mają przeszycia i wykończenia, poprawiono także wychodzącą poza kadr twarz z sercami. Brak bonusów bojowych, lotu czy uprawnień moderatora za zakup kosmetyków.
+Przy braku WebGL pozostaje podgląd 2D. Renderer 3D edytora jest zwalniany po opuszczeniu zakładki lub wejściu do gry.
+Tak jak dotąd, portfel i kolekcja są lokalnym zapisem przeglądarki, nie serwerowym portfelem odpornym na modyfikacje. Podgląd Computer przechowuje te dane tylko w pamięci sesji.
+
 ## Historia ostatnio granych
 
 Sekcja „Ostatnio grane” przechowuje do sześciu różnych dostępnych gier, od najnowszej.
