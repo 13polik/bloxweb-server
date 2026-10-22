@@ -6977,7 +6977,7 @@ function normalizeAvatar(value) {
   leaveGame=function(){
     const sceneToDispose=scene;session++;paused=false;clearInputs();closeActiveDialog?.();closeActiveDialog=null;
     // Do not leave user-earned currency unsaved when exiting mid-wave.
-    saveAllData(false);oldLeave();
+    saveAllData(false);disposeObject(cs2GunMesh);cs2GunMesh=null;oldLeave();
     for(const id of['v10MatchHud','v10CdActions','v10PauseBtn','v10SoundBtn','cs16NextWeaponBtn'])$(id)?.remove();
     effects.length=0;disposeObject(sceneToDispose);scene=null;playerGroup=null;cs2=null;castleDefense=null;placementRing=null;rangeRing=null;
     hitMarker.hidden=true;debug.hidden=true;delete document.body.dataset.game;accumulator=0;lastFrame=0;

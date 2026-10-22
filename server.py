@@ -235,6 +235,7 @@ def act(room, p, action):
         rooms.pop(fresh["code"])
         generation = room["generation"]+1
         room.update(fresh, code=code, generation=generation)
+        room.pop("_bot_director", None)
         for i, pid in enumerate(players):
             room["players"][pid] = player_state(pid, game, i)
             presence[pid]["room"] = code
