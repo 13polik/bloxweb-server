@@ -8909,7 +8909,21 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
   let category='hat',query='',filter='all',sort='default',trying=null,renderer=null,previewScene=null,cameraPreview=null,rig=null,frame=0,angle=.25,rigHash='',resizeObserver=null;
   const oldUpdate=updateUI,oldShop=handleShopClick,oldSwitch=switchTab,oldSelect=selectBodyPart,oldPreset=applyPreset;
   const node=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
-  const action=(label,fn,parent,cls='v10-game-btn')=>{const b=node('button',cls,label);b.type='button';b.onclick=e=>{e.stopPropagation();fn();};parent?.append(b);return b;};
+  let lastTouchAction=-1000;
+  function wireButton(b,fn){
+    let touch=null;
+    b.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&!b.disabled)touch={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};});
+    b.addEventListener('pointermove',e=>{if(touch?.id===e.pointerId&&Math.hypot(e.clientX-touch.x,e.clientY-touch.y)>9)touch.moved=true;});
+    b.addEventListener('pointercancel',()=>{touch=null;});
+    b.addEventListener('pointerup',e=>{
+      if(e.pointerType!=='touch'||!touch||touch.id!==e.pointerId)return;
+      const valid=!touch.moved&&!b.disabled&&Math.hypot(e.clientX-touch.x,e.clientY-touch.y)<=9;touch=null;
+      if(valid){e.preventDefault();e.stopPropagation();lastTouchAction=performance.now();fn();}
+    });
+    b.onclick=e=>{e.stopPropagation();if(e.pointerType==='touch'||(e.detail>0&&performance.now()-lastTouchAction<600))return;if(!b.disabled)fn();};
+    return b;
+  }
+  const action=(label,fn,parent,cls='v10-game-btn')=>{const b=node('button',cls,label);b.type='button';wireButton(b,fn);parent?.append(b);return b;};
   const isOwned=item=>item.price===0||ownedItems.includes(item.id);
   const cosmetic='Przedmiot kosmetyczny. Nie zwiększa obrażeń, szybkości ani szans na wygraną.';
   const descriptions={
@@ -8942,6 +8956,8 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
   const bodyGroup=controls.querySelector('.control-group');
   const colors=node('details','av-colors');colors.append(node('summary','','Kolory części ciała'),bodyGroup);stage.append(colors);
   for(const [part,label]of Object.entries(parts)){const el=$('part-'+part);el.setAttribute('role','button');el.tabIndex=0;el.setAttribute('aria-label',label);el.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();selectBodyPart(part);}};}
+  for(const part of Object.keys(parts))wireButton($('tab-'+part),()=>selectBodyPart(part));
+  [...stage.querySelectorAll('.preset-btn')].forEach((button,index)=>wireButton(button,()=>applyPreset(['noob','guest','knight','zombie'][index])));
   const nav=node('div','av-categories');nav.setAttribute('role','group');nav.setAttribute('aria-label','Kategorie przedmiotów');
   for(const[slot,label]of Object.entries(slots))action(label,()=>{category=slot;renderShops();},nav).dataset.slot=slot;
   controls.prepend(nav);
