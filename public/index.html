@@ -6164,6 +6164,7 @@ function normalizeAvatar(value) {
 
         joyZone.addEventListener('touchstart', function(e) {
             e.preventDefault(); e.stopPropagation();
+            if (joyTouchId !== null) return;
             var t = e.changedTouches[0];
             joyTouchId = t.identifier;
             updateJoystick(t.clientX, t.clientY);
@@ -6178,7 +6179,8 @@ function normalizeAvatar(value) {
             }
         }, { passive: false });
 
-        function resetJoy() {
+        function resetJoy(e) {
+            if (e && !Array.from(e.changedTouches).some(function(t) { return t.identifier === joyTouchId; })) return;
             joyTouchId = null;
             joyStick.style.transform = 'translate(0px, 0px)';
             keysPressed['KeyW'] = keysPressed['KeyS'] = keysPressed['KeyA'] = keysPressed['KeyD'] = false;
@@ -6630,7 +6632,7 @@ function normalizeAvatar(value) {
   for(const [id,label] of [['profileBioInput','Opis profilu'],['friendIdInput','ID lub nick znajomego'],['promoInput','Kod promocyjny'],['chatInputField','Wiadomość na czacie gry'],['dmInputField','Wiadomość prywatna']])$(id)?.setAttribute('aria-label',label);
   document.querySelectorAll('.bux-card h3').forEach(h=>{if(h.textContent.includes('Pakiet Startowy')){h.textContent='Bonus dzienny';h.nextElementSibling.textContent='Raz dziennie odbierz 250 BloxBux na zakupy dla awatara.';}});
   $('fovSlider').value=camFovSetting;$('fovValTxt').textContent=camFovSetting;
-  let paused=false,lastFrame=0,accumulator=0,fireHeld=false,session=0;
+  let paused=false,lastFrame=0,accumulator=0,fireHeld=false,session=0,firePointerId=null;
   let fps=0,fpsFrames=0,fpsAt=performance.now(),debugAt=0,ambientBeat=0;
   const STEP=1000/60;
   const debug=document.createElement('div');debug.id='v10Debug';debug.hidden=true;document.body.append(debug);
@@ -6675,7 +6677,7 @@ function normalizeAvatar(value) {
     defense:activeGameMode==='castle_defense'&&castleDefense?{wave:castleDefense.wave,maxWaves:castleDefense.maxWaves,hp:castleDefense.hp,gold:castleDefense.gold,betweenWaves:castleDefense.betweenWaves,countdown:+castleDefense.waveCountdown.toFixed(2),pending:castleDefense.pending,enemies:castleDefense.enemies.map(e=>({x:+e.mesh.position.x.toFixed(1),z:+e.mesh.position.z.toFixed(1),hp:e.hp,boss:e.isBoss})),turrets:castleDefense.turrets.map(t=>({type:t.type,level:t.level,x:t.mesh.position.x,z:t.mesh.position.z}))}:null,
     shooter:activeGameMode==='cs2'&&cs2?{hp:cs2.hp,kills:cs2.kills,round:cs2.round,money:cs2.money,weapon:cs2.weapons[cs2.currentWeapon]?.id,ammo:cs2.weapons[cs2.currentWeapon]?.ammo,reloading:!!cs2.reloading,buyZone:cs2.buyZone,enemies:cs2.enemies.map(e=>({x:+e.rig.group.position.x.toFixed(1),z:+e.rig.group.position.z.toFixed(1),hp:e.hp}))}:null
   });
-  function clearInputs(){keysPressed={};fireHeld=false;isRightMouseDown=false;}
+  function clearInputs(){keysPressed={};fireHeld=false;firePointerId=null;isRightMouseDown=false;}
   function pauseGame(){
     if(!currentPlayingGame||paused||$('v10Result'))return;
     paused=true;clearInputs();
@@ -6915,14 +6917,27 @@ function normalizeAvatar(value) {
 
   // Pointer events replace the leaking auto-fire interval.
   createCS16MobileButtons=function(){
+    fireHeld=false;firePointerId=null;
     for(const id of['cs16FireBtn','cs16MobileReloadBtn','cs16BuyBtnMobile','cs16NextWeaponBtn'])$(id)?.remove();
     if(!window.isMobileDevice)return;
     const add=(id,text,label,fn)=>{
       const b=button(text,null);b.id=id;b.className='v10-cs-touch';b.setAttribute('aria-label',label);
       if(id==='cs16FireBtn'){
-        b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(paused||closeActiveDialog)return;b.setPointerCapture(e.pointerId);fireHeld=true;shootCS2();});
-        for(const event of['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>{fireHeld=false;});
-      }else b.onclick=e=>{e.stopPropagation();fn();};
+        b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(paused||closeActiveDialog||firePointerId!==null)return;b.setPointerCapture(e.pointerId);firePointerId=e.pointerId;fireHeld=true;shootCS2();});
+        for(const event of['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,e=>{if(e.pointerId===firePointerId){fireHeld=false;firePointerId=null;}});
+        b.onclick=e=>{if(e.detail===0&&!paused&&!closeActiveDialog)shootCS2();};
+      }else{
+        let contact=null;
+        b.style.touchAction='none';
+        b.addEventListener('pointerdown',e=>{
+          if(e.pointerType==='mouse'&&e.button!==0)return;
+          e.preventDefault();e.stopPropagation();
+          if(contact!==null||paused||closeActiveDialog)return;
+          contact=e.pointerId;b.setPointerCapture(e.pointerId);fn();
+        });
+        for(const event of['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,e=>{if(contact===e.pointerId)contact=null;});
+        b.onclick=e=>{e.preventDefault();e.stopPropagation();if(e.detail===0&&!paused&&!closeActiveDialog)fn();};
+      }
       document.body.append(b);
     };
     add('cs16FireBtn','STRZAŁ','Strzelaj',shootCS2);
@@ -6933,10 +6948,11 @@ function normalizeAvatar(value) {
   window.createCS16MobileButtons=createCS16MobileButtons;
   const canvasContainer=$('gameCanvasContainer');
   canvasContainer.addEventListener('pointerdown',e=>{
-    if(e.pointerType==='mouse'&&e.button===0&&activeGameMode==='cs2'&&currentPlayingGame&&!paused&&!closeActiveDialog){fireHeld=true;shootCS2();}
+    if(e.pointerType==='mouse'&&e.button===0&&activeGameMode==='cs2'&&currentPlayingGame&&!paused&&!closeActiveDialog){firePointerId=e.pointerId;fireHeld=true;shootCS2();}
   });
-  window.addEventListener('pointerup',()=>{fireHeld=false;});
-  window.addEventListener('pointercancel',()=>{fireHeld=false;});
+  const releaseFire=e=>{if(e.pointerId===firePointerId){fireHeld=false;firePointerId=null;}};
+  window.addEventListener('pointerup',releaseFire);
+  window.addEventListener('pointercancel',releaseFire);
   const oldDevice=window.detectAndApplyDeviceMode;
   window.detectAndApplyDeviceMode=function(){oldDevice();if(currentPlayingGame==='cs2')createCS16MobileButtons();};
   window.addEventListener('resize',()=>{if(currentPlayingGame==='cs2')createCS16MobileButtons();});
@@ -7512,14 +7528,19 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const submit=btn(mode==='create'?'Utwórz i graj':'Dołącz i graj',async()=>{
         if(mode==='join'&&!/^[A-Za-z2-9]{6}$/.test(code.value.trim()))return feedback(f,'Kod ma 6 znaków. Sprawdź go u znajomego.',true);
         submit.disabled=true;feedback(f,'Łączę z pokojem…');
-        try{await enter(mode==='create'?{action:'create',game:selection.value,public:visible.checked}:{action:'join',code:code.value.trim()},close);}
+        try{const ok=await enter(mode==='create'?{action:'create',game:selection.value,public:visible.checked}:{action:'join',code:code.value.trim()},close);if(ok===false)submit.disabled=false;}
         catch(error){feedback(f,error.message,true);submit.disabled=false;}
       },true);
       const row=game.actionRow(panel);row.append(submit,btn('Anuluj',close));
       code?.addEventListener('keydown',e=>{if(e.key==='Enter')submit.click();});
     });
   }
-  async function enter(payload,close){
+  async function enter(payload,close,ready=false){
+    if(!ready&&window.BloxLoading){
+      const ok=await window.BloxLoading.run(()=>enter(payload,close,true),'Pokój online',{recoverInDialog:!!close});
+      if(!ok&&close)throw Error(window.BloxLoading.error||'Nie udało się połączyć z pokojem.');
+      return ok;
+    }
     if(starting)return;
     starting=true;
     try{
@@ -7528,7 +7549,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       roomEpoch++;
       const data=await api('room',payload);close?.();
       await openRoom(data.room);
-    }catch(error){window.bloxLastError=String(error.stack||error);showToast(error.message);if(!close)return;throw error;}
+    }catch(error){window.bloxLastError=String(error.stack||error);showToast(error.message);throw error;}
     finally{starting=false;}
   }
   joinFriendServer=id=>enter({action:'friend',target:id});
@@ -7796,8 +7817,9 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   const stopZoom=e=>e.preventDefault();
   for(const name of ['gesturestart','gesturechange','gestureend'])document.addEventListener(name,stopZoom,{passive:false});
   document.addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault();},{passive:false,capture:true});
-  document.addEventListener('touchstart',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
-  document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
+  const blockPinch=e=>{if(e.touches.length>1&&!e.target.closest('#gameEngineOverlay,.v10-cs-touch,#cs16BuyMenu,.studio-runner'))e.preventDefault();};
+  document.addEventListener('touchstart',blockPinch,{passive:false});
+  document.addEventListener('touchmove',blockPinch,{passive:false});
   document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(['+','=','-','_','0','NumpadAdd','NumpadSubtract'].includes(e.key)||['NumpadAdd','NumpadSubtract','Digit0'].includes(e.code)))e.preventDefault();},{capture:true});
 
   const W=24,H=14,S=40,VALID=new Set([0,1,2,3,4,5,6,7]);
@@ -8008,10 +8030,11 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     if(starts!==1||goals!==1)throw Error('Dodaj dokładnie jeden Start i jedną Metę.');
     if(p.kind==='coins'&&!p.tiles.includes(2))throw Error('W trybie monet dodaj co najmniej jedną monetę.');
   }
-  function startTest(){
+  function startTest(ready=false){
     if(!current)return;
     try{if(!$('studioName').value.trim())throw Error('Nadaj grze nazwę.');playable(current);}catch(e){feedback(e.message,true);return;}
     if(typeof currentPlayingGame!=='undefined'&&currentPlayingGame){feedback('Najpierw wyjdź z uruchomionej gry.',true);return;}
+    if(ready!==true&&window.BloxLoading)return window.BloxLoading.run(()=>startTest(true),current.name||'Studio Beta');
     persist('Projekt zapisany. Trwa test gry.');returnFocus=document.activeElement;
     run={project:clone(current),state:'playing'};runner.hidden=false;document.body.classList.add('studio-testing');restartRun();$('studioGame').focus({preventScroll:true});
     cancelAnimationFrame(frame);lastTime=performance.now();accumulator=0;frame=requestAnimationFrame(loop);
@@ -9072,6 +9095,109 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
   window.addEventListener('pagehide',stopPreview);
   window.BloxAvatar={get trying(){return trying?.id||null;},get angle(){return angle;},get active(){return !!renderer;}};
   renderColorPalette();updateUI();if(view.classList.contains('active'))startPreview();
+})();
+</script>
+<style id="loading-styles">.blox-loading[hidden]{display:none!important}
+.blox-loading{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;overflow-y:auto;background:#111418;color:#f5f3ef;padding:24px;box-sizing:border-box;touch-action:pan-y;isolation:isolate;-webkit-tap-highlight-color:transparent;user-select:none}
+.blox-loading::before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff04 1px,transparent 1px),linear-gradient(90deg,#ffffff04 1px,transparent 1px);background-size:48px 48px;pointer-events:none}
+.blox-loading-card{width:min(100%,420px);text-align:center;position:relative;flex-shrink:0;margin:auto 0}
+.blox-loading-brand{color:#b9b7b1;letter-spacing:.22em;font-size:var(--text-xs,12px);font-weight:800}
+.blox-loading-orbit{width:136px;height:136px;margin:32px auto;position:relative;display:grid;place-items:center}
+.blox-loading-orbit::before{content:"";position:absolute;inset:0;border:1px solid #ff985b38;border-radius:50%}
+.blox-loading-orbit::after{content:"";position:absolute;inset:0;border:2px solid transparent;border-top-color:#ff985b;border-radius:50%;animation:blox-orbit 1.6s linear infinite}
+.blox-loading-blocks{display:grid;grid-template-columns:repeat(2,24px);gap:6px;transform:rotate(-12deg)}
+.blox-loading-blocks i{width:24px;height:24px;background:#ff985b;box-shadow:inset -4px -4px #b8552d;animation:blox-block 1.4s ease-in-out infinite}
+.blox-loading-blocks i:nth-child(2){animation-delay:.12s}.blox-loading-blocks i:nth-child(3){animation-delay:.36s}.blox-loading-blocks i:nth-child(4){animation-delay:.24s}
+.blox-loading h2{font-size:var(--text-xl,28px);line-height:1.2;margin:0 0 12px;font-weight:800}
+.blox-loading-status{font-size:var(--text-sm,14px);color:#c2c0ba;line-height:1.6;min-height:2em}
+.blox-loading-track{height:3px;overflow:hidden;background:#303238;border-radius:4px;margin:28px 0 16px}
+.blox-loading-track span{display:block;width:38%;height:100%;background:#ff985b;animation:blox-track 1.5s ease-in-out infinite}
+.blox-loading-note{color:#aaa9a4;font-size:var(--text-xs,12px);line-height:1.6}
+.blox-loading-close{border:1px solid #75716b;background:#24272c;color:#fff;border-radius:10px;padding:12px 24px;font:inherit;cursor:pointer;margin-top:20px}
+.blox-loading[data-phase=error] .blox-loading-orbit::after,.blox-loading[data-phase=error] i,.blox-loading[data-phase=error] .blox-loading-track span{animation:none}
+.blox-loading[data-phase=error] .blox-loading-track{visibility:hidden}
+body.blox-is-loading{overflow:hidden}
+@keyframes blox-orbit{to{transform:rotate(360deg)}}
+@keyframes blox-block{0%,65%,100%{transform:translateY(0);opacity:1}30%{transform:translateY(-9px);opacity:.55}}
+@keyframes blox-track{from{transform:translateX(-105%)}to{transform:translateX(370%)}}
+@media(max-height:520px){.blox-loading-orbit{width:72px;height:72px;margin:12px auto}.blox-loading-blocks{grid-template-columns:repeat(2,16px);gap:4px}.blox-loading-blocks i{width:16px;height:16px}.blox-loading h2{font-size:22px;margin-bottom:6px}.blox-loading-status{margin:6px 0;min-height:1.6em}.blox-loading-track{margin:14px 0}.blox-loading-note{display:none}.blox-loading-close{margin-top:8px}}
+@media(prefers-reduced-motion:reduce){.blox-loading *,.blox-loading-orbit::after{animation:none!important}.blox-loading-track span{width:100%;opacity:.65}}
+</style>
+<script>/* Shared readiness transition: solo games, online rooms and Studio tests. */
+(()=>{
+  'use strict';
+  const overlay=document.createElement('section');
+  overlay.className='blox-loading';overlay.id='bloxGameLoading';overlay.hidden=true;
+  overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','bloxLoadingTitle');
+  overlay.innerHTML='<div class="blox-loading-card"><div class="blox-loading-brand">BLOXWEB / PLAY</div><div class="blox-loading-orbit" aria-hidden="true"><div class="blox-loading-blocks"><i></i><i></i><i></i><i></i></div></div><h2 id="bloxLoadingTitle"></h2><p class="blox-loading-status" role="status" aria-live="polite"></p><div class="blox-loading-track" aria-hidden="true"><span></span></div><p class="blox-loading-note">Za chwilę jesteś w grze.</p><button class="blox-loading-close" type="button" hidden>Wróć</button></div>';
+  document.body.append(overlay);
+  const title=overlay.querySelector('h2'),status=overlay.querySelector('[role=status]'),close=overlay.querySelector('button');
+  let pending=null,phase='idle',restoreFocus=null,errorMessage='';
+  const frame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+  function hide(){overlay.hidden=true;document.body.classList.remove('blox-is-loading');phase='idle';restoreFocus?.focus?.({preventScroll:true});}
+  close.onclick=hide;
+  window.addEventListener('keydown',e=>{
+    if(overlay.hidden)return;
+    if(phase==='error'&&(e.key==='Escape'||e.key==='Enter')){e.preventDefault();hide();return;}
+    e.preventDefault();e.stopImmediatePropagation();
+  },true);
+  window.BloxLoading={
+    get active(){return !overlay.hidden;},
+    get phase(){return phase;},
+    get error(){return errorMessage;},
+    run(task,name='Twoja gra',{recoverInDialog=false}={}){
+      if(pending)return pending;
+      restoreFocus=document.activeElement;errorMessage='';
+      const started=performance.now();
+      title.textContent=name;status.textContent='Przygotowujemy Twoją grę…';
+      phase='preparing';overlay.dataset.phase=phase;close.hidden=true;overlay.hidden=false;
+      document.body.classList.add('blox-is-loading');overlay.tabIndex=-1;overlay.focus({preventScroll:true});
+      window.BloxGame?.clearInputs();
+      pending=(async()=>{
+        try{
+          await frame();await frame();
+          phase='building';overlay.dataset.phase=phase;
+          status.textContent=name==='Pokój online'?'Łączymy z pokojem i przygotowujemy świat…':'Budujemy świat i przygotowujemy modele…';
+          await task();
+          if(currentPlayingGame){
+            window.BloxGame.paused=true;
+            if(!renderer||!scene||!camera)throw Error('Nie udało się przygotować obrazu gry.');
+            renderer.render(scene,camera);
+          }
+          phase='ready';overlay.dataset.phase=phase;status.textContent='Gotowe. Wchodzisz do gry.';
+          // A brief readable transition, never an invented download percentage.
+          const remaining=600-(performance.now()-started);
+          if(remaining>0)await new Promise(resolve=>setTimeout(resolve,remaining));
+          await frame();await frame();
+          if(currentPlayingGame)window.BloxGame.paused=false;
+          window.BloxGame?.clearInputs();hide();
+          return true;
+        }catch(error){
+          errorMessage=error?.message||'Spróbuj ponownie.';
+          if(currentPlayingGame)leaveGame();
+          phase='error';overlay.dataset.phase=phase;
+          status.textContent='Nie udało się uruchomić gry. '+(error?.message||'Spróbuj ponownie.');
+          close.hidden=false;close.focus({preventScroll:true});
+          window.bloxLastError=String(error?.stack||error);
+          if(recoverInDialog)hide();
+          return false;
+        }finally{pending=null;}
+      })();
+      return pending;
+    }
+  };
+  const launch=window.launch3DGame;
+  window.launch3DGame=function(id){
+    const names={castle_defense:'Castle Defense',cs2:'Counter Blox',football:'Piłka Nożna 3D'};
+    return window.BloxLoading.run(()=>{
+      launch(id);
+      if(currentPlayingGame!==id)throw Error('Gra nie jest dostępna lub jest zablokowana.');
+    },names[id]||'Twoja gra');
+  };
+  const text=window.render_game_to_text;
+  window.render_game_to_text=()=>{
+    const state=JSON.parse(text());state.loading={active:!overlay.hidden,phase};return JSON.stringify(state);
+  };
 })();
 </script>
 </body>

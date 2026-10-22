@@ -78,6 +78,13 @@ Nie zastępuje to systemowych ustawień dostępności ani uprawnień przeglądar
 
 Znajomi, zaproszenia, konta online i wiadomości są przechowywane w PostgreSQL.
 Pokoje i trwające rundy pozostają w pamięci, więc znikają po restarcie.
+### Końcowa poprawka wersji 13
+
+- Niezależne kontakty dotykowe w CS: joystick, strzał, przeładowanie, zmiana broni i sklep.
+- Zwolnienie innego palca nie zatrzymuje trzymanego strzału; anulowanie kontaktu i wyjście czyszczą sterowanie.
+- Wspólny ekran przygotowania wszystkich trzech gier, pokoi online i testów Studio, kończący się po przygotowaniu pierwszego obrazu. Animacja respektuje ograniczenie ruchu.
+- Zachowana końcowa poprawka dotyku awatara: obrót, kategorie, przymierzanie i zakupy bez podwójnego naliczenia.
+
 Kod konta online jest prywatnym kluczem odzyskiwania; publiczny identyfikator BLOX nie daje dostępu do konta.
 Monety, przedmioty i postęp dawnych kont nadal są zapisami lokalnymi przeglądarki.
 Ta wersja nie zapewnia pełnego systemu anty-cheat ani moderacji publicznej platformy.
