@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from storage import open_database
+from bot_ai import BotDirector
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
@@ -145,7 +146,9 @@ def leave(uid):
 
 
 def spawn_bot(room):
-    x, z = random.choice([(70, 70), (80, 50), (50, 80), (85, -10), (-10, 85), (60, 60)])
+    points = [(-28,-39),(32,-38),(-14,20),(58,18),(-25,52),(62,55)]
+    random.shuffle(points)
+    x, z = max(points, key=lambda p:min((math.hypot(p[0]-e["x"],p[1]-e["z"]) for e in room["enemies"]), default=100))
     room["serial"] += 1
     room["enemies"].append(dict(id=room["serial"], x=x, y=.5, z=z, hp=100, maxHp=100, cooldown=2, rot=0))
 
@@ -155,7 +158,7 @@ def player_state(uid, game, slot=0):
                 y=1.5 if game == "cs2" else .5, z=-70 if game == "cs2" else 18,
                 rotY=0, hp=100, money=800, kills=0, deaths=0,
                 weapons=[dict(id="glock", ammo=20)], currentWeapon=0,
-                reloadUntil=0, shootUntil=0, lastMove=now(), seen=now(),
+                reloadUntil=0, shootUntil=0, shieldUntil=now()+3, lastMove=now(), seen=now(),
                 sequence=0, acknowledgements=[], moving=False, dancing=False)
 
 
@@ -406,39 +409,26 @@ def tick(room, dt):
                 w = p["weapons"][p["currentWeapon"]]
                 w["ammo"] = WEAPONS[w["id"]]["ammo"]
                 p["reloadUntil"] = 0
-        for e in room["enemies"]:
-            p = min(room["players"].values(), key=lambda p: math.hypot(p["x"]-e["x"], p["z"]-e["z"]))
-            dx, dz = p["x"]-e["x"], p["z"]-e["z"]
-            distance = math.hypot(dx, dz) or 1
-            e["rot"] = math.atan2(dx, dz)
-            if distance > 13:
-                vx, vz = dx/distance*5*dt, dz/distance*5*dt
-                if free(e["x"]+vx, e["z"]+vz):
-                    e["x"] += vx
-                    e["z"] += vz
-                else:
-                    # Follow an obstacle edge instead of walking through it.
-                    turn = e.setdefault("turn", random.choice([-1, 1]))
-                    sx, sz = -dz/distance*5*dt*turn, dx/distance*5*dt*turn
-                    if free(e["x"]+sx, e["z"]+sz):
-                        e["x"] += sx
-                        e["z"] += sz
-                    else:
-                        e["turn"] *= -1
-            e["cooldown"] -= dt
-            if distance < 55 and e["cooldown"] <= 0:
-                o, target = [e["x"], 3, e["z"]], [p["x"], p["y"]+2, p["z"]]
-                delta = [target[i]-o[i] for i in range(3)]
-                length = math.sqrt(sum(v*v for v in delta)) or 1
-                direction = [v/length for v in delta]
-                if blocked(o, direction) >= length-.5:
-                    p["hp"] -= 8
-                    emit(room, "bot", origin=o, end=target)
-                    if p["hp"] <= 0:
-                        p.update(hp=100, x=-70, y=1.5, z=-70, deaths=p["deaths"]+1, reloadUntil=0)
-                        p["money"] = max(0, p["money"]-200)
-                        p["kevlar"] = False
-                e["cooldown"] = 1.3+random.random()
+        if "_bot_director" not in room:
+            room["_bot_director"] = BotDirector(MAP)
+        director = room["_bot_director"]
+        def sight(enemy, player):
+            origin = [enemy["x"],3,enemy["z"]]
+            delta = [player["x"]-origin[0],player["y"]+2-origin[1],player["z"]-origin[2]]
+            length = math.sqrt(sum(v*v for v in delta)) or 1
+            return blocked(origin,[v/length for v in delta]) >= length-.25
+        def bot_fire(enemy, player, hit):
+            origin, end = [enemy["x"],3,enemy["z"]], [player["x"],player["y"]+2,player["z"]]
+            if hit and now() >= player.get("shieldUntil",0):
+                player["hp"] -= 5 if player.get("kevlar") else 8
+            else:
+                end[0] += random.choice([-1,1])*2
+            emit(room,"bot",origin=origin,end=end,enemy=enemy["id"])
+            if player["hp"] <= 0:
+                player.update(hp=100,x=-70,y=1.5,z=-70,deaths=player["deaths"]+1,reloadUntil=0,shieldUntil=now()+2.5)
+                player["money"] = max(0,player["money"]-200)
+                player["kevlar"] = False
+        director.update(room["enemies"],list(room["players"].values()),dt,now(),sight,bot_fire)
 
 
 def room_view(room, uid):

@@ -1,4 +1,4 @@
-# BloxWeb 11: serwer i strona
+# BloxWeb 12: serwer i strona
 
 Serwer FastAPI udostępnia grę na `/`, API na `/api/*` i kontrolę stanu na `/health`.
 Jedna instancja procesu obsługuje wspólną symulację pokoi.
@@ -14,10 +14,20 @@ Jedna instancja procesu obsługuje wspólną symulację pokoi.
 - `TRUST_PREVIEW_PROXY` pozostaje wyłączone na Render.
 - Bez `DATABASE_URL` tryb lokalny używa SQLite; na Render brak tej zmiennej przerywa start, zamiast tworzyć nietrwałą bazę.
 
-## Studio Beta (11.1)
+## Portal, Studio i CS (12.0)
+
+Nowy grafitowo-pomarańczowy interfejs zachowuje istniejące dane kont i funkcje społecznościowe.
+CS ma prawą dłoń trzymającą pistolet, animowany odrzut i przeładowanie, szczegółowe modele operatorów i odświeżone materiały areny.
+Boty solo oraz serwerowe używają ograniczonego wyszukiwania drogi A*, widoczności, opóźnienia reakcji, pamięci celu, flankowania i osłon.
+Magazynek botów ma 8 nabojów, serie są krótkie, a przeładowanie trwa 1,8 s.
+Wersja protokołu API pozostaje 11, zgodnie ze starszym klientem; wersja interfejsu to 12.
 
 Zakładka „Twórz gry · Beta” zawiera edytor map 2D 24 × 14 oraz dwa szablony: obby i zbieranie monet.
 Można ustawiać platformy, monety, lawę, start i metę, cofać zmiany oraz testować grę klawiaturą i dotykiem.
+Nowe narzędzia: checkpointy, sprężyny, pędzel 1 × 1 / 3 × 3, prostokąty i wypełnienie.
+Każdy projekt ma ustawienia prędkości (3–10), skoku (8–18) i grawitacji (18–40).
+Starsze mapy dostają domyślne wartości fizyki 6/12/28; import jest nadal wyłącznie danymi.
+Biblioteka pozwala duplikować mapy, pobierać JSON i wczytywać pliki do 60 KB.
 Do 20 projektów jest zapisywanych lokalnie w przeglądarce, oddzielnie dla profilu.
 Eksport/import JSON służy do przenoszenia map między urządzeniami; import nie wykonuje kodu.
 Beta nie obejmuje publicznego katalogu gier, chmury ani multiplayera własnych map.
