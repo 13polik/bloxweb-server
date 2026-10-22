@@ -266,6 +266,16 @@ def act(room, p, action):
                 return "Maksymalny poziom lub za mało złota."
             room["gold"] -= cost
             tower["level"] += 1
+        elif kind == "sell":
+            tower = min(room["turrets"], key=lambda t: math.hypot(t["x"]-p["x"],t["z"]-p["z"]), default=None)
+            if not tower or math.hypot(tower["x"]-p["x"],tower["z"]-p["z"]) > 7:
+                return "Podejdź do wieży, którą chcesz sprzedać."
+            if action.get("towerId") != tower["id"]:
+                return "Najbliższa wieża się zmieniła. Otwórz sprzedaż ponownie."
+            base = TOWERS[tower["type"]]["cost"]
+            invested = base + sum(round(base*.8*level) for level in range(1,tower["level"]))
+            room["gold"] += invested*7//10
+            room["turrets"].remove(tower)
         elif kind == "repair":
             if room["gold"] < 100 or room["hp"] >= 250:
                 return "Naprawa wymaga uszkodzenia zamku i 100 złota."

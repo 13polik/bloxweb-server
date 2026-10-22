@@ -1,4 +1,25 @@
-# BloxWeb 12: serwer i strona
+# BloxWeb 13: serwer i strona
+
+## Logo i pozostałe gry (13.0)
+
+Nowy autorski znak „B”, wordmark i favicon zastępują pochylony kwadrat.
+Katalog ma nowe okładki Castle Defense i piłki, kategorię Sport oraz czytelne oznaczenia trybów zamiast przykładowych procentów ocen na kartach.
+
+Castle Defense zachowuje kolizje, 20 fal i ekonomię. Nowe modele obejmują zamek, pięć odrębnych typów wież, poziomy i przeciwników.
+Dodano minimapę, opis wybranego typu, wybór klawiszami 1–5 oraz potwierdzaną sprzedaż najbliższej wieży (X) z dokładnym zwrotem 70% inwestycji.
+Serwerowe działanie `sell` wymaga identyfikatora tej samej najbliższej wieży oraz dystansu do 7 metrów. Nieprawidłowe lub ponowne żądanie nie daje złota.
+Przykładowo Strzelec poziomu 2 kosztował 90 i zwraca 63 zł, a poziomu 3 kosztował 170 i zwraca 119 zł.
+
+Piłka Nożna 3D jest odblokowana jako beta wyłącznie SOLO.
+Mecz 3 na 3: gracz, dwóch niebieskich botów oraz trzech czerwonych botów, z bramkarzem w każdej drużynie.
+Sterowanie: WASD, E strzał na prawą bramkę, Q podanie, Shift sprint, P pauza; są też przyciski dotykowe i joystick.
+Piłka ma fizykę stałego kroku 1/60 s, tarcie, odbicia, słupki i kontrolę pełnego przekroczenia linii bramkowej.
+Mecz trwa do 5 goli lub 180 sekund aktywnej gry, z 2-sekundowymi wznowieniami po golach. Pauza zatrzymuje zegar.
+Wygrana daje 200 lokalnych BloxBux raz na mecz; pełny mecz bez wygranej daje 30 po co najmniej 60 s aktywnej gry. Nagrody i portfel pozostają lokalne, niechronione przed ręczną edycją.
+Piłka nie jest przyjmowana przez API pokoi i nie jest przedstawiana jako multiplayer.
+
+To przygotowana aktualizacja podglądu. W tej iteracji nie wykonano push do GitHuba ani wdrożenia na Render.
+Do udostępnienia nowych funkcji na Render potrzebny jest jednoczesny upload klienta 13 i serwera z obsługą `sell`.
 
 Serwer FastAPI udostępnia grę na `/`, API na `/api/*` i kontrolę stanu na `/health`.
 Jedna instancja procesu obsługuje wspólną symulację pokoi.
