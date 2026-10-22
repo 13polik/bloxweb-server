@@ -47,6 +47,18 @@ class Postgres:
         self.connection.close()
 
 
+def studio_schema(db):
+    # Additive and portable. Runtime roles may lack DDL: migrate PostgreSQL
+    # with the owner role using migrations/014_studio.sql before rollout.
+    db.execute("""CREATE TABLE IF NOT EXISTS studio_games(
+        id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES users(id),
+        project_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL,
+        project TEXT NOT NULL, created DOUBLE PRECISION NOT NULL,
+        updated DOUBLE PRECISION NOT NULL, published INTEGER NOT NULL DEFAULT 1,
+        plays INTEGER NOT NULL DEFAULT 0, UNIQUE(owner,project_id))""")
+    db.commit()
+
+
 def open_database(data):
     url = os.environ.get("DATABASE_URL", "")
     if url:
@@ -75,4 +87,5 @@ def open_database(data):
     CREATE INDEX IF NOT EXISTS messages_pair ON messages(sender,target,id);
     """)
     db.commit()
+    studio_schema(db)
     return db

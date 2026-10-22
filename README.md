@@ -1,4 +1,16 @@
-# BloxWeb 13: serwer i strona
+# BloxWeb 14: serwer i strona
+
+## Mapy i Studio
+
+- Cztery areny CS: Dust Yard, Depot, Temple, Citadel. Solo wybiera mapę przed meczem; online gracze głosują przez 15 sekund. Geometria, nawigacja i kolizje serwera pochodzą z `maps.py`.
+- Siedem osobnych modeli broni; lewa ręka dla broni dwuręcznej; kierunkowy dźwięk wystrzałów wrogów. Autorskie menu inspirowane strukturą CS2.
+- Studio: obrót obszaru 3 × 3 z cofaniem, odbicie kopii projektu, generowanie z opisu, zatwierdzanie nowych projektów, publikowanie, aktualizacja, wycofanie i granie z katalogu na drugim koncie.
+- Publiczne projekty to wyłącznie walidowane dane poziomu. Importy i odpowiedzi AI nigdy nie są wykonywane jako kod. Własne gry Studio nadal są platformówkami 2D, nie dowolnymi grami 3D ani multiplayerem.
+- Na istniejącym PostgreSQL administrator najpierw uruchamia `migrations/014_studio.sql`; migracja tylko dodaje tabelę i uprawnienia. Dla nowej instalacji użyj `schema.sql`. Nie usuwaj istniejących danych.
+- AI na Render wymaga sekretu `ANTHROPIC_API_KEY` oraz zmiennej `STUDIO_AI_MODEL` z obsługiwaną nazwą modelu dostawcy. Wbudowany proxy podglądu używa `ANTHROPIC_BASE_URL` i własnego aliasu modelu. Nie kopiuj jego tymczasowych kluczy na Render.
+- Brak konfiguracji AI jest jawnie pokazany; osobny generator szablonowy jest opisany jako „bez AI”. Limit AI: 6 prób na godzinę i konto, 1200 znaków opisu, 45 sekund na odpowiedź.
+- Publiczny adres gry: `/?game=ugc-…`. Nick autora, opis i mapa są publiczne; tokeny, wiadomości i dane konta nie są publikowane.
+- Testy backendu: `python -m unittest discover -s tests -v`. Korzystają z osobnej, tymczasowej SQLite, nie z produkcyjnej bazy.
 
 ## Awatar i sklep
 

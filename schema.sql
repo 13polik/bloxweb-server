@@ -17,6 +17,12 @@ CREATE TABLE IF NOT EXISTS bloxweb.messages (
 CREATE INDEX IF NOT EXISTS messages_sender ON bloxweb.messages(sender,id);
 CREATE INDEX IF NOT EXISTS messages_target ON bloxweb.messages(target,id);
 CREATE INDEX IF NOT EXISTS requests_target ON bloxweb.requests(target);
+CREATE TABLE IF NOT EXISTS bloxweb.studio_games(
+ id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES bloxweb.users(id),
+ project_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL,
+ project TEXT NOT NULL, created DOUBLE PRECISION NOT NULL,
+ updated DOUBLE PRECISION NOT NULL, published INTEGER NOT NULL DEFAULT 1,
+ plays INTEGER NOT NULL DEFAULT 0, UNIQUE(owner,project_id));
 CREATE OR REPLACE FUNCTION bloxweb.fold(TEXT) RETURNS TEXT
  LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
  SET search_path = pg_catalog AS 'SELECT lower($1)';
@@ -24,6 +30,7 @@ ALTER TABLE bloxweb.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bloxweb.friends ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bloxweb.requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bloxweb.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bloxweb.studio_games ENABLE ROW LEVEL SECURITY;
 GRANT USAGE ON SCHEMA bloxweb TO bloxweb_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA bloxweb TO bloxweb_runtime;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA bloxweb TO bloxweb_runtime;
@@ -31,3 +38,4 @@ CREATE POLICY runtime_access ON bloxweb.users TO bloxweb_runtime USING (true) WI
 CREATE POLICY runtime_access ON bloxweb.friends TO bloxweb_runtime USING (true) WITH CHECK (true);
 CREATE POLICY runtime_access ON bloxweb.requests TO bloxweb_runtime USING (true) WITH CHECK (true);
 CREATE POLICY runtime_access ON bloxweb.messages TO bloxweb_runtime USING (true) WITH CHECK (true);
+CREATE POLICY runtime_access ON bloxweb.studio_games TO bloxweb_runtime USING (true) WITH CHECK (true);

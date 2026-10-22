@@ -25,6 +25,8 @@ from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from storage import open_database
 from bot_ai import BotDirector
+from maps import MAPS
+from studio import validate_project, procedural, from_ai
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
@@ -148,6 +150,8 @@ def leave(uid):
 def spawn_bot(room):
     points = [(-28,-39),(32,-38),(-14,20),(58,18),(-25,52),(62,55)]
     random.shuffle(points)
+    points = [p for p in points if free(*p, room)] or [
+        (x, z) for x in range(-60, 70, 10) for z in range(-40, 70, 10) if free(x, z, room)]
     x, z = max(points, key=lambda p:min((math.hypot(p[0]-e["x"],p[1]-e["z"]) for e in room["enemies"]), default=100))
     room["serial"] += 1
     room["enemies"].append(dict(id=room["serial"], x=x, y=.5, z=z, hp=100, maxHp=100, cooldown=2, rot=0))
@@ -171,8 +175,7 @@ def create_room(uid, game, public=False):
                 created=now(), emptySince=0, gold=300, hp=250, wave=0, countdown=15,
                 betweenWaves=True, pending=0, spawnWait=0, kills=0, round=1, generation=1)
     if game == "cs2":
-        for _ in range(5):
-            spawn_bot(room)
+        room.update(phase="voting", mapId="dust", votes={}, voteUntil=now()+15)
     rooms[code] = room
     enter_room(uid, room)
     return room
@@ -202,12 +205,14 @@ def ray_box(o, d, box):
     return lo
 
 
-def blocked(o, d):
-    return min((ray_box(o, d, b) for b in MAP if b[4] > .3), default=180)
+def blocked(o, d, room=None):
+    boxes = MAPS[room.get("mapId", "dust")]["boxes"] if room else MAP
+    return min((ray_box(o, d, b) for b in boxes if b[4] > .3), default=180)
 
 
-def free(x, z):
-    return not any(abs(x-b[0]) < b[3]/2+.8 and abs(z-b[2]) < b[5]/2+.8 for b in MAP if b[4] > 1)
+def free(x, z, room=None):
+    boxes = MAPS[room.get("mapId", "dust")]["boxes"] if room else MAP
+    return not any(abs(x-b[0]) < b[3]/2+.8 and abs(z-b[2]) < b[5]/2+.8 for b in boxes if b[4] > 1)
 
 
 def emit(room, kind, **kwargs):
@@ -218,6 +223,12 @@ def emit(room, kind, **kwargs):
 
 def act(room, p, action):
     kind = action.get("kind")
+    if kind == "map_vote":
+        choice = action.get("mapId")
+        if room["game"] != "cs2" or room["phase"] != "voting" or choice not in MAPS:
+            return "Głosowanie nie jest aktywne lub mapa nie istnieje."
+        room["votes"][p["id"]] = choice
+        return
     if room["phase"] != "playing" and kind not in ("chat", "restart"):
         return "Mecz jest już zakończony."
     if kind == "chat":
@@ -331,7 +342,7 @@ def act(room, p, action):
         d = [v/length for v in d]
         w["ammo"] -= 1
         p["shootUntil"] = now()+spec["cooldown"]
-        distance, target, head = blocked(o, d), None, False
+        distance, target, head = blocked(o, d, room), None, False
         for enemy in room["enemies"]:
             for y, size, is_head in [(enemy["y"]+1.5, (1.65, 2, .9), False), (enemy["y"]+2.6, (.75, .75, .75), True)]:
                 hit = ray_box(o, d, [enemy["x"], y, enemy["z"], *size])
@@ -357,6 +368,16 @@ def act(room, p, action):
 def tick(room, dt):
     room["revision"] += 1
     room["fx"] = [fx for fx in room["fx"] if fx["until"] > now()]
+    if room["phase"] == "voting" and room["players"]:
+        votes = [room["votes"][uid] for uid in room["players"] if uid in room["votes"]]
+        if now() >= room["voteUntil"] or len(votes) == len(room["players"]):
+            scores = {key: votes.count(key) for key in MAPS}
+            maximum = max(scores.values())
+            winner = random.choice([key for key in MAPS if scores[key] == maximum])
+            room.update(mapId=winner, phase="playing", generation=room["generation"]+1)
+            for _ in range(5):
+                spawn_bot(room)
+        return
     if room["phase"] != "playing" or not room["players"]:
         return
     if room["game"] == "castle_defense":
@@ -421,13 +442,13 @@ def tick(room, dt):
                 w["ammo"] = WEAPONS[w["id"]]["ammo"]
                 p["reloadUntil"] = 0
         if "_bot_director" not in room:
-            room["_bot_director"] = BotDirector(MAP)
+            room["_bot_director"] = BotDirector(MAPS[room.get("mapId", "dust")]["boxes"])
         director = room["_bot_director"]
         def sight(enemy, player):
             origin = [enemy["x"],3,enemy["z"]]
             delta = [player["x"]-origin[0],player["y"]+2-origin[1],player["z"]-origin[2]]
             length = math.sqrt(sum(v*v for v in delta)) or 1
-            return blocked(origin,[v/length for v in delta]) >= length-.25
+            return blocked(origin,[v/length for v in delta],room) >= length-.25
         def bot_fire(enemy, player, hit):
             origin, end = [enemy["x"],3,enemy["z"]], [player["x"],player["y"]+2,player["z"]]
             if hit and now() >= player.get("shieldUntil",0):
@@ -453,7 +474,9 @@ def room_view(room, uid):
             public.update({k: p[k] for k in ("money", "weapons", "currentWeapon", "sequence", "acknowledgements")})
             public["reloadRemaining"] = max(0, p["reloadUntil"]-now())
         players.append(public)
-    return {k: room[k] for k in ("code", "game", "owner", "public", "revision", "phase", "gold", "hp", "wave", "countdown", "betweenWaves", "pending", "kills", "round", "generation", "enemies", "turrets", "fx", "chat")} | dict(players=players)
+    return {k: room[k] for k in ("code", "game", "owner", "public", "revision", "phase", "gold", "hp", "wave", "countdown", "betweenWaves", "pending", "kills", "round", "generation", "enemies", "turrets", "fx", "chat")} | dict(
+        players=players, mapId=room.get("mapId", "dust"), votes=room.get("votes", {}),
+        voteRemaining=max(0, room.get("voteUntil", 0)-now()))
 
 
 async def simulation():
@@ -494,13 +517,38 @@ async def error_response(request, exc):
 @app.get("/health")
 async def health():
     db.execute("SELECT 1").fetchone()
-    return dict(ok=True, version=11, rooms=len(rooms),
-                storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
+    return dict(ok=True, version=14, rooms=len(rooms),
+                storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite",
+                studioAI=bool(os.getenv("ANTHROPIC_API_KEY") and
+                              (os.getenv("STUDIO_AI_MODEL") or os.getenv("ANTHROPIC_BASE_URL"))))
 
 
 @app.get("/")
 async def homepage():
     return FileResponse(ROOT / "public" / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/maps")
+async def maps():
+    return MAPS
+
+
+@app.get("/api/games")
+async def published_games():
+    rows = db.execute("""SELECT g.id,g.title,g.description,g.plays,g.updated,u.name AS author
+        FROM studio_games g JOIN users u ON g.owner=u.id
+        WHERE g.published=1 ORDER BY g.updated DESC LIMIT 200""").fetchall()
+    return dict(games=[dict(r) for r in rows])
+
+
+@app.get("/api/games/{game_id}")
+async def published_game(game_id: str):
+    row = db.execute("""SELECT g.*,u.name AS author FROM studio_games g
+        JOIN users u ON g.owner=u.id WHERE g.id=? AND g.published=1""", (game_id,)).fetchone()
+    if not row:
+        fail("Gra nie jest opublikowana lub została wycofana.", 404)
+    return dict(id=row["id"], title=row["title"], author=row["author"],
+                description=row["description"], project=json.loads(row["project"]))
 
 
 @app.post("/api/{operation}")
@@ -551,6 +599,94 @@ async def api(operation: str, request: Request):
     user = auth(request, body)
     uid = user["id"]
     presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
+    if operation == "studio":
+        action = body.get("action")
+        if action == "publish":
+            try:
+                project = validate_project(body.get("project"))
+            except ValueError as error:
+                fail(str(error))
+            project_id = project["id"]
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", project_id):
+                fail("Projekt nie ma poprawnego identyfikatora.")
+            existing = db.execute("SELECT id FROM studio_games WHERE owner=? AND project_id=?", (uid, project_id)).fetchone()
+            if not existing and db.execute("SELECT COUNT(*) FROM studio_games WHERE owner=?", (uid,)).fetchone()[0] >= 30:
+                fail("Limit to 30 opublikowanych projektów na konto.")
+            game_id = existing["id"] if existing else "ugc-"+secrets.token_hex(10)
+            description = clean(body.get("description"), 500)
+            timestamp = time.time()
+            if existing:
+                db.execute("""UPDATE studio_games SET title=?,description=?,project=?,updated=?,published=1
+                    WHERE id=? AND owner=?""", (project["name"], description, json.dumps(project), timestamp, game_id, uid))
+            else:
+                db.execute("""INSERT INTO studio_games(id,owner,project_id,title,description,project,created,updated)
+                    VALUES(?,?,?,?,?,?,?,?)""", (game_id, uid, project_id, project["name"], description,
+                                               json.dumps(project), timestamp, timestamp))
+            db.commit()
+            return dict(id=game_id, published=True)
+        if action == "mine":
+            return dict(games=[dict(r) for r in db.execute(
+                "SELECT id,project_id,title,published,plays FROM studio_games WHERE owner=? ORDER BY updated DESC", (uid,)).fetchall()])
+        if action == "unpublish":
+            row = db.execute("SELECT owner FROM studio_games WHERE id=?", (clean(body.get("id"), 64),)).fetchone()
+            if not row or row["owner"] != uid:
+                fail("Tylko autor może wycofać tę grę.", 403)
+            db.execute("UPDATE studio_games SET published=0 WHERE id=? AND owner=?", (body["id"], uid))
+            db.commit()
+            return dict(published=False)
+        if action == "play":
+            db.execute("UPDATE studio_games SET plays=plays+1 WHERE id=? AND published=1", (clean(body.get("id"), 64),))
+            db.commit()
+            return dict(ok=True)
+        if action == "generate":
+            prompt = clean(body.get("prompt"), 1200)
+            if len(prompt) < 8:
+                fail("Opisz grę co najmniej ośmioma znakami.")
+            if body.get("mode") == "procedural":
+                return dict(project=procedural(prompt), generator="procedural")
+            key = "generate:"+uid
+            recent = rates[key]
+            while recent and recent[0] < now()-3600:
+                recent.popleft()
+            if len(recent) >= 6:
+                fail("Limit generatora AI: 6 prób na godzinę.", 429)
+            if not (os.getenv("ANTHROPIC_API_KEY") and
+                    (os.getenv("STUDIO_AI_MODEL") or os.getenv("ANTHROPIC_BASE_URL"))):
+                fail("AI nie jest skonfigurowane na tym serwerze. Administrator musi ustawić klucz dostawcy i nazwę modelu. Możesz wybrać generator szablonowy (bez AI).", 503)
+            recent.append(now())
+            try:
+                from anthropic import AsyncAnthropic
+                async with AsyncAnthropic(timeout=45, max_retries=0,
+                                         default_headers={"anthropic-version": "2023-06-01"}) as client:
+                    result = await client.messages.create(
+                        model=os.environ.get("STUDIO_AI_MODEL", "claude_sonnet_5_5"), max_tokens=1800,
+                        system='Create a playable BloxWeb platformer as JSON only. No markdown or code. '
+                        'Schema: {"name":"short Polish title",'
+                        '"kind":"obby" or "coins","theme":"forest" or "night" or "sand",'
+                        '"settings":{"speed":6,"jump":12,"gravity":28},'
+                        '"terrain":[{"x":4,"y":11,"w":3,"h":1}],'
+                        '"objects":[{"type":"start","x":1,"y":12},{"type":"finish","x":22,"y":12},'
+                        '{"type":"coin","x":5,"y":10}]}. Grid 24 columns by 14 rows, y down. '
+                        'All coordinates integers, x 0..23, y 0..12. Row 13 is automatically solid floor; '
+                        'DO NOT include row 13 in terrain. Terrain rectangles stay inside columns 0..23 and rows 0..12. '
+                        'Object types: start,finish,coin,lava,checkpoint,spring. Place objects only in EMPTY cells '
+                        'outside terrain; no two objects share a cell. Exactly one start and finish, on top of ground. '
+                        'Maximum safe horizontal jump 4 cells; vertical jump 2 cells. '
+                        'Keep an accessible route to the finish. Coins mode needs reachable coins. '
+                        'Build creatively for the prompt, with 4-10 varied terrain rectangles and 6-20 objects.',
+                        messages=[dict(role="user", content=prompt)])
+                raw = "".join(block.text for block in result.content if block.type == "text").strip()
+                if raw.startswith("```"):
+                    raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
+                document = json.loads(raw)
+                project = from_ai(document)
+                return dict(project=project, generator="ai")
+            except (ValueError, TypeError, KeyError):
+                fail("AI zwróciło niepoprawną mapę. Nie zmieniono Twojego projektu. Spróbuj jeszcze raz.", 502)
+            except Exception as error:
+                print("Studio AI:", type(error).__name__, getattr(error, "status_code", ""), flush=True)
+                fail("Dostawca AI jest niedostępny. Nie zmieniono Twojego projektu.", 502)
+        fail("Nieznana operacja Studio.")
     if operation == "sync":
         if body.get("profile"):
             profile = body["profile"]

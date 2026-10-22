@@ -1194,7 +1194,7 @@ function normalizeAvatar(value) {
         function normalizeRecentGames(ids) {
             if (!Array.isArray(ids)) return [];
             return [...new Set(ids.filter(id => typeof id === 'string' &&
-                defaultGames.some(game => game.id === id && !game.locked)))].slice(0, RECENT_GAMES_LIMIT);
+                (defaultGames.some(game => game.id === id && !game.locked)||/^ugc-[a-f0-9]{20}$/.test(id))))].slice(0, RECENT_GAMES_LIMIT);
         }
         const savedRecentGames = loadAccountKey('blox_recent_games', 'recent_games', null);
         let recentPlayedGameIds = normalizeRecentGames(Array.isArray(savedRecentGames) ? savedRecentGames :
@@ -1756,6 +1756,7 @@ function normalizeAvatar(value) {
             sec.style.display = 'block';
             recentPlayedGameIds.forEach(id => {
             const g = defaultGames.find(game => game.id === id);
+            if(!g)return; // Community metadata arrives asynchronously after startup.
             const card = document.createElement('div');
             card.className = 'game-card';
             card.dataset.gameId = g.id;
@@ -1764,7 +1765,7 @@ function normalizeAvatar(value) {
                 <div class="game-title">${g.title}</div>
                 <div class="game-stats">
                     <span>${g.genre === 'Sports' ? 'Mecz 3 na 3' : g.genre}</span>
-                    <span>${g.id === 'football' ? 'Beta / solo' : 'Solo / online'}</span>
+                    <span>${g.id.startsWith('ugc-') ? 'Studio / solo' : g.id === 'football' ? 'Beta / solo' : 'Solo / online'}</span>
                 </div>
                 <button type="button" class="quick-play-card-btn">▶ Zagraj ponownie</button>
             `;
@@ -1772,6 +1773,7 @@ function normalizeAvatar(value) {
             card.onclick = () => openGameModal(g.id);
             cont.appendChild(card);
             });
+            if(!cont.children.length)sec.style.display='none';
         }
 
         function renderGames(list) {
@@ -3714,6 +3716,10 @@ function normalizeAvatar(value) {
                 weaponSwitchCd: 0
             };
 
+            if (window.BloxCS?.maps) {
+                const arena = window.BloxCS.maps[window.BloxCS.mapId] || window.BloxCS.maps.dust;
+                for (const b of arena.boxes) addBlock(...b, arena.color);
+            } else {
             // Podłoga 200x200
             addBlock(0, 0, 0, 200, 1, 200, '#8b7355');
 
@@ -3749,6 +3755,7 @@ function normalizeAvatar(value) {
 
             // Strefa zakupów
             addBlock(-70, 0.6, -70, 24, 0.2, 24, '#f5c542');
+            }
 
             spawnPoint = { x: -70, y: 1.5, z: -70 };
             playerHP = 100;
@@ -3960,6 +3967,8 @@ function normalizeAvatar(value) {
                 };
                 el.onclick = doBuy;
                 el.ontouchstart = doBuy;
+                el.setAttribute('role','button');el.tabIndex=0;
+                el.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')doBuy(e);};
             });
 
             // Przycisk X
@@ -7290,7 +7299,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   }
   async function api(operation,body={},withToken=true){
     if(!base)throw Error('Backend nie jest skonfigurowany. Otwórz Ustawienia → Połączenie multiplayer.');
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),operation==='studio'&&body.action==='generate'?55000:10000);
     try{
       const response=await fetch(base+'/api/'+operation,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({...body,...(withToken?{token}:{})}),signal:controller.signal,credentials:'same-origin'});
@@ -7565,6 +7574,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const keepRoom=room;closing=true;
       if(currentPlayingGame)soloLeave();closing=false;
       active=true;room=keepRoom;
+      if(room.game==='cs2'&&window.BloxCS){await window.BloxCS.loadMaps();window.BloxCS.mapId=room.mapId||'dust';}
       soloLaunch(room.game);clearEntities();
       const self=room.players.find(p=>p.id===onlineId());
       if(self&&playerGroup)playerGroup.position.set(self.x,self.y,self.z);
@@ -7605,6 +7615,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   function applyRoom(value){
     if(!active||!currentPlayingGame||value.game!==activeGameMode)return;
     if(value.generation!==generation){openRoom(value);return;}
+    if(value.game==='cs2'&&window.BloxCS){window.BloxCS.onlineVote(value);if(value.phase==='voting')game.paused=true;}
     lastWorldAt=performance.now();
     const self=value.players.find(p=>p.id===onlineId());
     if(!self)return;
@@ -7647,12 +7658,13 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       if(shopChanged&&$('cs16BuyMenu')){showBuyMenu();showBuyMenu();}
     }
     for(const fx of value.fx)if(fx.id>lastFx){game.tracer(new THREE.Vector3(...fx.origin),new THREE.Vector3(...fx.end),fx.kind==='bot'?0xffa078:0x90efb2);
-      if(fx.kind==='bot'){const bot=entityMaps.enemies.get(fx.enemy);if(bot)bot.flashUntil=gameTimeMs/1000+.07;}
+      if(fx.kind==='bot'){const bot=entityMaps.enemies.get(fx.enemy);if(bot)bot.flashUntil=gameTimeMs/1000+.07;window.BloxCS?.enemySound(fx.origin);}
+      else if(fx.player!==onlineId())window.BloxCS?.enemySound(fx.origin);
       if(fx.player===onlineId()){game.tone(160,.05,'sawtooth',.025);if(fx.hit)addKillFeed('Trafienie potwierdzone przez serwer.','#a5efbc');}lastFx=fx.id;}
     for(const m of value.chat)if(m.id>lastChat){appendChatMessage(m.name,m.text,'#d0eed8',false);lastChat=m.id;}
     updateIngameHUD();game.updateHud();
     if(lastRoomRevision!==value.revision){lastRoomRevision=value.revision;setStatus('Online',true);}
-    if(value.phase!=='playing')showOnlineResult();
+    if(value.phase==='won'||value.phase==='lost')showOnlineResult();
   }
   function interpolate(){
     if(!active)return;
@@ -7683,7 +7695,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     actions.push({seq:++sequence,kind,...payload});
     if(!syncing){clearTimeout(pollTimer);pollTimer=setTimeout(poll,5);}
   }
-  window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,frame:interpolate,
+  window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,request:api,frame:interpolate,
     get state(){return {connected,id:onlineId(),room:room?{code:room.code,game:room.game,players:room.players,phase:room.phase,wave:room.wave,hp:room.hp,gold:room.gold,kills:room.kills,enemies:room.enemies,turrets:room.turrets,revision:room.revision,owner:room.owner}:null,social,latency,pending:actions.length};}};
   const soloCD=updateCastleDefense,soloCS=updateCS2,soloShot=shootCS2,soloReload=reloadCS2,soloSwitch=switchCS2Weapon,soloBuy=buyCS2Item;
   const previousRemoteUpdate=updateRemotePlayer3D,previousRemoteRemove=removeRemotePlayer3D;
@@ -7851,7 +7863,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
       <h1>Twoja wyobraźnia.<br>Twoja gra. <span class="studio-beta">BETA</span></h1>
       <p>Zbuduj mały świat, ustaw zasady i od razu wskocz do gry. Bez pisania kodu.</p></div>
       <div class="studio-actions" id="studioHeaderActions"></div></header>
-    <div class="studio-note">Beta lokalna: projekty zapisują się w tej przeglądarce. W podglądzie bez trwałego zapisu użyj eksportu. Własne mapy są na razie jednoosobowe, bez publicznego publikowania.</div>
+    <div class="studio-note">Wersje robocze zapisują się w tej przeglądarce. Gotową grę możesz opublikować we wspólnym katalogu. Gry Studio są jednoosobowe; zachowaj też eksport projektu.</div>
     <div id="studioTemplates" class="studio-templates"></div>
     <div class="studio-status" id="studioStatus" role="status" aria-live="polite"></div>
     <div id="studioWorkbench" class="studio-workbench" hidden>
@@ -8017,8 +8029,9 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     <div class="studio-controls"><div class="studio-movement" id="studioMovement"></div><div class="studio-shortcuts">A/D lub strzałki: ruch · spacja/W: skok<br>R: restart · Esc: pauza. Na telefonie użyj przycisków.</div></div>
   </section>`;document.body.append(runner);
   const pauseButton=button('Pauza',togglePause);pauseButton.id='studioPause';
-  $('studioRunActions').append(pauseButton,button('Restart',restartRun),button('Wróć do edytora',stopTest));
-  $('studioResultActions').append(button('Spróbuj ponownie',restartRun,true),button('Do edytora',stopTest));
+  const exitRunButton=button('Wróć do edytora',stopTest),exitResultButton=button('Do edytora',stopTest);
+  $('studioRunActions').append(pauseButton,button('Restart',restartRun),exitRunButton);
+  $('studioResultActions').append(button('Spróbuj ponownie',restartRun,true),exitResultButton);
   const checkpointButton=button('Wróć do checkpointu',()=>{if(!run?.checkpoint)return;const c=run.checkpoint;Object.assign(run,{state:'playing',x:c.x,y:c.y,vx:0,vy:0,grounded:false,coyote:0,jumpBuffer:0,wasJump:false,collected:new Set(c.coins)});keys.clear();$('studioResult').hidden=true;pauseButton.disabled=false;drawGame();},true);checkpointButton.id='studioCheckpointResume';checkpointButton.hidden=true;$('studioResultActions').prepend(checkpointButton);
   for(const [key,label,aria] of [['left','←','Idź w lewo'],['right','→','Idź w prawo'],['jump','Skok','Skok']]){
     const b=node('button','studio-hold',label);b.type='button';b.dataset.key=key;b.setAttribute('aria-label',aria);b.setAttribute('aria-pressed','false');
@@ -8036,13 +8049,13 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     if(typeof currentPlayingGame!=='undefined'&&currentPlayingGame){feedback('Najpierw wyjdź z uruchomionej gry.',true);return;}
     if(ready!==true&&window.BloxLoading)return window.BloxLoading.run(()=>startTest(true),current.name||'Studio Beta');
     persist('Projekt zapisany. Trwa test gry.');returnFocus=document.activeElement;
-    run={project:clone(current),state:'playing'};runner.hidden=false;document.body.classList.add('studio-testing');restartRun();$('studioGame').focus({preventScroll:true});
+    run={project:clone(current),state:'playing'};exitRunButton.textContent='Wróć do edytora';exitResultButton.textContent='Do edytora';runner.hidden=false;document.body.classList.add('studio-testing');restartRun();$('studioGame').focus({preventScroll:true});
     cancelAnimationFrame(frame);lastTime=performance.now();accumulator=0;frame=requestAnimationFrame(loop);
   }
   function restartRun(){
     if(!run)return;const start=run.project.tiles.indexOf(4);
     Object.assign(run,{state:'playing',x:start%W+.2,y:Math.floor(start/W)+.12,vx:0,vy:0,w:.6,h:.86,grounded:false,coyote:0,jumpBuffer:0,wasJump:false,collected:new Set(),elapsed:0,checkpoint:null});
-    keys.clear();$('studioMovement').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));$('studioResult').hidden=true;pauseButton.textContent='Pauza';$('studioRunTitle').textContent=run.project.name;drawGame();
+    keys.clear();$('studioMovement').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));$('studioResult').hidden=true;pauseButton.disabled=false;pauseButton.textContent='Pauza';$('studioRunTitle').textContent=run.project.name;drawGame();
   }
   function stopTest(){cancelAnimationFrame(frame);frame=0;run=null;keys.clear();runner.hidden=true;document.body.classList.remove('studio-testing');drawEditor();returnFocus?.focus();}
   function togglePause(){if(!run||!['playing','paused'].includes(run.state))return;run.state=run.state==='playing'?'paused':'playing';keys.clear();pauseButton.textContent=run.state==='paused'?'Wznów':'Pauza';
@@ -8053,7 +8066,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   function showResult(title,description,retry=true){$('studioResultTitle').textContent=title;$('studioResultText').textContent=description;$('studioResult').hidden=false;$('studioResultActions').hidden=!retry;}
   function finish(state){if(!run||run.state!=='playing')return;run.state=state;keys.clear();pauseButton.disabled=true;
     checkpointButton.hidden=state!=='failed'||!run.checkpoint;
-    showResult(state==='won'?'Udało się!':'Jeszcze jedna próba?',state==='won'?'Twoja mapa działa. Czas: '+run.elapsed.toFixed(1)+' s. Wróć do edytora albo zagraj ponownie.':'Lawa lub upadek zakończyły test. Spróbuj ponownie albo zmień układ platform.');
+    showResult(state==='won'?'Udało się!':'Jeszcze jedna próba?',state==='won'?'Poziom ukończony. Czas: '+run.elapsed.toFixed(1)+' s. Możesz zagrać ponownie.':'Lawa lub upadek zakończyły próbę. Spróbuj ponownie.');
   }
   function solids(x,y,w,h){const boxes=[];for(let cy=Math.max(0,Math.floor(y));cy<=Math.min(H-1,Math.floor(y+h-.001));cy++)for(let cx=Math.max(0,Math.floor(x));cx<=Math.min(W-1,Math.floor(x+w-.001));cx++){const tile=run.project.tiles[gridIndex(cx,cy)];if(tile===1||tile===7)boxes.push({x:cx,y:cy,tile});}return boxes;}
   function tick(dt){
@@ -8102,6 +8115,13 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   const oldAdvance=window.advanceTime;
   window.advanceTime=ms=>{if(run){for(let i=0;i<Math.min(600,Math.ceil(Math.max(0,ms)/(1000/60)));i++)tick(1/60);drawGame();return window.render_game_to_text();}return oldAdvance?.(ms);};
   window.addEventListener('pagehide',()=>persist());
+  window.BloxStudio={
+    current(){persist();return current?clone(current):null;},
+    importProject(value){const p=validate(value);playable(p);if(projects.length>=20)throw Error('Limit 20 projektów. Wyeksportuj i usuń niepotrzebny projekt.');p.id=uid();persist();projects.push(p);select(p);persist('Dodano projekt. Przetestuj grę przed publikacją.');},
+    playProject(value){const p=validate(value);playable(p);return window.BloxLoading.run(()=>{returnFocus=document.activeElement;run={project:p,state:'playing'};exitRunButton.textContent='Wróć do katalogu';exitResultButton.textContent='Do katalogu';runner.hidden=false;document.body.classList.add('studio-testing');restartRun();$('studioGame').focus({preventScroll:true});cancelAnimationFrame(frame);lastTime=performance.now();accumulator=0;frame=requestAnimationFrame(loop);},p.name);},
+    rotateRegion(){if(!current)return;const x=Math.max(0,Math.min(W-3,cursor.x-1)),y=Math.max(0,Math.min(H-3,cursor.y-1));snapshot();const old=current.tiles.slice();for(let row=0;row<3;row++)for(let col=0;col<3;col++)current.tiles[(y+row)*W+x+col]=old[(y+2-col)*W+x+row];changed();feedback('Obrócono obszar 3 × 3 wokół kursora o 90°. Możesz cofnąć zmianę.');},
+    stop:stopTest
+  };
   renderTools();renderLibrary();updateUndo();if(projects.length)select(projects[0]);
   // A bookmark to #studio opens a starter map when the library is empty.
   if(location.hash==='#studio'){switchTab('studio');if(!current)create('obby');}
@@ -8318,15 +8338,64 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
     for(let i=0;i<3;i++)box(root,.09,.044,.13,-.065,-.13-i*.052,-.017,0xc69b74,opt);
     const index=box(root,.035,.045,.19,-.093,-.04,-.10,0xc69b74,opt);index.rotation.x=.20;
     const thumb=box(root,.055,.12,.065,.11,-.055,.025,0xc69b74,opt);thumb.rotation.z=-.45;
-    const weapon=pistol(root,true,id==='usp'||id==='deagle');
+    const weapon=distinctWeapon(root,id,opt);
     if(!['glock','usp','deagle'].includes(id)){
-      box(root,.18,.16,.65,0,.09,-.55,0x444b50,opt);box(root,.13,.15,.37,0,-.035,-.35,0x61533b,opt);
-      const magazine=box(root,.11,.35,.18,0,-.21,-.20,0x242b31,opt);magazine.rotation.x=-.15;
-      if(id==='awp')box(root,.08,.085,.35,0,.26,-.32,0x252e34,opt);
+      const support=new THREE.Group();support.name='left-support-hand';root.add(support);
+      const arm=box(support,.20,.23,.72,-.30,-.28,.03,0x525e51,opt);arm.rotation.y=-.57;arm.rotation.z=-.13;
+      box(support,.19,.13,.18,-.17,-.12,-.36,0x303b35,opt);
+      const hand=box(support,.20,.14,.22,-.10,-.07,-.49,0x9d7655,opt);hand.rotation.z=.18;
+      for(let i=0;i<4;i++)box(support,.045,.10,.075,-.17+i*.047,-.015,-.53,0xc69b74,opt);
+      box(support,.06,.10,.13,-.22,-.015,-.40,0xc69b74,opt);
     }
     root.scale.setScalar(.62);root.userData.parts=weapon;root.userData.lastAmmo=null;root.userData.kick=0;
     root.traverse(o=>{if(o.isMesh)o.onBeforeRender=r=>{if(root.userData.depthFrame!==r.info.render.frame){r.clearDepth();root.userData.depthFrame=r.info.render.frame;}};});
     return root;
+  }
+  function distinctWeapon(root,id,opt){
+    const metal=id==='deagle'?0xb2bbc2:id==='awp'?0x768a54:0x343c44,wood=0x9f5831,dark=0x1c2329;
+    const b=(w,h,d,x,y,z,c=metal)=>box(root,w,h,d,x,y,z,c,opt);
+    const tube=(radius,length,x,y,z,color=dark)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,12),new THREE.MeshPhongMaterial({color}));m.rotation.x=Math.PI/2;m.position.set(x,y,z);root.add(m);return m;};
+    let slide, muzzle;
+    if(['glock','usp','deagle'].includes(id)){
+      const heavy=id==='deagle',silenced=id==='usp',length=heavy?.62:.44;
+      slide=b(heavy?.19:.15,heavy?.18:.13,length,0,.11,-.15);
+      b(.14,.10,.30,0,0,-.09,dark);const grip=b(.135,.29,.16,0,-.16,.045,dark);grip.rotation.x=-.23;
+      b(.12,.025,.16,0,-.31,.075,metal);
+      if(silenced){tube(.055,.30,0,.10,-.52);muzzle=-.70;}
+      else{tube(heavy?.055:.035,.035,0,.10,-.15-length/2);muzzle=-.19-length/2;}
+      b(.025,.035,.03,0,.22,-.15-length*.35,0xd4e0ba);b(.12,.03,.03,0,.21,.035,dark);
+      for(let i=0;i<(heavy?3:6);i++)b(.156,.065,.008,0,.11,.025-i*.018,dark);
+      b(.023,.105,.025,-.07,-.10,-.14,metal);b(.023,.105,.025,.07,-.10,-.14,metal);b(.13,.025,.025,0,-.15,-.14,metal);
+    }else{
+      const ak=id==='ak47',awp=id==='awp',mp5=id==='mp5';
+      slide=b(mp5?.14:.18,mp5?.15:.18,mp5?.35:.45,0,.10,-.15);
+      b(.13,.24,.14,0,-.16,.05,dark);
+      const stock=b(mp5?.075:.15,mp5?.09:.19,mp5?.30:.36,0,.08,.23,ak?wood:awp?0x768a54:dark);stock.rotation.x=awp?-.07:0;
+      b(.18,.24,.04,0,.04,.42,dark);
+      if(ak){
+        b(.17,.17,.31,0,.09,-.53,wood);tube(.033,.45,0,.13,-.87);
+        for(let i=0;i<5;i++){const mag=b(.12,.09,.17,0,-.12-i*.073,-.24-i*.019,dark);mag.rotation.x=-.1-i*.06;}
+        tube(.025,.50,0,.23,-.65,metal);b(.035,.12,.045,0,.23,-1.05,dark);muzzle=-1.12;
+      }else if(awp){
+        b(.22,.17,.76,0,-.005,-.43,0x768a54);tube(.035,.70,0,.11,-1.02);
+        b(.15,.17,.20,0,-.17,-.22,dark);b(.08,.10,.18,0,.25,-.20,dark);
+        tube(.085,.46,0,.36,-.28);tube(.11,.08,0,.36,-.54);tube(.09,.06,0,.36,-.025);
+        b(.15,.15,.012,0,.36,-.588,0x63b8cd);b(.08,.04,.13,.13,.14,.0,0xaeb8bd);muzzle=-1.40;
+      }else if(mp5){
+        b(.14,.16,.28,0,.07,-.43,dark);tube(.035,.24,0,.12,-.66);
+        for(let i=0;i<3;i++)b(.11,.10,.14,0,-.14-i*.085,-.24-i*.018,dark);
+        tube(.065,.04,0,.23,-.58);b(.10,.05,.10,0,.23,.005,dark);
+        for(let i=0;i<5;i++)b(.145,.018,.015,0,.12,-.35-i*.04,0x555f65);muzzle=-.81;
+      }else{
+        b(.18,.17,.42,0,.09,-.55,dark);tube(.033,.40,0,.12,-.94);
+        b(.12,.30,.16,0,-.20,-.23,0x555e65);b(.055,.12,.12,0,.26,-.16,dark);b(.12,.04,.28,0,.33,-.13,dark);
+        for(let i=0;i<7;i++){b(.195,.025,.018,0,.19,-.38-i*.045,0x69727a);b(.195,.018,.02,0,.055,-.38-i*.045,0x69727a);}
+        b(.035,.13,.055,0,.22,-.86,dark);muzzle=-1.17;
+      }
+      b(.025,.12,.025,-.072,-.09,-.075,metal);b(.025,.12,.025,.072,-.09,-.075,metal);b(.15,.025,.025,0,-.15,-.075,metal);
+    }
+    const flash=b(.14,.14,.15,0,.10,muzzle,0xffca80);flash.material.dispose();flash.material=new THREE.MeshBasicMaterial({color:0xffcf8b,transparent:true,opacity:.9,depthWrite:false});flash.visible=false;
+    return {root,slide,flash};
   }
   updateGunMesh=function(){
     if(!cs2||!camera||activeGameMode!=='cs2')return;
@@ -8360,6 +8429,8 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
   }
   spawnCS2Enemy=function(){
     if(!cs2)return;const id=serial++,pt=positions[id%positions.length],rig=tacticalRig(id%3);rig.group.position.set(pt[0],.5,pt[1]);scene.add(rig.group);
+    const solid=(x,z)=>platforms.some(b=>b.h>1&&x>b.minX-1&&x<b.maxX+1&&z>b.minZ-1&&z<b.maxZ+1);
+    if(solid(pt[0],pt[1]))for(let n=0;n<196;n++){const x=-60+(n%14)*9,z=-45+Math.floor(n/14)*9;if(!solid(x,z)){rig.group.position.set(x,.5,z);break;}}
     cs2.enemies.push({rig,hp:100,speed:5.2,shootCd:2,id,role:id%3,path:[],plan:0,reaction:.6,seen:-100,memory:{x:-62,z:-56},ammo:8,reload:0,burst:0,state:'szukanie'});
   };
   // Navigation grid is derived from the same arena colliders as server A*.
@@ -8437,7 +8508,7 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
         e.ammo--;e.burst++;e.shootCd=e.burst<3?.3:1.3+e.role*.15;if(e.burst>=3)e.burst=0;
         const from=new THREE.Vector3(p.x,2.8,p.z),end=target.clone();end.y+=2;
         const hit=Math.random()<Math.max(.12,.65-dist/95);if(!hit){end.x+=(e.id%2?1:-1)*2;end.y+=1;}
-        window.BloxGame.tracer(from,end,0xffa46b);e.flashUntil=clock+.07;
+        window.BloxGame.tracer(from,end,0xffa46b);e.flashUntil=clock+.07;window.BloxCS?.enemySound([p.x,2.8,p.z]);
         if(hit&&clock>cs2.spawnShieldUntil){cs2.hp-=cs2.boughtKevlar?5:8;if(cs2.hp<=0){cs2.hp=100;cs2.money=Math.max(0,cs2.money-200);cs2.boughtKevlar=false;cs2.reloading=false;cs2.spawnShieldUntil=clock+2.5;playerGroup.position.set(-70,1.5,-70);addKillFeed('Powrót do bazy · -$200','#ffb08e');}playerHP=cs2.hp;updateIngameHUD();updateWeaponHUD();}
       }
     }
@@ -9198,6 +9269,243 @@ body.blox-is-loading{overflow:hidden}
   window.render_game_to_text=()=>{
     const state=JSON.parse(text());state.loading={active:!overlay.hidden,phase};return JSON.stringify(state);
   };
+})();
+</script>
+<style id="v14-styles">
+.cs14-menu{position:fixed;inset:0;z-index:100180;overflow:auto;background:#11171c;color:#f3f2ed;padding:clamp(20px,4vw,56px);font-size:var(--text-sm);isolation:isolate}
+.cs14-menu::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 78% 60%,#6c5b3240,transparent 50%),linear-gradient(130deg,#28354355,transparent 55%);pointer-events:none}
+.cs14-top{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #ffffff26;padding-bottom:20px}
+.cs14-brand{font-weight:900;letter-spacing:-.06em;font-size:clamp(24px,3vw,36px);font-style:normal}.cs14-brand span{color:#ffae52}
+.cs14-menu button{background:#283139;color:#f6f4ed;border:1px solid #6a7276;border-radius:4px;padding:12px 18px;min-height:44px;cursor:pointer;font-size:var(--text-sm)}
+.cs14-menu button:hover{background:#3e484d}.cs14-menu button:focus-visible{outline:3px solid #ffc37b;outline-offset:3px}
+.cs14-menu button.primary{background:#eeb05e;border-color:#eeb05e;color:#151a1e;font-weight:800}
+.cs14-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}.cs14-tabs button{background:transparent;border-color:transparent;color:#c7cccd}
+.cs14-tabs button[aria-selected=true]{border-bottom:3px solid #ffc37b;color:#fff;background:#ffffff09}
+.cs14-body{max-width:1320px;margin:32px auto}.cs14-eyebrow{letter-spacing:.14em;color:#dfb47d;font-size:var(--text-xs);text-transform:uppercase}
+.cs14-body h1{font-size:clamp(26px,4vw,48px);line-height:1.1;letter-spacing:-.04em;margin:12px 0 16px;max-width:800px}
+.cs14-body p{color:#c0c8ce;line-height:1.65;max-width:720px}.cs14-controls{display:flex;gap:12px;flex-wrap:wrap;margin:24px 0}
+.cs14-map-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:24px 0}
+.cs14-map{position:relative;display:flex;flex-direction:column;align-items:stretch!important;text-align:left!important;gap:12px;padding:12px!important;background:#1c252b!important}
+.cs14-map[aria-pressed=true]{border:2px solid #ffc37b!important;background:#403525!important}
+.cs14-map canvas{width:100%;aspect-ratio:1.5;background:#0c1419;display:block;border-radius:2px}
+.cs14-map strong{font-size:var(--text-lg)}.cs14-map small{font-size:var(--text-xs);color:#c5cdd0;line-height:1.5;min-height:40px}
+.cs14-map .cs14-count{font-size:var(--text-xs);color:#ffcd8f}
+.cs14-arsenal{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.cs14-weapon{padding:20px;background:#1e282f;border:1px solid #4a565e;border-radius:4px}
+.cs14-weapon canvas{width:100%;height:120px;display:block}.cs14-weapon h3{margin:12px 0 4px}.cs14-weapon p{font-size:var(--text-xs)}
+.cs14-foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;border-top:1px solid #ffffff26;padding-top:20px;margin-top:32px;color:#c5cdd0;font-size:var(--text-xs)}
+.studio14-panel{background:#202630;border:1px solid #556071;border-radius:12px;padding:24px;margin:24px 0}.studio14-panel h2{margin-top:0;font-size:var(--text-lg)}
+.studio14-panel p{line-height:1.6;color:#c6cdd7}.studio14-panel textarea{width:100%;box-sizing:border-box;min-height:90px;resize:vertical;background:#131820;border:1px solid #67758b;border-radius:8px;color:#fff;padding:12px;font-size:16px}
+.studio14-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}.studio14-feedback{color:#ffd09e;white-space:pre-wrap;line-height:1.6}
+.studio14-published{display:grid;gap:12px;margin-top:16px}.studio14-published article{padding:16px;border:1px solid #546171;border-radius:8px}
+.studio14-published article strong{display:block;margin-bottom:8px}.ugc14-cover{background:#27384a!important;display:flex;align-items:center;justify-content:center;overflow:hidden}.ugc14-cover canvas{width:100%;height:100%;object-fit:contain}
+@media(max-width:900px){.cs14-map-grid,.cs14-arsenal{grid-template-columns:repeat(2,minmax(0,1fr))}.cs14-body{margin:24px auto}}
+@media(max-width:480px){.cs14-menu{padding:16px}.cs14-brand{font-size:24px}.cs14-top{gap:8px}.cs14-top button{padding:10px}.cs14-map-grid{gap:8px}.cs14-map{padding:8px!important}.cs14-map strong{font-size:16px}.cs14-map small{font-size:12px}.cs14-body h1{font-size:30px}.studio14-panel{padding:16px}.cs14-tabs{gap:0}.cs14-tabs button{padding:10px}.cs14-arsenal{grid-template-columns:1fr 1fr;gap:8px}.cs14-weapon{padding:12px}}
+</style>
+<script>
+/* v14: data-only creator publishing, shared map votes and distinct tactical gear. */
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id),game=window.BloxGame;
+  const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
+  const button=(text,fn,cls)=>{const e=node('button',text,cls);e.type='button';e.onclick=fn;return e;};
+  const apiBase=()=>String(window.BLOX_API_BASE||location.origin).replace(/\/$/,'');
+  const request=(body)=>window.bloxOnline.request('studio',body);
+  let menu=null,menuTimer=0,selected=null,lastVote=null,launchPending=false,audio=null,noise=null;
+  let mapPromise=null,enemyShots=0,menuFocus=null;
+  const CS=window.BloxCS={
+    maps:null,mapId:'dust',
+    async loadMaps(){
+      if(CS.maps)return CS.maps;
+      if(!mapPromise)mapPromise=(async()=>{const r=await fetch(apiBase()+'/api/maps');if(!r.ok)throw Error('Nie udało się pobrać map.');const data=await r.json();if(!data.dust?.boxes)throw Error('Nieprawidłowy zestaw map.');CS.maps=data;return data;})().catch(e=>{mapPromise=null;throw e;});
+      return mapPromise;
+    },
+    enemySound(origin){
+      if(loadAccountKey('blox_sound','sound',true)===false)return;
+      try{
+        audio ||= new (window.AudioContext||window.webkitAudioContext)();
+        if(audio.state!=='running'){audio.resume();return;}
+        if(!noise){noise=audio.createBuffer(1,Math.ceil(audio.sampleRate*.14),audio.sampleRate);const samples=noise.getChannelData(0);for(let i=0;i<samples.length;i++)samples[i]=(Math.random()*2-1)*Math.exp(-i/samples.length*5);}
+        const dx=(origin?.[0]||0)-(playerGroup?.position.x||0),dz=(origin?.[2]||0)-(playerGroup?.position.z||0),distance=Math.hypot(dx,dz);
+        const source=audio.createBufferSource(),gain=audio.createGain(),filter=audio.createBiquadFilter(),pan=audio.createStereoPanner(),t=audio.currentTime;
+        source.buffer=noise;filter.type='lowpass';filter.frequency.value=Math.max(700,4000-distance*28);
+        gain.gain.setValueAtTime(.22/(1+distance*.055),t);gain.gain.exponentialRampToValueAtTime(.001,t+.14);
+        pan.pan.value=Math.max(-1,Math.min(1,(dx*Math.cos(camYaw)-dz*Math.sin(camYaw))/Math.max(distance,1)));
+        source.connect(filter).connect(gain).connect(pan).connect(audio.destination);source.start(t);source.stop(t+.14);enemyShots++;
+      }catch{}
+    },
+    onlineVote(value){
+      if(value.phase!=='voting'){if(menu?.dataset.mode==='online')closeMenu();return;}
+      lastVote=value;
+      if(!menu||menu.dataset.mode!=='online')openMenu('online');
+      updateVotes(value);
+    }
+  };
+  function unlockAudio(){try{audio ||= new(window.AudioContext||window.webkitAudioContext)();audio.resume();}catch{}}
+  document.addEventListener('pointerdown',unlockAudio,{once:true});
+  function closeMenu(){clearInterval(menuTimer);menuTimer=0;menu?.remove();menu=null;lastVote=null;selected=null;menuFocus?.focus?.();}
+  function minimap(canvas,map){
+    canvas.width=360;canvas.height=240;const ctx=canvas.getContext('2d');ctx.fillStyle='#101b23';ctx.fillRect(0,0,360,240);
+    ctx.save();ctx.translate(180,120);ctx.scale(1.08,1.08);ctx.fillStyle=map.color+'40';ctx.fillRect(-100,-100,200,200);
+    for(const b of map.boxes){if(b[4]<1.1)continue;ctx.fillStyle=map.color;ctx.fillRect(b[0]-b[3]/2,b[2]-b[5]/2,b[3],b[5]);}
+    ctx.fillStyle='#9fdbbd';ctx.beginPath();ctx.arc(-70,-70,5,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+  function openMenu(mode='solo'){
+    closeMenu();menuFocus=document.activeElement;selected=null;
+    menu=node('section',undefined,'cs14-menu');menu.id='cs14Menu';menu.dataset.mode=mode;menu.setAttribute('role','dialog');menu.setAttribute('aria-modal','true');menu.setAttribute('aria-label','Counter Strike: menu meczu');
+    const top=node('header',undefined,'cs14-top'),brand=node('div',undefined,'cs14-brand');brand.append('COUNTER ',node('span','STRIKE'));
+    top.append(brand,button(mode==='online'?'Opuść pokój':'Wróć do BloxWeb',()=>{closeMenu();if(window.bloxOnline.active)leaveGame();}));menu.append(top);
+    if(mode==='solo'){
+      const tabs=node('nav',undefined,'cs14-tabs');tabs.setAttribute('aria-label','Menu Counter Strike');
+      for(const [id,title]of[['play','GRAJ'],['loadout','WYPOSAŻENIE'],['settings','USTAWIENIA']]){
+        const b=button(title,()=>{for(const x of tabs.children)x.setAttribute('aria-selected',String(x===b));renderTab(id);});b.dataset.tab=id;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(id==='play'));tabs.append(b);
+      }menu.append(tabs);
+    }
+    const body=node('main',undefined,'cs14-body');body.id='cs14Body';menu.append(body);document.body.append(menu);renderTab('play');menu.querySelector('button')?.focus();
+  }
+  function renderTab(tab){
+    const body=$('cs14Body');body.replaceChildren();
+    if(tab==='settings'){
+      body.append(node('div','KONFIGURACJA','cs14-eyebrow'),node('h1','Przygotuj swój mecz.'));
+      const label=node('label','Dźwięki gry '),check=node('input');check.type='checkbox';check.checked=loadAccountKey('blox_sound','sound',true)!==false;
+      check.onchange=()=>{const setting=$('v10SoundSetting');setting.checked=check.checked;setting.dispatchEvent(new Event('change'));};label.append(check);body.append(label,node('p','WASD: ruch · mysz/przeciąganie: celowanie · klik: strzał · R: przeładuj · B: sklep · P: pauza. Na telefonie joystick i przyciski działają niezależnie.'));
+      return;
+    }
+    if(tab==='loadout'){
+      body.append(node('div','ARSENAŁ / 7 MODELI','cs14-eyebrow'),node('h1','Broń, którą rozpoznasz.'));
+      const grid=node('div',undefined,'cs14-arsenal');
+      for(const [id,spec]of Object.entries(CS16_WEAPONS)){
+        const card=node('article',undefined,'cs14-weapon'),canvas=node('canvas');canvas.width=320;canvas.height=140;
+        drawWeaponIcon(canvas,id);card.append(canvas,node('h3',spec.name),node('p',`${spec.price?'$'+spec.price:'Startowa'} · ${spec.ammo} nabojów · ${['glock','usp','deagle'].includes(id)?'jedna ręka':'dwie ręce'}`));grid.append(card);
+      }body.append(grid,node('p','Broń kupisz za pieniądze meczu w bazie. Wyposażenie nie kosztuje BloxBux.'));
+      return;
+    }
+    const online=menu.dataset.mode==='online';
+    body.append(node('div',online?'GŁOSOWANIE DRUŻYNY':'TRYB SOLO / TRENING Z BOTAMI','cs14-eyebrow'),node('h1',online?'Wybierzcie pole walki.':'Następny mecz. Twoja mapa.'));
+    body.append(node('p',online?'Każdy gracz ma jeden głos i może go zmienić. Mecz ruszy po oddaniu wszystkich głosów lub po 15 sekundach. Remis rozstrzyga serwer.':'Wybierz mapę przed każdym meczem. W solo decyduje Twój głos, a w pokoju online głosuje cała drużyna. To autorskie menu inspirowane układem CS2, bez oficjalnych zasobów gry.'));
+    const grid=node('div',undefined,'cs14-map-grid');body.append(grid);
+    for(const[id,map]of Object.entries(CS.maps||{})){
+      const b=button('',()=>{selected=id;for(const x of grid.children)x.setAttribute('aria-pressed',String(x===b));if(online)window.bloxOnline.action('map_vote',{mapId:id},true);else $('cs14Start').disabled=false;},'cs14-map');
+      b.dataset.map=id;b.setAttribute('aria-pressed','false');b.setAttribute('aria-label','Głosuj: '+map.name);
+      const canvas=node('canvas');minimap(canvas,map);b.append(canvas,node('strong',map.name),node('small',map.description),node('span',online?'0 głosów':'Wybierz mapę','cs14-count'));grid.append(b);
+    }
+    const controls=node('div',undefined,'cs14-controls');
+    if(!online){
+      const start=button('Zatwierdź głos i rozpocznij',async()=>{if(launchPending||!selected)return;launchPending=true;CS.mapId=selected;closeMenu();try{unlockAudio();await actualLaunch('cs2');}finally{launchPending=false;}},'primary');start.id='cs14Start';start.disabled=true;controls.append(start);
+    }
+    const status=node('span',online?'Oczekiwanie na głosy…':'4 mapy · 7 broni · 20 eliminacji');status.id='cs14VoteStatus';controls.append(status);body.append(controls);
+    const foot=node('footer',undefined,'cs14-foot');foot.append(node('span','BLOXWEB / TAKTYCZNY TRENING'),node('span',online?'Wspólny wynik · maks. 6 graczy':'WASD + mysz lub sterowanie dotykowe'));body.append(foot);
+  }
+  function updateVotes(value){
+    const status=$('cs14VoteStatus');if(!status)return;
+    status.textContent=`${Math.ceil(value.voteRemaining||0)} s · ${Object.keys(value.votes||{}).filter(id=>value.players.some(p=>p.id===id)).length}/${value.players.length} głosów`;
+    const me=window.bloxOnline.state.id;
+    for(const b of menu.querySelectorAll('[data-map]')){
+      b.setAttribute('aria-pressed',String(value.votes?.[me]===b.dataset.map));
+      const count=Object.entries(value.votes||{}).filter(([uid,v])=>v===b.dataset.map&&value.players.some(p=>p.id===uid)).length;
+      b.querySelector('.cs14-count').textContent=count+' głosów';
+    }
+  }
+  function drawWeaponIcon(c,id){
+    const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#d8dee0';ctx.translate(24,65);
+    if(['glock','usp','deagle'].includes(id)){ctx.fillRect(40,-20,id==='deagle'?115:90,id==='deagle'?28:23);ctx.fillStyle='#89959e';ctx.fillRect(110,4,28,42);if(id==='usp'){ctx.fillStyle='#7c8994';ctx.fillRect(0,-17,50,16);}}
+    else{ctx.fillRect(78,-15,85,24);ctx.fillRect(160,-11,57,16);ctx.fillRect(12,-9,72,7);ctx.fillRect(121,8,14,32);ctx.fillRect(85,10,17,36);if(id==='awp'){ctx.fillRect(80,-33,73,11);ctx.fillRect(153,-5,72,12);}if(id==='ak47'){ctx.fillStyle='#c08450';ctx.fillRect(40,-15,42,23);ctx.fillRect(162,-14,47,21);}if(id==='mp5')ctx.clearRect(0,-50,35,110);}
+    ctx.setTransform(1,0,0,1,0,0);
+  }
+  const actualLaunch=launch3DGame;
+  launch3DGame=async function(id){
+    if(id?.startsWith('ugc-'))return playPublished(id);
+    if(id!=='cs2'||window.bloxOnline.active)return actualLaunch(id);
+    try{await CS.loadMaps();openMenu('solo');}catch(error){showToast(error.message);}
+  };
+  const previousLeave=leaveGame;leaveGame=function(){closeMenu();return previousLeave();};
+  document.addEventListener('keydown',e=>{
+    if(!menu)return;
+    if(e.key==='Escape'&&menu.dataset.mode==='solo'){e.preventDefault();closeMenu();}
+    if(e.key==='Tab'){const candidates=[...menu.querySelectorAll('button,input')].filter(x=>!x.disabled&&x.getClientRects().length);const first=candidates[0],last=candidates.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+  },true);
+
+  // Existing Studio remains the editor and runtime; this adds discovery and cloud publication.
+  const panel=node('section',undefined,'studio14-panel');panel.id='studio14Creator';
+  panel.append(node('h2','Od pomysłu do gry'),node('p','Opisz poziom, wygeneruj projekt, przetestuj go i opublikuj. Generator AI tworzy tylko bezpieczne dane mapy, nie uruchamia dowolnego kodu.'));
+  const promptLabel=node('label','Twój pomysł'),prompt=node('textarea');prompt.id='studio14Prompt';prompt.maxLength=1200;prompt.placeholder='Nocny tor przeszkód z monetami, checkpointem i sprężyną. Łatwy na telefon.';promptLabel.htmlFor=prompt.id;panel.append(promptLabel,prompt);
+  const generateRow=node('div',undefined,'studio14-row'),status=node('p','AI wymaga konfiguracji po stronie serwera. Generator szablonowy działa bez AI.','studio14-feedback');status.id='studio14Status';status.setAttribute('role','status');
+  const generate=async(mode,b)=>{
+    if(prompt.value.trim().length<8){status.textContent='Opisz pomysł co najmniej ośmioma znakami.';return;}
+    b.disabled=true;status.textContent=mode==='ai'?'AI projektuje mapę…':'Tworzę projekt z szablonu…';
+    try{
+      const data=await request({action:'generate',prompt:prompt.value,mode});
+      game.dialog('Nowy projekt jest gotowy',`${data.project.name}. ${data.generator==='ai'?'Wygenerowany przez AI.':'Generator szablonowy, bez AI.'} Zostanie dodany jako osobny projekt, bez nadpisywania obecnego. Przetestuj przechodniość przed publikacją.`,(p,close)=>{
+        const row=game.actionRow(p);row.append(button('Dodaj do moich projektów',()=>{try{window.BloxStudio.importProject(data.project);status.textContent='Dodano nowy projekt. Możesz go edytować i testować.';close();}catch(e){status.textContent=e.message;close();}}),button('Odrzuć',close));
+      });status.textContent='Projekt czeka na Twoje zatwierdzenie.';
+    }catch(error){status.textContent=error.message;}finally{b.disabled=false;}
+  };
+  const ai=button('Generuj z AI',()=>generate('ai',ai),'v11-primary'),template=button('Generator szablonowy (bez AI)',()=>generate('procedural',template),'v11-button');generateRow.append(ai,template);panel.append(generateRow,status);
+  fetch(apiBase()+'/health').then(r=>r.json()).then(data=>{if(data.studioAI)status.textContent='Generator AI jest dostępny. Opisz poziom i zatwierdź nowy projekt przed dodaniem do edytora.';else{ai.disabled=true;status.textContent='AI na tym serwerze czeka na konfigurację dostawcy i modelu. Generator szablonowy działa bez AI.';}}).catch(()=>{status.textContent='Serwer jest chwilowo niedostępny. Edytor i lokalne projekty nadal działają.';});
+  const publish=button('Opublikuj wybraną grę',()=>publishDialog(),'v11-primary');publish.id='studio14Publish';
+  const manager=button('Moje publikacje',()=>myPublications(),'v11-button'),tools=node('div',undefined,'studio14-row');tools.append(publish,manager);panel.append(tools);
+  const mine=node('div',undefined,'studio14-published');mine.id='studio14Mine';panel.append(mine);$('studioTemplates').before(panel);
+  const mirror=button('Odbij poziomo',()=>{
+    const p=window.BloxStudio.current();if(!p)return showToast('Najpierw wybierz projekt.');
+    p.tiles=Array.from({length:14},(_,y)=>p.tiles.slice(y*24,y*24+24).reverse()).flat();p.name=(p.name.slice(0,35)+' · odbicie');
+    try{window.BloxStudio.importProject(p);showToast('Odbita kopia dodana. Oryginał pozostał bez zmian.');}catch(e){showToast(e.message);}
+  },'v11-button');$('studioEditActions').append(mirror);
+  const rotate=button('Obróć obszar 3 × 3',()=>window.BloxStudio.rotateRegion(),'v11-button');rotate.title='Obrót 90° zgodnie z ruchem zegara wokół zaznaczonego kafelka. Cofnij przywraca poprzedni stan.';$('studioEditActions').append(rotate);
+  async function publishDialog(){
+    const project=window.BloxStudio.current();if(!project)return showToast('Najpierw utwórz lub wybierz projekt.');
+    game.dialog('Opublikować grę dla wszystkich?',`Gra „${project.name}” oraz jej mapa i Twój nick online trafią do publicznego katalogu BloxWeb. Publikacja kolejny raz zaktualizuje ten sam projekt. Nie wysyłamy wiadomości ani prywatnych danych konta.`,(p,close)=>{
+      const label=node('label','Opis gry (publiczny)'),description=node('textarea');description.maxLength=500;description.id='studio14Description';label.htmlFor=description.id;p.append(label,description);
+      const feedback=node('p','','studio14-feedback');feedback.setAttribute('role','status');p.append(feedback);
+      const submit=button('Opublikuj publicznie',async()=>{submit.disabled=true;try{const data=await request({action:'publish',project,description:description.value});feedback.textContent='Opublikowano. Gra jest już w katalogu.';await refreshCatalog();await myPublications();submit.remove();const url=new URL(location.href);url.searchParams.set('game',data.id);const share=node('input');share.value=url.href;share.readOnly=true;share.setAttribute('aria-label','Adres opublikowanej gry');p.append(share);status.textContent='Opublikowano: '+project.name;}catch(e){feedback.textContent=e.message;submit.disabled=false;}},'v11-primary');
+      const row=game.actionRow(p);row.append(submit,button('Zamknij',close));
+    });
+  }
+  async function myPublications(){
+    mine.replaceChildren(node('p','Pobieram Twoje publikacje…'));
+    try{const data=await request({action:'mine'});mine.replaceChildren();if(!data.games.length)mine.append(node('p','Nie masz jeszcze publikacji.'));
+      for(const g of data.games){const card=node('article');card.append(node('strong',g.title),node('p',`${g.published?'Publiczna':'Wycofana'} · ${g.plays} uruchomień`));const row=node('div',undefined,'studio14-row');
+        if(g.published)row.append(button('Zagraj',()=>playPublished(g.id),'v11-button'),button('Wycofaj publikację',()=>game.dialog('Wycofać grę?',`„${g.title}” zniknie z katalogu. Lokalny projekt pozostanie w Studio.`,(p,close)=>{const r=game.actionRow(p);r.append(button('Wycofaj',async()=>{try{await request({action:'unpublish',id:g.id});close();await myPublications();await refreshCatalog();}catch(e){showToast(e.message);}}),button('Anuluj',close));}),'v11-button'));
+        card.append(row);mine.append(card);}
+    }catch(e){mine.replaceChildren(node('p',e.message));}
+  }
+  const community=new Map(),escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  async function refreshCatalog(){
+    try{const response=await fetch(apiBase()+'/api/games');if(!response.ok)throw Error();const data=await response.json();
+      for(let i=defaultGames.length-1;i>=0;i--)if(defaultGames[i].id.startsWith('ugc-'))defaultGames.splice(i,1);
+      community.clear();
+      for(const g of data.games){community.set(g.id,g);defaultGames.push({id:g.id,title:escapeHTML(g.title),desc:escapeHTML(g.description),genre:'Adventure',thumbKey:'sandbox_studio',locked:false,creator:g.author});}
+      renderGames(getFilteredGamesList());renderContinuePlaying();
+    }catch{status.textContent='Katalog społeczności jest chwilowo niedostępny. Lokalne projekty i gry nadal działają.';}
+  }
+  const previousRender=renderGames;
+  renderGames=function(list){
+    previousRender(list.filter(g=>!g.id.startsWith('ugc-')));
+    if(list.length)$('gamesContainer').querySelector('.empty-state')?.remove();
+    for(const item of list.filter(g=>g.id.startsWith('ugc-'))){
+      const g=community.get(item.id);if(!g)continue;
+      const card=node('article',undefined,'game-card');card.dataset.gameId=g.id;card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label','Otwórz grę '+g.title);
+      const cover=node('div',undefined,'game-thumb ugc14-cover');cover.innerHTML=GAME_THUMBNAILS.sandbox_studio||'';
+      card.append(cover,node('div',g.title,'game-title'),node('div',`${g.author} · Gra społeczności · ${g.plays} uruchomień`,'game-stats'));
+      const play=button('Zagraj teraz',e=>{},'quick-play-card-btn');play.onclick=e=>{e.stopPropagation();playPublished(g.id);};card.append(play);card.onclick=()=>openPublished(g.id);$('gamesContainer').append(card);
+    }
+  };
+  async function playPublished(id){
+    try{const r=await fetch(apiBase()+'/api/games/'+encodeURIComponent(id));const data=await r.json();if(!r.ok)throw Error(data.error||'Nie znaleziono gry.');closeModal();await window.BloxStudio.playProject(data.project);lastPlayedGameId=id;recentPlayedGameIds=normalizeRecentGames([id,...recentPlayedGameIds]);saveAllData(false);request({action:'play',id}).catch(()=>{});}
+    catch(e){showToast(e.message);}
+  }
+  function openPublished(id){
+    const g=community.get(id);if(!g)return playPublished(id);
+    game.dialog(g.title,`${g.description||'Gra stworzona w BloxWeb Studio.'} Autor: ${g.author}. Tryb jednoosobowy.`,(p,close)=>{const row=game.actionRow(p);row.append(button('Zagraj',()=>{close();playPublished(id);},'v11-primary'),button('Zamknij',close));});
+  }
+  const previousModal=openGameModal;openGameModal=function(id){return id?.startsWith('ugc-')?openPublished(id):previousModal(id);};
+  const oldState=window.render_game_to_text;
+  window.render_game_to_text=()=>{
+    const state=JSON.parse(oldState());state.interfaceVersion=14;state.csMenu=menu?{mode:menu.dataset.mode,selected}:null;
+    if(state.shooter&&cs2){state.shooter.map=CS.mapId;state.shooter.leftHand=!!cs2GunMesh?.getObjectByName('left-support-hand');state.shooter.model=cs2GunMesh?.userData.weapon;state.shooter.enemyShotsHeard=enemyShots;}
+    state.communityGames=community.size;return JSON.stringify(state);
+  };
+  document.querySelectorAll('.ver-badge').forEach(e=>e.textContent='v14.0');
+  CS.loadMaps().catch(()=>{});refreshCatalog().then(()=>{const id=new URL(location.href).searchParams.get('game');if(id?.startsWith('ugc-'))openPublished(id);});
 })();
 </script>
 </body>
