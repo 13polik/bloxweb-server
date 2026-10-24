@@ -9301,13 +9301,14 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
   // Hat space: y=0 is the top of the 1.25-unit head, the face looks toward -Z.
   const HATS={
     cap(g){
+      // A round dome of radius 1 covers the square head's corners (0.88 from the centre).
       const red=mat(0xc4281c,'cloth'),dark=mat(0x9c1e15,'cloth');
-      add(g,roundBox(1.38,.62,1.38,.34,.24),red,[0,.05,0]);
-      add(g,roundBox(1.4,.1,1.4,.34,.02),dark,[0,-.24,0]);
-      const s=new THREE.Shape();s.moveTo(-.64,0);s.bezierCurveTo(-.64,.82,.64,.82,.64,0);s.lineTo(-.64,0);
-      add(g,new THREE.ExtrudeGeometry(s,{depth:.05,bevelEnabled:true,bevelThickness:.015,bevelSize:.015,bevelSegments:2}),dark,[0,-.22,-.6],[-Math.PI/2-.12,0,0]);
-      add(g,new THREE.PlaneGeometry(.44,.44),new THREE.MeshLambertMaterial({map:badge('capR','#ffffff','#c4281c','R',92),transparent:true}),[0,.02,-.695],[0,Math.PI,0]);
-      add(g,new THREE.SphereGeometry(.075,10,8),dark,[0,.37,0]);
+      add(g,new THREE.SphereGeometry(1.0,24,12,0,Math.PI*2,0,Math.PI/2),red,[0,-.22,0],[0,0,0],[1,.6,1]);
+      add(g,new THREE.CylinderGeometry(1.0,1.0,.1,28,1,true),dark,[0,-.24,0]);
+      const s=new THREE.Shape();s.moveTo(-.62,0);s.bezierCurveTo(-.62,.66,.62,.66,.62,0);s.lineTo(-.62,0);
+      add(g,new THREE.ExtrudeGeometry(s,{depth:.05,bevelEnabled:true,bevelThickness:.015,bevelSize:.015,bevelSegments:2}),dark,[0,-.24,-.86],[-Math.PI/2-.12,0,0]);
+      add(g,new THREE.PlaneGeometry(.42,.42),new THREE.MeshLambertMaterial({map:badge('capR','#ffffff','#c4281c','R',92),transparent:true}),[0,.02,-.945],[.35,Math.PI,0]);
+      add(g,new THREE.SphereGeometry(.075,10,8),dark,[0,.38,0]);
     },
     pothat(g){
       const steel=mat(0xb8c2c9,'silver'),dark=mat(0x2b2f36,'plastic');
@@ -9333,7 +9334,7 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
       for(const s of[-1,1]){
         add(g,roundBox(.06,.32,.1,.03,.01),metal,[s*.82,-.36,0]);
         add(g,new THREE.CylinderGeometry(.38,.38,.24,28),shell,[s*.78,-.62,0],[0,0,Math.PI/2]);
-        add(g,new THREE.TorusGeometry(.32,.085,8,24),pad,[s*.66,-.62,0],[0,Math.PI/2,0]);
+        add(g,new THREE.TorusGeometry(.32,.085,8,24),pad,[s*.72,-.62,0],[0,Math.PI/2,0]);
         add(g,new THREE.TorusGeometry(.27,.03,8,28),neon,[s*.91,-.62,0],[0,Math.PI/2,0]);
         add(g,new THREE.CylinderGeometry(.2,.2,.04,24),metal,[s*.905,-.62,0],[0,0,Math.PI/2]);
       }
@@ -9354,8 +9355,9 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     },
     fedora(g){
       const felt=mat(0x6b327c,'cloth',{side:THREE.DoubleSide}),band=mat(0x16c48c,'gloss',{side:THREE.DoubleSide});
-      add(g,lathe([[0,.62],[.45,.65],[.6,.58],[.66,.25],[.68,.06],[.72,.02],[1.0,0],[1.12,.06],[1.15,.1]],40),felt,[0,0,0],[0,0,0],[1,1,1.12]);
-      add(g,new THREE.CylinderGeometry(.675,.685,.14,28,1,true),band,[0,.13,0],[0,0,0],[1,1,1.12]);
+      // The head top sits at y=0.03, so the brim stays above 0.05 wherever the head is below it.
+      add(g,lathe([[0,.66],[.45,.69],[.6,.62],[.66,.3],[.68,.1],[.74,.07],[.94,.06],[1.04,.07],[1.13,.11],[1.16,.15]],40),felt,[0,0,0],[0,0,0],[1,1,1.12]);
+      add(g,new THREE.CylinderGeometry(.675,.685,.14,28,1,true),band,[0,.17,0],[0,0,0],[1,1,1.12]);
       for(const[x,y,z,c]of[[.9,.12,-.6,0xffffff],[-.95,.1,.5,0x8ffff0],[.3,.7,-.2,0xffffff],[-.5,.45,-.65,0x8ffff0],[.62,.42,.7,0xffffff],[-.2,.72,.4,0x8ffff0]])
         add(g,new THREE.OctahedronGeometry(.06),mat(c,'gloss',{glow:c===0xffffff?0x777777:0x2a8c84}),[x,y,z],[.4,.4,0]);
     },
@@ -9371,6 +9373,10 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     dominus(g){
       const cloak=mat(0x1b1d24,'cloth',{side:THREE.DoubleSide}),gold=mat(0xe2b23a,'gold'),voidMat=new THREE.MeshBasicMaterial({color:0x050507}),white=mat(0xf1f4f7,'cloth',{side:THREE.DoubleSide});
       add(g,lathe([[0,1.05],[.16,.98],[.55,.62],[.88,.16],[.99,-.35],[1.0,-.95],[.96,-1.38]],40,Math.PI+.7,Math.PI*2-1.4),cloak);
+      // Inner hood over the crown, so the head top never shows through the front opening.
+      add(g,new THREE.SphereGeometry(.92,24,12,0,Math.PI*2,0,Math.PI/2),cloak,[0,-.02,0],[0,0,0],[1,.6,1]);
+      // The whole face hides in shadow, so no head corner shows beside the opening.
+      add(g,new THREE.PlaneGeometry(1.3,1.28),voidMat,[0,-.6,-.64],[0,Math.PI,0]);
       add(g,new THREE.CircleGeometry(.56,32),voidMat,[0,-.58,-.69],[0,Math.PI,0]);
       add(g,new THREE.TorusGeometry(.57,.045,8,28),gold,[0,-.58,-.7]);
       add(g,new THREE.SphereGeometry(.07,10,8),mat(0x5ad1ff,'gloss',{glow:0x1a6a8a}),[0,.02,-.74]);
@@ -9378,20 +9384,21 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     },
     cowboy(g){
       const felt=mat(0x8a6343,'cloth',{side:THREE.DoubleSide}),band=mat(0x3b2a1f,'cloth',{side:THREE.DoubleSide}),silver=mat(0xd6dde3,'silver');
-      const geo=lathe([[0,.8],[.4,.84],[.6,.78],[.66,.4],[.68,.1],[.72,.04],[1.05,0],[1.32,.08],[1.42,.2]],48),pos=geo.attributes.position;
+      // Brim kept above the head top (y=0.03) out to the head's corners at r=0.88; only the outer rim dips.
+      const geo=lathe([[0,.84],[.4,.88],[.6,.82],[.66,.44],[.68,.14],[.74,.08],[.95,.065],[1.1,.06],[1.32,.13],[1.42,.25]],48),pos=geo.attributes.position;
       for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i),r=Math.hypot(x,z);let y=pos.getY(i);
-        if(r>.74){const t=(r-.74)/.68;y+=t*((x*x)/(r*r)*.34-.08);}
+        if(r>.95){const t=(r-.95)/.47;y+=t*((x*x)/(r*r)*.34-.08);}
         if(y>.7&&r<.42)y-=(1-r/.42)*.12;pos.setY(i,y);}
       geo.computeVertexNormals();add(g,geo,felt,[0,0,0],[0,0,0],[1,1,1.08]);
-      add(g,new THREE.CylinderGeometry(.685,.69,.12,28,1,true),band,[0,.12,0],[0,0,0],[1,1,1.08]);
-      add(g,new THREE.SphereGeometry(.07,10,8),silver,[0,.12,-.74],[0,0,0],[1,1,.45]);
+      add(g,new THREE.CylinderGeometry(.685,.69,.12,28,1,true),band,[0,.16,0],[0,0,0],[1,1,1.08]);
+      add(g,new THREE.SphereGeometry(.07,10,8),silver,[0,.16,-.74],[0,0,0],[1,1,.45]);
     },
     devil_horns(g){
       const red=mat(0xb81f1c,'gloss'),dark=mat(0x4a1012,'plastic');
       for(const s of[-1,1]){
         const curve=tube(g,red,[[s*.42,-.02,-.08],[s*.62,.32,-.04],[s*.58,.7,.14],[s*.42,.92,.34]],.17,.035,9);
         const tip=curve.getPoint(1);add(g,new THREE.SphereGeometry(.04,8,6),red,[tip.x,tip.y,tip.z]);
-        add(g,new THREE.TorusGeometry(.18,.04,8,20),dark,[s*.42,.0,-.08],[Math.PI/2,0,0]);
+        add(g,new THREE.TorusGeometry(.18,.04,8,20),dark,[s*.42,.05,-.08],[Math.PI/2,0,0]);
       }
     },
     halo(g){
@@ -9402,15 +9409,16 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     },
     ninja_mask(g){
       const cloth=mat(0x1e2127,'cloth'),red=mat(0xc0262c,'cloth'),gold=mat(0xe2b23a,'gold');
-      add(g,roundBox(1.36,.48,1.36,.26,.14),cloth,[0,.02,0]);
-      add(g,roundBox(1.36,.56,1.36,.22,.08),cloth,[0,-.97,0]);
-      add(g,roundBox(1.36,.52,.1,.05,.03),cloth,[0,-.47,.64]);for(const s of[-1,1])add(g,roundBox(.1,.52,1.2,.05,.03),cloth,[s*.64,-.47,.05]);
-      const ring=new THREE.Shape();ring.moveTo(-.71,-.71);ring.lineTo(.71,-.71);ring.lineTo(.71,.71);ring.lineTo(-.71,.71);ring.lineTo(-.71,-.71);
-      const hole=new THREE.Path();hole.moveTo(-.64,-.64);hole.lineTo(-.64,.64);hole.lineTo(.64,.64);hole.lineTo(.64,-.64);hole.lineTo(-.64,-.64);ring.holes.push(hole);
+      // Square cloth panels with small corner radii so the head's corners stay covered.
+      add(g,roundBox(1.44,.5,1.44,.12,.08),cloth,[0,.03,0]);
+      add(g,roundBox(1.44,.56,1.44,.12,.08),cloth,[0,-.97,0]);
+      add(g,roundBox(1.44,.52,.08,.04,.02),cloth,[0,-.47,.69]);for(const s of[-1,1])add(g,roundBox(.08,.52,1.3,.04,.02),cloth,[s*.69,-.47,.04]);
+      const ring=new THREE.Shape();ring.moveTo(-.76,-.76);ring.lineTo(.76,-.76);ring.lineTo(.76,.76);ring.lineTo(-.76,.76);ring.lineTo(-.76,-.76);
+      const hole=new THREE.Path();hole.moveTo(-.7,-.7);hole.lineTo(-.7,.7);hole.lineTo(.7,.7);hole.lineTo(.7,-.7);hole.lineTo(-.7,-.7);ring.holes.push(hole);
       const band=new THREE.ExtrudeGeometry(ring,{depth:.12,bevelEnabled:false});band.rotateX(-Math.PI/2);add(g,band,red,[0,-.28,0]);
-      add(g,roundBox(.16,.1,.04,.03,.01),gold,[0,-.22,-.725]);
-      add(g,new THREE.SphereGeometry(.1,10,8),red,[0,-.22,.75]);
-      for(const s of[-1,1])add(g,roundBox(.14,.62,.04,.05,.015),red,[s*.12,-.55,.78],[.2,0,s*.25]);
+      add(g,roundBox(.16,.1,.04,.03,.01),gold,[0,-.22,-.775]);
+      add(g,new THREE.SphereGeometry(.1,10,8),red,[0,-.22,.8]);
+      for(const s of[-1,1])add(g,roundBox(.14,.62,.04,.05,.015),red,[s*.12,-.55,.83],[.2,0,s*.25]);
     },
     beanie(g){
       const wool=mat(0xc4281c,'cloth',{map:knit('knitRed','#c4281c','#a91f16')}),cuff=mat(0x9e1d15,'cloth',{map:knit('knitCuff','#9e1d15','#7e160f')}),white=mat(0xf6f6f2,'cloth',{flat:true});
@@ -9422,9 +9430,9 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     },
     birthday(g){
       const stripes=canvasMap('partyCone',128,128,(x,w,h)=>{x.fillStyle='#e84393';x.fillRect(0,0,w,h);x.fillStyle='#ffe066';for(let i=-h;i<w;i+=32){x.beginPath();x.moveTo(i,h);x.lineTo(i+16,h);x.lineTo(i+16+h,0);x.lineTo(i+h,0);x.fill();}x.fillStyle='#4fc3f7';for(const[a,b]of[[24,30],[80,70],[50,104],[100,20]]){x.beginPath();x.arc(a,b,6,0,7);x.fill();}});
-      add(g,new THREE.ConeGeometry(.45,1.1,32),mat(0xffffff,'gloss',{map:stripes}),[.06,.55,0],[0,0,-.1]);
-      add(g,new THREE.TorusGeometry(.45,.05,8,28),mat(0xf2c037,'gold'),[0,.01,0],[Math.PI/2,0,0]);
-      add(g,new THREE.IcosahedronGeometry(.15,1),mat(0xffe066,'cloth',{flat:true}),[.17,1.12,0]);
+      add(g,new THREE.ConeGeometry(.45,1.1,32,1,true),mat(0xffffff,'gloss',{map:stripes,side:THREE.DoubleSide}),[.06,.6,0],[0,0,-.1]);
+      add(g,new THREE.TorusGeometry(.45,.05,8,28),mat(0xf2c037,'gold'),[0,.08,0],[Math.PI/2,0,0]);
+      add(g,new THREE.IcosahedronGeometry(.15,1),mat(0xffe066,'cloth',{flat:true}),[.17,1.17,0]);
     }
   };
   // Back gear: rig space, torso spans y 2..4 and its back face is at z=+0.5.
@@ -9494,7 +9502,8 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
       }
     },
     banhammer(g){
-      const hammer=new THREE.Group();hammer.position.set(0,3.05,.85);hammer.rotation.z=.35;g.add(hammer);
+      // Far enough back that the hammer head clears the back of the player's head (z 0.625).
+      const hammer=new THREE.Group();hammer.position.set(0,3.05,.98);hammer.rotation.z=.35;g.add(hammer);
       add(hammer,new THREE.CylinderGeometry(.09,.1,2.6,16),mat(0x6e4b32,'cloth'));
       for(const y of[-1.1,-.95,-.8])add(hammer,new THREE.TorusGeometry(.1,.025,6,16),mat(0x2a1d14,'cloth'),[0,y,0],[Math.PI/2,0,0]);
       add(hammer,new THREE.SphereGeometry(.13,10,8),mat(0xf2c037,'gold'),[0,-1.32,0]);
@@ -9515,11 +9524,12 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     },
     rocket(g){
       const white=mat(0xeef1f4,'gloss'),red=mat(0xd2342b,'gloss'),dark=mat(0x2d3139,'plastic');
-      const r=new THREE.Group();r.position.set(0,3.15,.95);g.add(r);
+      const r=new THREE.Group();r.position.set(0,3.15,1.0);g.add(r);
       add(r,lathe([[0,-1.0],[.3,-1.0],[.42,-.8],[.45,-.2],[.44,.4],[.37,.85]],36),white);
       add(r,lathe([[.37,.85],[.3,1.02],[.2,1.16],[0,1.32]],36),red);
       add(r,new THREE.TorusGeometry(.445,.03,8,28),red,[0,-.2,0],[Math.PI/2,0,0]);
-      for(let i=0;i<4;i++){const a=Math.PI/4+i*Math.PI/2,fin=new THREE.Shape();fin.moveTo(0,0);fin.lineTo(.42,-.35);fin.lineTo(.42,-.62);fin.lineTo(0,-.5);fin.lineTo(0,0);
+      // Fins point left, right and away from the back; none into the torso.
+      for(const a of[0,Math.PI,-Math.PI/2]){const fin=new THREE.Shape();fin.moveTo(0,0);fin.lineTo(.42,-.35);fin.lineTo(.42,-.62);fin.lineTo(0,-.5);fin.lineTo(0,0);
         const geo=new THREE.ExtrudeGeometry(fin,{depth:.05,bevelEnabled:true,bevelThickness:.01,bevelSize:.01,bevelSegments:1});geo.translate(.38,-.4,-.025);const m=add(r,geo,red);m.rotation.y=a;}
       add(r,new THREE.TorusGeometry(.15,.035,8,24),mat(0xc9d1d9,'silver'),[0,.35,.44]);
       add(r,new THREE.CircleGeometry(.13,24),mat(0x5ad1ff,'gloss',{glow:0x0e3a52}),[0,.35,.445]);
@@ -9558,7 +9568,8 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
       add(g,new THREE.TorusGeometry(1.25,.02,6,28,Math.PI*.28),zip,[0,2.2,1.16],[0,0,Math.PI*.36]);
       add(g,new THREE.TorusGeometry(.2,.04,8,16,Math.PI),dark,[0,3.78,.85]);
       add(g,new THREE.CircleGeometry(.12,20),mat(0xff995c,'cloth'),[-.3,2.6,1.325]);
-      for(const s of[-1,1]){add(g,roundBox(.22,1.4,.06,.05,.02),dark,[s*.55,3.15,-.53]);add(g,roundBox(.22,.08,1.08,.04,.02),dark,[s*.55,4.03,0]);add(g,roundBox(.16,.1,.08,.02,.01),zip,[s*.55,2.55,-.56]);}
+      // Shoulder straps run outside the head's width (|x| > 0.625).
+      for(const s of[-1,1]){add(g,roundBox(.2,1.4,.06,.05,.02),dark,[s*.76,3.15,-.53]);add(g,roundBox(.2,.08,1.08,.04,.02),dark,[s*.76,4.04,0]);add(g,roundBox(.14,.1,.08,.02,.01),zip,[s*.76,2.55,-.56]);}
     }
   };
   // A broken model must never take the whole character (or a match) down with it.
