@@ -7275,7 +7275,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   if(welcome)welcome.after(lobby);else $('view-home').prepend(lobby);
   const publicPanel=el('div','v11-panel');publicPanel.id='v11PublicRooms';publicPanel.append(el('h3','','Otwarte pokoje'),note('Trwa łączenie z serwerem…'));lobby.after(publicPanel);
   // Explain the two data stores accurately on every affected screen.
-  const profileNote=el('div','v11-panel');profileNote.id='v11ProfileNotice';profileNote.append(el('h3','','Twój profil online'),note('Wygląd i postęp zapisujesz lokalnie. Znajomi i wiadomości są przechowywani na serwerze.'));$('view-profile').append(profileNote);
+  const profileNote=el('div','v11-panel');profileNote.id='v11ProfileNotice';profileNote.append(el('h3','','Twój profil online'),note('Nick, wygląd, BloxBux, przedmioty, znajomi i wiadomości są zapisywane na serwerze.'));$('view-profile').append(profileNote);
   const inventoryNote=note('Przedmioty i saldo z poprzedniej wersji pozostają zachowane. Awatar zobaczą także inni gracze w Twoim pokoju.');$('view-inventory').prepend(inventoryNote);
   const questsNote=note('Misje działają w grze solo. W kooperacji zliczamy Twoją budowę, eliminacje i wspólnie obronione fale.');$('view-quests').prepend(questsNote);
   const info=el('div','v11-panel');info.id='v11ServerSetting';
@@ -7341,6 +7341,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const data=await api('session',{token,id:myPlayerId,name:username,avatar:avatarData,keepProfile,scope:isSecondaryTestTab?myPlayerId:'main'},false,WAKE_TIMEOUT);
       token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;account=data.account||null;connected=true;failures=0;
       if(keepProfile)useServerProfile(me);else markProfileSynced();
+      receiveProgress(data.progress);
       setStatus('Online',true);applySocial(data.social);renderFriendsAll();renderProfileOnline();renderPublicRooms();
       feedback(settingsFeedback,'Połączenie gotowe. ID online: '+me.id);
     }catch(error){connected=false;setStatus('Tryb solo · serwer niedostępny');feedback(settingsFeedback,error.message,true);renderFriendsAll();renderPublicRooms();}
@@ -7352,6 +7353,49 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   function profileKey(name,look){return JSON.stringify([name,...Object.keys(look||{}).sort().map(k=>k+'='+look[k])]);}
   function localProfileKey(){return profileKey(username,normalizeAvatar(avatarData));}
   function syncedKey(){return tokenKey()+':profile';}
+  // BloxBux, owned items, badges and quests are saved on the account too.
+  // Every upload carries the snapshot it started from (base), so the server
+  // adds this device's changes on top of changes made on other devices.
+  function progressNorm(p){
+    p=p&&typeof p==='object'?p:{};
+    const ids=(v,n)=>[...new Set((Array.isArray(v)?v:[]).filter(x=>typeof x==='string'&&/^[a-z0-9_-]{1,40}$/.test(x)))].sort().slice(0,n);
+    const clamp=(v,hi)=>{const n=Number(v);return Number.isFinite(n)?Math.floor(Math.max(0,Math.min(hi,n))):0;};
+    const q=p.quests&&typeof p.quests==='object'?p.quests:{},quests={};
+    for(const k of Object.keys(q).filter(k=>k!=='claimed'&&/^[a-z0-9_]{1,40}$/.test(k)).slice(0,50))quests[k]=clamp(q[k],1e9);
+    quests.claimed=ids(q.claimed,100);
+    return {coins:clamp(p.coins,1e12),owned:ids(p.owned,500),badges:ids(p.badges,100),quests};
+  }
+  function progressKey(p){if(!p)return 'null';const n=progressNorm(p);return JSON.stringify([n.coins,n.owned,n.badges,Object.keys(n.quests).sort().map(k=>[k,n.quests[k]])]);}
+  function localProgress(){return progressNorm({coins,owned:ownedItems,badges:unlockedBadges,quests:questProgress});}
+  function progressBaseKey(){return syncedKey()+':progress';}
+  function readProgressBase(){try{const v=JSON.parse(accountStore.getItem(progressBaseKey())||'null');return v&&typeof v==='object'?progressNorm(v):null;}catch{return null;}}
+  function writeProgressBase(p){accountStore.setItem(progressBaseKey(),JSON.stringify(p?progressNorm(p):null));}
+  function applyProgress(p){
+    const next=progressNorm(p);
+    if(progressKey(next)===progressKey(localProgress()))return;
+    coins=next.coins;
+    ownedItems.splice(0,ownedItems.length,...new Set([...next.owned,'none','smile']));
+    unlockedBadges.splice(0,unlockedBadges.length,...next.badges);
+    for(const k of Object.keys(questProgress))delete questProgress[k];
+    Object.assign(questProgress,next.quests,{claimed:[...next.quests.claimed]});
+    try{saveAllData(false);}catch{}
+  }
+  // A device that has never synced with this account combines what it holds
+  // with the account (highest coins, all items and badges) instead of
+  // silently dropping either side.
+  function combineProgress(server,local){
+    const s=progressNorm(server),l=progressNorm(local),quests={...s.quests};
+    for(const [k,v] of Object.entries(l.quests))if(k!=='claimed')quests[k]=Math.max(quests[k]||0,v);
+    quests.claimed=[...new Set([...s.quests.claimed,...l.quests.claimed])];
+    return progressNorm({coins:Math.max(s.coins,l.coins),owned:[...s.owned,...l.owned],badges:[...s.badges,...l.badges],quests});
+  }
+  function receiveProgress(server,{replace=false}={}){
+    const base=readProgressBase();
+    if(!server){if(replace)writeProgressBase(null);return;}
+    if(replace){applyProgress(server);writeProgressBase(server);return;}
+    if(base===null){applyProgress(combineProgress(server,localProgress()));writeProgressBase(server);return;}
+    if(progressKey(localProgress())===progressKey(base)){applyProgress(server);writeProgressBase(server);}
+  }
   function markProfileSynced(){
     accountStore.setItem(syncedKey(),localProfileKey());
     profileHash=JSON.stringify({name:username,avatar:avatarData});
@@ -7371,6 +7415,8 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   function adoptAccount(data){
     token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;account=data.account||null;connected=true;failures=0;
     useServerProfile(me);
+    // The account's saved BloxBux and items replace this device's guest copy.
+    receiveProgress(data.progress,{replace:true});
     socialHash='';applySocial(data.social);
     try{saveAllData(false);}catch{}
     setStatus('Online',true);renderFriendsAll();renderProfileOnline();renderPublicRooms();
@@ -7394,7 +7440,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
         return;
       }
       const heading=value=>{const h=el('h3','',value);h.style.margin='18px 0 6px';return h;};
-      panel.append(heading('Mam już konto'));
+      panel.append(heading('Mam już konto'),note('Po zalogowaniu to urządzenie pokaże nick, BloxBux i przedmioty zapisane na koncie.'));
       const loginIn=field('Login','text','username'),passIn=field('Hasło','password','current-password');
       const loginRow=game.actionRow(panel);
       const signIn=btn('Zaloguj się',e=>guard(e.currentTarget,async()=>{
@@ -7440,12 +7486,18 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const position=active&&playerGroup?{x:playerGroup.position.x,y:playerGroup.position.y,z:playerGroup.position.z,rotY:playerGroup.rotation.y,moving:!!(keysPressed.KeyW||keysPressed.KeyS||keysPressed.KeyA||keysPressed.KeyD),dancing:isDancing}:null;
       const payload={position,actions:active?actions:[],social:wantSocial};
       if(hash!==profileHash)payload.profile=profile;
+      const sentProgress=localProgress(),progressBase=readProgressBase();
+      if(progressKey(sentProgress)!==progressKey(progressBase))payload.progress={base:progressBase,current:sentProgress};
       const data=await api('sync',payload);
       profileHash=hash;latency=Math.round(performance.now()-started);lastSeen=performance.now();failures=0;connected=true;
       if(wantSocial){lastSocial=performance.now();applySocial(data.social);}
       me=data.user;
       // Skip when the player edited their profile while this request was in flight.
       if(localProfileKey()===sentKey){if(payload.profile)markProfileSynced();else useServerProfile(me);}
+      if(progressKey(localProgress())===progressKey(sentProgress)){if(data.progress){applyProgress(data.progress);writeProgressBase(data.progress);}}
+      // Coins changed during the request: the server already has what was
+      // sent, so only the newer local changes go up next time.
+      else if(payload.progress)writeProgressBase(sentProgress);
       const publicHash=JSON.stringify(data.rooms);
       if(publicHash!==JSON.stringify(publicRooms)){publicRooms=data.rooms;renderPublicRooms();}
       if(epoch===roomEpoch){
@@ -7480,7 +7532,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     });
   }
   function renderProfileOnline(){
-    profileNote.replaceChildren(el('h3','','Twój profil online'),el('div','v11-online-id',onlineId()),note('To ID podajesz znajomym. Relacje i wiadomości zapisuje serwer. Monety, ekwipunek i misje pozostają lokalnym postępem.'));
+    profileNote.replaceChildren(el('h3','','Twój profil online'),el('div','v11-online-id',onlineId()),note('To ID podajesz znajomym. Serwer zapisuje znajomych, wiadomości, nick, wygląd, BloxBux, ekwipunek, odznaki i misje.'));
     profileNote.append(note(account?.login?'Konto: '+account.login+' · możesz zalogować się na innym urządzeniu.':'Grasz jako gość. Załóż konto (sam login i hasło, bez e-maila), aby nie stracić znajomych na innym urządzeniu.'));
     profileNote.append(btn(account?.login?'Konto i logowanie':'Załóż konto / zaloguj się',()=>showAccount(),!account?.login),btn('Znajomi i zaproszenia',()=>switchTab('friends')));
     const accountHint=$('v14AccountHint');
@@ -7586,7 +7638,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     const isFriend=social.friends.some(u=>u.id===user.id),pending=social.outgoing.some(u=>u.id===user.id),invited=social.incoming.some(u=>u.id===user.id);
     $('fpTitleName').textContent=user.name;$('fpNameBig').textContent=user.name;$('fpIdBig').textContent='ID: '+user.id;
     $('fpR6Preview').innerHTML=buildMiniR6PreviewHTML(normalizeAvatar(user.avatar),0.68);
-    const bio=$('fpBioBox');bio.textContent='Monety, przedmioty i odznaki są zapisywane na urządzeniu tego gracza, dlatego nie widać ich w profilu.';
+    const bio=$('fpBioBox');bio.textContent='Monety, przedmioty i odznaki gracza są prywatne, dlatego nie widać ich w profilu.';
     const statusNode=$('fpStatusBadge');
     statusNode.textContent=user.status==='ingame'?'W grze: '+gameTitle(user.gameId):user.status==='online'?'Online · w menu':isFriend?'Offline':'Status widoczny po dodaniu do znajomych';
     statusNode.style.color=user.status==='ingame'?'#00e691':user.status==='online'?'#3498db':'#9aa3ad';

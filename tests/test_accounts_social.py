@@ -99,6 +99,45 @@ def test_reconnect_with_keep_profile_does_not_revert_a_rename_from_another_devic
     assert call(client, "sync", token=ala["token"])["user"]["name"] == "AlaZTelefonu"
 
 
+def progress(coins, owned=("none",), claimed=()):
+    return {"coins": coins, "owned": list(owned), "badges": ["b_welcome"], "quests": {"q_coins": 0, "claimed": list(claimed)}}
+
+
+def test_bloxbux_and_items_follow_the_account_to_another_device(client):
+    ala = guest(client, "Ala", "BLOX-111111")
+    call(client, "register", token=ala["token"], login="ala", password="tajne123")
+    first = call(client, "sync", token=ala["token"], progress={"base": None, "current": progress(750, ["none", "jeans"])})
+    assert first["progress"]["coins"] == 750
+    phone = call(client, "login", login="ala", password="tajne123")
+    assert phone["progress"]["coins"] == 750 and "jeans" in phone["progress"]["owned"]
+
+
+def test_changes_from_two_devices_add_up_instead_of_overwriting(client):
+    ala = guest(client, "Ala", "BLOX-111111")
+    base = call(client, "sync", token=ala["token"], progress={"base": None, "current": progress(500)})["progress"]
+    # Computer earns 200 while the phone spends 100 on a hat, both from 500.
+    call(client, "sync", token=ala["token"], progress={"base": base, "current": progress(700)})
+    after = call(client, "sync", token=ala["token"], progress={"base": base, "current": progress(400, ["none", "cap"])})["progress"]
+    assert after["coins"] == 600 and "cap" in after["owned"]
+
+
+def test_first_sync_of_a_new_device_does_not_double_coins(client):
+    ala = guest(client, "Ala", "BLOX-111111")
+    call(client, "sync", token=ala["token"], progress={"base": None, "current": progress(900)})
+    merged = call(client, "sync", token=ala["token"], progress={"base": None, "current": progress(500, ["none", "camo"])})["progress"]
+    assert merged["coins"] == 900 and "camo" in merged["owned"]
+
+
+def test_progress_is_validated_and_private(client):
+    ala, olek = guest(client, "Ala", "BLOX-111111"), guest(client, "Olek", "BLOX-222222")
+    bad = {"coins": -5, "owned": ["ok_item", "<script>", 7], "badges": "x", "quests": {"q_coins": "9", "claimed": ["q_a"]}}
+    saved = call(client, "sync", token=ala["token"], progress={"base": None, "current": bad})["progress"]
+    assert saved == {"coins": 0, "owned": ["ok_item"], "badges": [], "quests": {"q_coins": 9, "claimed": ["q_a"]}}
+    call(client, "friend", token=ala["token"], target="BLOX-222222", action="request")
+    call(client, "friend", token=olek["token"], target="BLOX-111111", action="accept")
+    assert "progress" not in str(call(client, "sync", token=olek["token"])["social"])
+
+
 def test_login_errors_and_brute_force_limit(client):
     ala = guest(client, "Ala", "BLOX-111111")
     call(client, "register", token=ala["token"], login="ala", password="tajne123")
@@ -135,4 +174,4 @@ def test_login_never_leaks_into_public_profiles(client):
 
 
 def test_health_reports_version(client):
-    assert client.get("/health").json()["version"] == 14
+    assert client.get("/health").json()["version"] == 15

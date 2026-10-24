@@ -4,9 +4,17 @@
 
 Gość może w „Konto i logowanie” przypisać do swojego ID login i hasło (bez e-maila i danych osobowych, więc działa też na kontach dzieci z kontrolą rodzicielską).
 Na innym urządzeniu logowanie tym loginem przywraca to samo ID, znajomych i wiadomości. Stary kod dostępu nadal działa.
-Hasła są haszowane scryptem; 10 błędnych prób blokuje login na 15 minut. Monety i ekwipunek pozostają lokalne.
+Hasła są haszowane scryptem; 10 błędnych prób blokuje login na 15 minut.
 
-Przed wdrożeniem tej wersji administrator uruchamia raz `migrations/2026-10-24_accounts.sql` (tylko dodaje kolumny, tabelę `sessions` i indeksy).
+## Synchronizacja postępu (15)
+
+Nick, wygląd, BloxBux, posiadane przedmioty, odznaki i misje są zapisywane na koncie i synchronizowane między urządzeniami co ok. 1,5 s.
+Każde urządzenie wysyła tylko swoje zmiany względem ostatnio zsynchronizowanej wersji, więc zarobki i wydatki z kilku urządzeń sumują się zamiast się nadpisywać.
+Urządzenie, które łączy się z kontem pierwszy raz, łączy swój stan z kontem (wyższe saldo, suma przedmiotów); logowanie na nowym urządzeniu przejmuje stan konta.
+Postęp jest prywatny i nie trafia do profili widocznych dla innych. To nadal nie jest anty-cheat: saldo pochodzi z przeglądarki.
+
+Migracje uruchamia raz administrator, w kolejności dat, przed wdrożeniem odpowiadającej wersji serwera:
+`migrations/2026-10-24_accounts.sql` (wersja 14), `migrations/2026-10-25_progress.sql` (wersja 15). Obie tylko dodają kolumny, tabele i indeksy.
 
 Testy: `pip install -r requirements-dev.txt`, potem `python -m pytest tests` (SQLite w katalogu tymczasowym).
 

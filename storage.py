@@ -87,7 +87,7 @@ def open_database(data):
     CREATE INDEX IF NOT EXISTS friends_b ON friends(b);
     """)
     columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
-    for column in ("login", "password_hash"):
+    for column in ("login", "password_hash", "progress"):
         if column not in columns:
             db.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_login ON users(login)")

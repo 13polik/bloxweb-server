@@ -132,11 +132,61 @@ def auth(request, body):
 
 def profile(uid):
     if uid not in user_cache:
-        u = db.execute("SELECT id,name,avatar,login FROM users WHERE id=?", (uid,)).fetchone()
+        u = db.execute("SELECT id,name,avatar,login,progress FROM users WHERE id=?", (uid,)).fetchone()
         if not u:
             return None
-        user_cache[uid] = dict(id=u["id"], name=u["name"], avatar=json.loads(u["avatar"]), login=u["login"])
+        user_cache[uid] = dict(id=u["id"], name=u["name"], avatar=json.loads(u["avatar"]), login=u["login"],
+                               progress=json.loads(u["progress"]) if u["progress"] else None)
     return user_cache[uid]
+
+
+def item_ids(value, limit):
+    value = value if isinstance(value, list) else []
+    return sorted({v for v in value if isinstance(v, str) and re.fullmatch(r"[a-z0-9_-]{1,40}", v)})[:limit]
+
+
+def progress_data(value):
+    """Validate a progress snapshot: BloxBux, owned items, badges and quests."""
+    value = value if isinstance(value, dict) else {}
+    quests = value.get("quests") if isinstance(value.get("quests"), dict) else {}
+    counters = {k: int(number(v, 0, 0, 1e9)) for k, v in quests.items()
+                if k != "claimed" and isinstance(k, str) and re.fullmatch(r"[a-z0-9_]{1,40}", k)}
+    return dict(coins=int(number(value.get("coins"), 0, 0, 1e12)), owned=item_ids(value.get("owned"), 500),
+                badges=item_ids(value.get("badges"), 100),
+                quests=dict(list(counters.items())[:50], claimed=item_ids(quests.get("claimed"), 100)))
+
+
+def merge_progress(server, base, current):
+    """Apply one device's changes (current minus the base it started from) on
+    top of the server copy, so two devices earning at once both keep coins."""
+    current = progress_data(current)
+    if server is None:
+        return current
+    if base is None:
+        # A device that never synced: combine (highest coins, all items)
+        # rather than adding its whole balance on top a second time.
+        base = dict(current, coins=min(current["coins"], server["coins"]),
+                    quests={k: min(v, server["quests"].get(k, 0)) for k, v in current["quests"].items() if k != "claimed"})
+    base = progress_data(base)
+    quests = dict(server["quests"])
+    for key, value in current["quests"].items():
+        if key != "claimed":
+            quests[key] = max(0, quests.get(key, 0) + value - base["quests"].get(key, 0))
+    quests["claimed"] = sorted(set(server["quests"]["claimed"]) | set(current["quests"]["claimed"]))
+    return dict(coins=max(0, server["coins"] + current["coins"] - base["coins"]),
+                owned=sorted(set(server["owned"]) | set(current["owned"])),
+                badges=sorted(set(server["badges"]) | set(current["badges"])), quests=quests)
+
+
+def save_progress(uid, change):
+    if not isinstance(change, dict):
+        return
+    current = profile(uid)
+    merged = merge_progress(current["progress"], change.get("base"), change.get("current"))
+    if merged != current["progress"]:
+        db.execute("UPDATE users SET progress=? WHERE id=?", (json.dumps(merged), uid))
+        db.commit()
+        current["progress"] = merged
 
 
 def save_profile(uid, name, look):
@@ -591,7 +641,7 @@ async def unexpected_error(request, exc):
 @app.get("/health")
 async def health():
     db.execute("SELECT 1").fetchone()
-    return dict(ok=True, version=14, rooms=len(rooms),
+    return dict(ok=True, version=15, rooms=len(rooms),
                 storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
 
 
@@ -642,7 +692,8 @@ async def api(operation: str, request: Request):
         elif not body.get("keepProfile"):
             save_profile(uid, body.get("name"), body.get("avatar"))
         presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
-        return dict(token=token, user=user_view(uid), social=social(uid), account=account_view(uid))
+        return dict(token=token, user=user_view(uid), social=social(uid), account=account_view(uid),
+                    progress=profile(uid)["progress"])
     if operation == "login":
         login, password = credentials(body)
         attempts = login_failures[login]
@@ -662,7 +713,8 @@ async def api(operation: str, request: Request):
         db.commit()
         token_cache[hash_token(token)] = uid
         presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
-        return dict(token=token, user=user_view(uid), social=social(uid), account=account_view(uid))
+        return dict(token=token, user=user_view(uid), social=social(uid), account=account_view(uid),
+                    progress=profile(uid)["progress"])
     user = auth(request, body)
     uid = user["id"]
     presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
@@ -689,6 +741,8 @@ async def api(operation: str, request: Request):
             changes = body["profile"]
             if isinstance(changes, dict):
                 save_profile(uid, changes.get("name"), changes.get("avatar"))
+        if body.get("progress"):
+            save_progress(uid, body["progress"])
         room = rooms.get(presence[uid].get("room"))
         if room and uid in room["players"]:
             p = room["players"][uid]
@@ -719,7 +773,7 @@ async def api(operation: str, request: Request):
                 message = act(room, p, action)
                 p["acknowledgements"].append(dict(seq=sequence, error=message))
                 p["acknowledgements"] = p["acknowledgements"][-35:]
-        return dict(user=user_view(uid), room=room_view(room, uid),
+        return dict(user=user_view(uid), room=room_view(room, uid), progress=user["progress"],
                     social=social(uid) if body.get("social", True) else None,
                     rooms=[dict(code=r["code"], game=r["game"], count=len(r["players"]), phase=r["phase"]) for r in rooms.values() if r["public"] and r["players"] and len(r["players"]) < 6][:20])
     if operation == "search":
