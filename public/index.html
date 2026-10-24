@@ -1029,7 +1029,13 @@ function normalizeAvatar(value) {
             'galaxy': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><rect width="84" height="88" fill="#1a1040"/><circle cx="20" cy="20" r="2" fill="#fff"/><circle cx="60" cy="30" r="1.5" fill="#fff"/><circle cx="30" cy="60" r="2" fill="#fff"/><circle cx="65" cy="65" r="1.5" fill="#fff"/></svg>`
         };
 
+        // Tył koszulki: bez nadruków z przodu (twarz creepera, numer z przodu itp.).
         const SHIRT_BACK_SVGS = {
+            'creeper': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><rect width="84" height="88" fill="#4a8b2c"/><rect x="10" y="12" width="12" height="12" fill="#3b7423"/><rect x="58" y="30" width="14" height="14" fill="#5d9f3a"/><rect x="24" y="56" width="16" height="12" fill="#3b7423"/></svg>`,
+            'football': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><rect width="84" height="88" fill="#1c6fbf"/><rect y="0" width="84" height="12" fill="#fff"/><rect y="76" width="84" height="12" fill="#fff"/><text x="42" y="30" font-size="11" font-weight="900" fill="#fff" text-anchor="middle" font-family="Arial">BLOX</text><text x="42" y="64" font-size="30" font-weight="900" fill="#fff" text-anchor="middle" font-family="Arial">10</text></svg>`,
+            'ninja': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><rect width="84" height="88" fill="#16181a"/><rect y="34" width="84" height="18" fill="#c4281c"/><path d="M30 34L54 52M54 34L30 52" stroke="#16181a" stroke-width="5"/></svg>`,
+            'rainbow': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><rect y="0" width="84" height="14" fill="#e74c3c"/><rect y="14" width="84" height="14" fill="#f39c12"/><rect y="28" width="84" height="14" fill="#f5c542"/><rect y="42" width="84" height="14" fill="#2ecc71"/><rect y="56" width="84" height="14" fill="#3498db"/><rect y="70" width="84" height="18" fill="#9b59b6"/></svg>`,
+            'galaxy': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><rect width="84" height="88" fill="#1a1040"/><circle cx="14" cy="34" r="1.5" fill="#fff"/><circle cx="48" cy="14" r="2" fill="#fff"/><circle cx="70" cy="48" r="2" fill="#fff"/><circle cx="40" cy="70" r="1.5" fill="#fff"/><circle cx="42" cy="42" r="9" fill="#5b3fa8"/><ellipse cx="42" cy="42" rx="16" ry="4" fill="none" stroke="#c9b6ff" stroke-width="1.5"/></svg>`,
             'none': '',
             'tuxedo': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><polygon points="20,0 64,0 42,55" fill="#1b1d21"/></svg>`,
             'guest_hoodie': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 88"><rect x="24" y="14" width="36" height="32" rx="4" fill="#c4281c"/><text x="42" y="36" font-size="13" font-weight="900" fill="#fff" text-anchor="middle">GUEST</text></svg>`,
@@ -1052,6 +1058,21 @@ function normalizeAvatar(value) {
             'shorts': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 88"><rect width="40" height="48" fill="#3498db"/><rect y="0" width="40" height="6" fill="#1c6fbf"/></svg>`,
             'neon': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 88"><rect width="40" height="88" fill="#0d0d1a"/><rect x="4" y="0" width="4" height="88" fill="#00e691"/><rect x="32" y="0" width="4" height="88" fill="#00e691"/></svg>`
         };
+
+        // Tył spodni tam, gdzie przód ma elementy tylko z przodu (guzik, nakolanniki).
+        // Pozostałe spodnie mają symetryczny wzór i używają przodu.
+        const PANTS_BACK_SVGS = {
+            'jeans': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 88"><rect width="40" height="88" fill="#1f4e78"/><rect width="40" height="10" fill="#3b2314"/><path d="M8 15H32V30L20 34L8 30Z" fill="#1a4368" stroke="#f5c542" stroke-width="1"/><rect y="76" width="40" height="12" fill="#1b1d1f"/></svg>`,
+            'knight_greaves': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 88"><rect width="40" height="88" fill="#7f8c8d"/><rect width="40" height="8" fill="#5d6d6e"/><rect x="6" y="44" width="28" height="30" rx="6" fill="#95a5a6"/><rect x="0" y="80" width="40" height="8" fill="#5d6d6e"/></svg>`
+        };
+
+        // Bok ubrania = wąski pas z krawędzi wzoru, rozciągnięty na całą ścianę.
+        // Paski (tęcza, neon), pasek spodni i mankiety przechodzą wtedy na bok,
+        // a logo z przodu nie jest powielane.
+        function clothingSideSvg(svg) {
+            return String(svg || '').replace(/viewBox="0 0 (\d+) (\d+)"/, (_, w, h) =>
+                `viewBox="0 0 ${Math.max(4, Math.round(w / 10))} ${h}" preserveAspectRatio="none"`);
+        }
 
         // --- 3. KATALOGI, MISJE, ODZNAKI I DANE KONTA ---
         const defaultGames = [
@@ -4496,10 +4517,13 @@ function normalizeAvatar(value) {
             const torsoBackMat = hasShirt
                 ? new THREE.MeshLambertMaterial({ map: createSvgCanvasTexture(shirtBackSvg, av.torso) })
                 : torsoSide;
+            const torsoFlankMat = hasShirt
+                ? new THREE.MeshLambertMaterial({ map: createSvgCanvasTexture(clothingSideSvg(shirtFrontSvg), av.torso, 64, 128) })
+                : torsoSide;
             const torsoMesh = new THREE.Mesh(
                 new THREE.BoxGeometry(2.0, 2.0, 1.0),
-                // v4: w tym projekcie indeks 4 = TYŁ postaci, indeks 5 = PRZÓD postaci
-                [torsoFrontMat, torsoFrontMat, torsoSide, torsoSide, torsoBackMat, torsoFrontMat]
+                // v4: w tym projekcie indeks 4 = TYŁ postaci, indeks 5 = PRZÓD postaci; 0/1 = boki, 2/3 = góra/dół
+                [torsoFlankMat, torsoFlankMat, torsoSide, torsoSide, torsoBackMat, torsoFrontMat]
             );
             torsoMesh.position.y = 3.0;
             rigRoot.add(torsoMesh);
@@ -4512,27 +4536,23 @@ function normalizeAvatar(value) {
             const rArmM = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.0, 1.0), new THREE.MeshLambertMaterial({ color: av.rightArm }));
             rArmM.position.y = -1.0; rArmPiv.add(rArmM);
 
-            const legSideL = new THREE.MeshLambertMaterial({ color: av.leftLeg });
             const hasPants = av.pants && av.pants !== 'none' && PANTS_SVGS[av.pants];
-            const legPantsMatL = hasPants
-                ? new THREE.MeshLambertMaterial({ map: createSvgCanvasTexture(PANTS_SVGS[av.pants], av.leftLeg, 128, 256) })
-                : legSideL;
+            const pantsFrontSvg = hasPants ? PANTS_SVGS[av.pants] : null;
+            const pantsBackSvg = hasPants ? (PANTS_BACK_SVGS[av.pants] || pantsFrontSvg) : null;
+            // Kolejność ścian jak w tułowiu: boki, góra/dół, tył, przód.
+            const legMaterials = (legColor) => {
+                const plain = new THREE.MeshLambertMaterial({ color: legColor });
+                if (!hasPants) return [plain, plain, plain, plain, plain, plain];
+                const textured = (svg, w, h) => new THREE.MeshLambertMaterial({ map: createSvgCanvasTexture(svg, legColor, w, h) });
+                const flank = textured(clothingSideSvg(pantsFrontSvg), 64, 256);
+                return [flank, flank, plain, plain, textured(pantsBackSvg, 128, 256), textured(pantsFrontSvg, 128, 256)];
+            };
             const lLegPiv = new THREE.Group(); lLegPiv.position.set(0.5, 2.0, 0);
-            const lLegM = new THREE.Mesh(
-                new THREE.BoxGeometry(1.0, 2.0, 1.0),
-                [legPantsMatL, legPantsMatL, legSideL, legSideL, legPantsMatL, legPantsMatL]
-            );
+            const lLegM = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.0, 1.0), legMaterials(av.leftLeg));
             lLegM.position.y = -1.0; lLegPiv.add(lLegM);
 
-            const legSideR = new THREE.MeshLambertMaterial({ color: av.rightLeg });
-            const legPantsMatR = hasPants
-                ? new THREE.MeshLambertMaterial({ map: createSvgCanvasTexture(PANTS_SVGS[av.pants], av.rightLeg, 128, 256) })
-                : legSideR;
             const rLegPiv = new THREE.Group(); rLegPiv.position.set(-0.5, 2.0, 0);
-            const rLegM = new THREE.Mesh(
-                new THREE.BoxGeometry(1.0, 2.0, 1.0),
-                [legPantsMatR, legPantsMatR, legSideR, legSideR, legPantsMatR, legPantsMatR]
-            );
+            const rLegM = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.0, 1.0), legMaterials(av.rightLeg));
             rLegM.position.y = -1.0; rLegPiv.add(rLegM);
 
             rigRoot.add(lArmPiv, rArmPiv, lLegPiv, rLegPiv);
@@ -6097,8 +6117,12 @@ function normalizeAvatar(value) {
 
     window.detectAndApplyDeviceMode = function() {
         var uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        // iPadOS 13+ reports a desktop Mac user agent; touch points give it away.
+        var touchMac = /Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+        // Tablets and phones whose only pointer is a finger, at any screen width.
+        var touchOnly = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(any-pointer: fine)').matches);
         var smallViewport = document.documentElement.clientWidth <= 860 || window.matchMedia('(max-width: 860px)').matches;
-        window.isMobileDevice = Boolean(uaMobile || smallViewport);
+        window.isMobileDevice = Boolean(uaMobile || touchMac || touchOnly || smallViewport);
 
         if (window.isMobileDevice) {
             document.body.classList.add('device-mobile');
@@ -7208,7 +7232,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   let room=null,active=false,actions=[],sequence=0,lastShoot=0,lastFx=0,lastChat=0,generation=0;
   let previousKills=0,previousWave=0,finishedKey='',lastAck=0,starting=false,closing=false;
   let lastWorldAt=performance.now(),lastSeen=performance.now(),latency=0,failures=0;
-  let oldDeath=0,roomEpoch=0;
+  let oldDeath=0,roomEpoch=0,account=null;
   const entityMaps={enemies:new Map(),turrets:new Map()};
   // Shut down all older P2P routes so packets cannot race with the new server.
   try{localChannel?.close();}catch{}localChannel=null;
@@ -7270,7 +7294,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     // to a different host just because the settings field changed.
     base=value;token=accountStore.getItem(tokenKey())||'';accountStore.setItem('blox_api_base',base);connected=false;
     await connect();settingsFeedback.textContent=connected?'Połączono z backendem.':'Nie udało się połączyć. Sprawdź adres i dostępność serwera.';
-  },true),btn('Połącz ponownie',()=>connect(true)),btn('Kod dostępu online',showRecovery));
+  },true),btn('Połącz ponownie',()=>connect(true)),btn('Konto i logowanie',()=>showAccount()),btn('Kod dostępu online',showRecovery));
   info.append(urlLabel,urlInput,settingActions,settingsFeedback);
   if(window.bloxPreview)info.append(note('Ten podgląd ma już podłączony backend. Nie musisz zmieniać adresu. Na własnym hostingu trzeba uruchomić serwer z paczki.'));
   $('view-settings').append(info);
@@ -7288,9 +7312,12 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if($('networkStatusTxt'))$('networkStatusTxt').textContent=value;
     const bar=$('v11NetworkBar');if(bar){bar.classList.toggle('offline',!ok);$('v11ConnectionText').textContent=ok?`${room?.players.length||1}/6 · ${latency} ms`:value;bar.title=value;}
   }
-  async function api(operation,body={},withToken=true){
+  // Render Free sleeps when idle and needs up to a minute to wake up, so the
+  // first request of a visit gets a long timeout; game syncs stay short.
+  const WAKE_TIMEOUT=70000;
+  async function api(operation,body={},withToken=true,timeout=6500){
     if(!base)throw Error('Backend nie jest skonfigurowany. Otwórz Ustawienia → Połączenie multiplayer.');
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
     try{
       const response=await fetch(base+'/api/'+operation,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({...body,...(withToken?{token}:{})}),signal:controller.signal,credentials:'same-origin'});
@@ -7306,14 +7333,66 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if(connecting)return;
     if(connected&&!force)return;
     connecting=true;setStatus(base?'Łączenie z serwerem…':'Tryb solo · skonfiguruj serwer');
+    const waking=setTimeout(()=>setStatus('Budzenie serwera… to może potrwać do minuty'),3000);
     try{
-      const data=await api('session',{token,id:myPlayerId,name:username,avatar:avatarData,scope:isSecondaryTestTab?myPlayerId:'main'},false);
-      token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;connected=true;failures=0;
+      const data=await api('session',{token,id:myPlayerId,name:username,avatar:avatarData,scope:isSecondaryTestTab?myPlayerId:'main'},false,WAKE_TIMEOUT);
+      token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;account=data.account||null;connected=true;failures=0;
       setStatus('Online',true);applySocial(data.social);renderFriendsAll();renderProfileOnline();renderPublicRooms();
       feedback(settingsFeedback,'Połączenie gotowe. ID online: '+me.id);
       profileHash=JSON.stringify({name:username,avatar:avatarData});
     }catch(error){connected=false;setStatus('Tryb solo · serwer niedostępny');feedback(settingsFeedback,error.message,true);renderFriendsAll();renderPublicRooms();}
-    finally{connecting=false;schedulePoll();}
+    finally{clearTimeout(waking);connecting=false;schedulePoll();}
+  }
+  // Switch this device to an account returned by login: its server profile
+  // (nick and look) replaces the local one so all devices show the same player.
+  function adoptAccount(data){
+    token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;account=data.account||null;connected=true;failures=0;
+    if(me){username=me.name;Object.assign(avatarData,normalizeAvatar(me.avatar));}
+    profileHash=JSON.stringify({name:username,avatar:avatarData});
+    socialHash='';applySocial(data.social);
+    try{saveAllData(false);}catch{}
+    setStatus('Online',true);renderFriendsAll();renderProfileOnline();renderPublicRooms();
+    feedback(settingsFeedback,'Połączenie gotowe. ID online: '+onlineId());
+  }
+  function showAccount(){
+    game.dialog('Konto BloxWeb','Login i hasło pozwalają grać na każdym urządzeniu z tymi samymi znajomymi i wiadomościami. Nie podajemy e-maila ani danych osobowych.',(panel,close)=>{
+      const f=el('p','v11-feedback');f.setAttribute('role','status');
+      const field=(label,type,auto)=>{const id='v14'+Math.random().toString(36).slice(2);const l=el('label','v11-field-label',label);l.htmlFor=id;const i=el('input','v11-field');i.id=id;i.type=type;i.autocomplete=auto;i.maxLength=type==='password'?128:20;panel.append(l,i);return i;};
+      const guard=async(button,work)=>{if(active)return feedback(f,'Najpierw wyjdź z meczu online.',true);button.disabled=true;feedback(f,'Łączę z serwerem… (pierwsze połączenie może potrwać do minuty)');try{await work();}catch(error){feedback(f,error.message,true);}finally{if(button.isConnected)button.disabled=false;}};
+      if(account?.login){
+        panel.append(note('Zalogowano jako: '+account.login+' · ID '+onlineId()),note('Na innym urządzeniu wybierz „Konto i logowanie” i wpisz ten sam login oraz hasło.'));
+        panel.append(f);
+        const row=game.actionRow(panel);
+        const out=btn('Wyloguj na tym urządzeniu',e=>guard(e.currentTarget,async()=>{
+          try{await api('logout',{});}catch{}
+          accountStore.removeItem(tokenKey());token='';account=null;me=null;connected=false;socialHash='';
+          applySocial({friends:[],incoming:[],outgoing:[],messages:[]});close();showToast('Wylogowano. Grasz teraz jako gość.');await connect(true);
+        }));
+        row.append(out,btn('Zamknij',close));
+        return;
+      }
+      const heading=value=>{const h=el('h3','',value);h.style.margin='18px 0 6px';return h;};
+      panel.append(heading('Mam już konto'));
+      const loginIn=field('Login','text','username'),passIn=field('Hasło','password','current-password');
+      const loginRow=game.actionRow(panel);
+      const signIn=btn('Zaloguj się',e=>guard(e.currentTarget,async()=>{
+        const data=await api('login',{login:loginIn.value.trim(),password:passIn.value},false,WAKE_TIMEOUT);
+        adoptAccount(data);close();showToast('Zalogowano jako '+data.account.login+'.');
+      }),true);
+      loginRow.append(signIn);
+      passIn.addEventListener('keydown',e=>{if(e.key==='Enter')signIn.click();});
+      panel.append(heading('Załóż konto dla obecnego profilu'),note('Twoje obecne ID, znajomi i wiadomości zostaną przypisane do loginu. Nie używaj imienia i nazwiska jako loginu.'));
+      const newLogin=field('Nowy login (3–20 znaków: a–z, 0–9, . _ -)','text','username'),newPass=field('Hasło (min. 6 znaków)','password','new-password'),repeat=field('Powtórz hasło','password','new-password');
+      panel.append(f);
+      const row=game.actionRow(panel);
+      row.append(btn('Załóż konto',e=>guard(e.currentTarget,async()=>{
+        if(newPass.value!==repeat.value)throw Error('Hasła nie są takie same.');
+        if(!connected)await connect();
+        if(!connected)throw Error('Serwer jest niedostępny. Spróbuj za chwilę.');
+        const data=await api('register',{login:newLogin.value.trim().toLowerCase(),password:newPass.value},true,WAKE_TIMEOUT);
+        account=data.account;renderProfileOnline();close();showToast('Konto zapisane. Login: '+account.login);
+      }),true),btn('Zamknij',close));
+    });
   }
   function applySocial(value){
     if(!value)return;
@@ -7377,7 +7456,10 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   }
   function renderProfileOnline(){
     profileNote.replaceChildren(el('h3','','Twój profil online'),el('div','v11-online-id',onlineId()),note('To ID podajesz znajomym. Relacje i wiadomości zapisuje serwer. Monety, ekwipunek i misje pozostają lokalnym postępem.'));
-    profileNote.append(btn('Znajomi i zaproszenia',()=>switchTab('friends')));
+    profileNote.append(note(account?.login?'Konto: '+account.login+' · możesz zalogować się na innym urządzeniu.':'Grasz jako gość. Załóż konto (sam login i hasło, bez e-maila), aby nie stracić znajomych na innym urządzeniu.'));
+    profileNote.append(btn(account?.login?'Konto i logowanie':'Załóż konto / zaloguj się',()=>showAccount(),!account?.login),btn('Znajomi i zaproszenia',()=>switchTab('friends')));
+    const accountHint=$('v14AccountHint');
+    if(accountHint){accountHint.hidden=!connected||!!account?.login;}
     document.querySelector('.my-id-pill')?.setAttribute('title','Publiczne ID online: '+onlineId());
     if(me)for(const id of ['topPlayerId','welcomePlayerId','profileIdBig'])if($(id))$(id).textContent=onlineId();
   }
@@ -7407,7 +7489,9 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     const legacyId=el('span');legacyId.id='friendsPageMyId';legacyId.hidden=true;idPanel.append(legacyId);
     const network=el('p','v11-feedback');network.id='networkStatusTxt';
     idPanel.append(el('h3','','Twoje publiczne ID online'),id,note('Podaj koledze ID, nie kod dostępu. Zaproszenia czekają na serwerze, nawet gdy druga osoba jest offline.'),btn('Kopiuj moje ID',()=>copyMyPlayerId()),network);
-    view.append(idPanel);
+    const hint=el('div','v11-panel');hint.id='v14AccountHint';hint.hidden=true;
+    hint.append(el('h3','','Grasz jako gość'),note('Bez konta znajomi i wiadomości są przypisane tylko do tej przeglądarki. Załóż konto z loginem i hasłem (bez e-maila), a potem zaloguj się nim na telefonie, tablecie czy innym komputerze.'),btn('Załóż konto / zaloguj się',()=>showAccount(),true));
+    view.append(hint,idPanel);
     const searchPanel=el('div','v11-panel');
     const label=el('label','v11-field-label','ID lub nick gracza');label.htmlFor='targetFriendIdInput';
     const input=el('input','v11-field');input.id='targetFriendIdInput';input.placeholder='Np. BLOX-123456 albo nick';input.autocomplete='off';input.maxLength=54;
@@ -7433,7 +7517,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const {list,count}=friendContainers[type];count.textContent=social[type].length;list.replaceChildren();
       if(!social[type].length)list.append(el('div','v11-empty',({incoming:'Brak oczekujących zaproszeń. Poproś znajomego o wyszukanie Twojego ID.',outgoing:'Nie masz wysłanych zaproszeń.',friends:'Znajdź znajomego powyżej i wyślij zaproszenie. Po akceptacji pojawi się tutaj.'})[type]));
       for(const user of social[type]){
-        const controls=[];
+        const controls=[btn('Profil',()=>openFriendProfile(user.id,user))];
         if(type==='incoming')controls.push(btn('Akceptuj',e=>friendAction(user.id,'accept',e.currentTarget),true),btn('Odrzuć',e=>friendAction(user.id,'decline',e.currentTarget)));
         if(type==='outgoing')controls.push(btn('Anuluj zaproszenie',e=>friendAction(user.id,'cancel',e.currentTarget)));
         if(type==='friends'){
@@ -7461,12 +7545,39 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       for(const user of data.users){
         const existing=social.friends.some(f=>f.id===user.id),pending=social.outgoing.some(f=>f.id===user.id);
         const b=btn(existing?'Już znajomi':pending?'Zaproszenie wysłane':'Wyślij zaproszenie',async e=>{const clicked=e.currentTarget;await friendAction(user.id,'request',clicked);if(social.outgoing.some(f=>f.id===user.id)||social.friends.some(f=>f.id===user.id)){clicked.textContent='Zaproszenie wysłane';clicked.disabled=true;}},true);
-        b.disabled=existing||pending;results.append(person(user,[b]));
+        b.disabled=existing||pending;results.append(person(user,[btn('Profil',()=>openFriendProfile(user.id,user)),b]));
       }
     }catch(error){feedback(f,error.message,true);}
     finally{b.disabled=false;}
   };
   acceptFriendRequest=id=>friendAction(id,'accept');declineFriendRequest=id=>friendAction(id,'decline');removeFriendById=id=>friendAction(id,'remove');
+  // Profiles come from the server, so they open for friends, invitations and
+  // search results alike. Coins, items and badges live only on the owner's
+  // device, so the modal says so instead of showing invented numbers.
+  openFriendProfile=function(id,known){
+    const all=[...social.friends,...social.incoming,...social.outgoing];
+    const user=all.find(u=>u.id===id)||known;
+    if(!user)return showToast('Nie znaleziono danych tego gracza.');
+    const isFriend=social.friends.some(u=>u.id===user.id),pending=social.outgoing.some(u=>u.id===user.id),invited=social.incoming.some(u=>u.id===user.id);
+    $('fpTitleName').textContent=user.name;$('fpNameBig').textContent=user.name;$('fpIdBig').textContent='ID: '+user.id;
+    $('fpR6Preview').innerHTML=buildMiniR6PreviewHTML(normalizeAvatar(user.avatar),0.68);
+    const bio=$('fpBioBox');bio.textContent='Monety, przedmioty i odznaki są zapisywane na urządzeniu tego gracza, dlatego nie widać ich w profilu.';
+    const statusNode=$('fpStatusBadge');
+    statusNode.textContent=user.status==='ingame'?'W grze: '+gameTitle(user.gameId):user.status==='online'?'Online · w menu':isFriend?'Offline':'Status widoczny po dodaniu do znajomych';
+    statusNode.style.color=user.status==='ingame'?'#00e691':user.status==='online'?'#3498db':'#9aa3ad';
+    const stats=document.querySelector('#friendProfileModal .profile-stats-grid')?.parentElement;if(stats)stats.hidden=true;
+    const actions=$('fpActionBtns');actions.replaceChildren();
+    const close=()=>closeFriendProfileModal();
+    if(isFriend){
+      if(user.roomCode)actions.append(btn('Dołącz do gry',()=>{close();joinFriendServer(user.id);},true));
+      actions.append(btn('Wyślij wiadomość',()=>{close();activeDmFriendId=user.id;switchTab('messages');}));
+    }else if(invited){
+      actions.append(btn('Akceptuj zaproszenie',()=>{close();friendAction(user.id,'accept');},true));
+    }else if(user.id!==onlineId()){
+      const invite=btn(pending?'Zaproszenie wysłane':'Wyślij zaproszenie',()=>{close();friendAction(user.id,'request');},true);invite.disabled=pending;actions.append(invite);
+    }
+    $('friendProfileModal').style.display='flex';
+  };
   renderMessagesTab=function(){
     const list=$('msgFriendsList'),history=$('msgChatHistory'),head=$('msgChatHeader'),input=$('dmInputField');
     if(!list||!history)return;
@@ -7478,7 +7589,8 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     const user=users.find(u=>u.id===activeDmFriendId);
     input.disabled=!user||!connected;input.maxLength=1000;
     const send=$('view-messages').querySelector('.chat-input-row button');if(send)send.disabled=!user||!connected;
-    head.textContent=user?'Rozmowa z '+user.name+' · '+user.id:'Wybierz znajomego';
+    head.textContent=user?'Rozmowa z '+user.name+' · '+user.id+' ':'Wybierz znajomego';
+    if(user)head.append(btn('Profil',()=>openFriendProfile(user.id,user)));
     const messages=user?social.messages.filter(m=>(m.sender===user.id&&m.target===onlineId())||(m.sender===onlineId()&&m.target===user.id)):[];
     const hash=JSON.stringify({id:activeDmFriendId,messages});
     if(messageHash===hash)return;
@@ -8912,8 +9024,10 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     return compact(g,id);
   };
   // Better texture detail is shared by store previews, profile and the R6 rig.
-  for(const [dict,w,h]of[[SHIRT_SVGS,84,88],[SHIRT_BACK_SVGS,84,88],[PANTS_SVGS,40,88]]){
-    for(const id of Object.keys(dict)){if(id==='none')continue;const seam=w===40?'<path d="M3 2V76M37 2V76M6 16L14 27M34 16L26 27" stroke="#e9ddba" stroke-opacity=".45" stroke-width=".8" fill="none"/><path d="M0 72H40" stroke="#10131a" stroke-width="2"/>':'<path d="M5 4V84M79 4V84M6 80H78" stroke="#ffffff" stroke-opacity=".28" stroke-width="1" fill="none"/><path d="M27 0Q42 17 57 0" stroke="#141923" stroke-width="3" fill="none"/>';
+  // Back pants get seams and a yoke instead of the front pocket lines.
+  const backPants={};for(const id of Object.keys(PANTS_SVGS))backPants[id]=PANTS_BACK_SVGS[id]||PANTS_SVGS[id];Object.assign(PANTS_BACK_SVGS,backPants);
+  for(const [dict,w,h,back]of[[SHIRT_SVGS,84,88],[SHIRT_BACK_SVGS,84,88],[PANTS_SVGS,40,88],[PANTS_BACK_SVGS,40,88,true]]){
+    for(const id of Object.keys(dict)){if(id==='none'||!dict[id])continue;const seam=w===40?(back?'<path d="M3 2V76M37 2V76M4 12Q20 18 36 12" stroke="#e9ddba" stroke-opacity=".45" stroke-width=".8" fill="none"/><path d="M0 72H40" stroke="#10131a" stroke-width="2"/>':'<path d="M3 2V76M37 2V76M6 16L14 27M34 16L26 27" stroke="#e9ddba" stroke-opacity=".45" stroke-width=".8" fill="none"/><path d="M0 72H40" stroke="#10131a" stroke-width="2"/>'):'<path d="M5 4V84M79 4V84M6 80H78" stroke="#ffffff" stroke-opacity=".28" stroke-width="1" fill="none"/><path d="M27 0Q42 17 57 0" stroke="#141923" stroke-width="3" fill="none"/>';
       dict[id]=dict[id].replace('</svg>',seam+'</svg>');
     }
   }
