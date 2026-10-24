@@ -37,7 +37,15 @@ class Postgres:
         query = query.replace("?", "%s")
         if self.connection.closed or self.connection.broken:
             self.connection = self.connect()
-        return self.connection.execute(query, parameters or None)
+        try:
+            return self.connection.execute(query, parameters or None)
+        except self.driver.OperationalError:
+            # A dropped connection is retried once, but only for reads: a
+            # write may already have reached the database.
+            if not query.lstrip().upper().startswith("SELECT"):
+                raise
+            self.connection = self.connect()
+            return self.connection.execute(query, parameters or None)
 
     def commit(self):
         # Do not keep read transactions open across HTTP requests.
@@ -73,6 +81,15 @@ def open_database(data):
      id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT NOT NULL REFERENCES users(id),
      target TEXT NOT NULL REFERENCES users(id), text TEXT NOT NULL, created REAL NOT NULL);
     CREATE INDEX IF NOT EXISTS messages_pair ON messages(sender,target,id);
+    CREATE TABLE IF NOT EXISTS sessions(
+     token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), created REAL NOT NULL);
+    CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS friends_b ON friends(b);
     """)
+    columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
+    for column in ("login", "password_hash"):
+        if column not in columns:
+            db.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT")
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_login ON users(login)")
     db.commit()
     return db

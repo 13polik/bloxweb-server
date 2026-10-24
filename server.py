@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import math
 import os
 import random
@@ -39,6 +40,15 @@ TRUST_VISITOR = os.environ.get("TRUST_PREVIEW_PROXY") == "1"
 rooms = {}
 presence = {}
 rates = defaultdict(deque)
+login_failures = defaultdict(deque)
+# This single process is the only writer, so profiles, sessions and social
+# relations can be cached and invalidated on every write. A /sync then needs
+# no database round trip at all, which keeps the room simulation smooth.
+user_cache = {}
+token_cache = {}
+relation_cache = {}
+LOGIN_PATTERN = r"[a-z0-9_.-]{3,20}"
+log = logging.getLogger("bloxweb")
 GAME_IDS = {"castle_defense", "cs2"}
 COLORS = ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]
 TOWERS = {
@@ -94,41 +104,119 @@ def hash_token(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def token_user(token):
+    """Resolve a session token from a signed-in device or an original guest token."""
+    if not token:
+        return None
+    digest = hash_token(token)
+    if digest in token_cache:
+        return token_cache[digest]
+    row = db.execute("SELECT user_id FROM sessions WHERE token_hash=?", (digest,)).fetchone()
+    if not row:
+        row = db.execute("SELECT id AS user_id FROM users WHERE token_hash=?", (digest,)).fetchone()
+    if row:
+        token_cache[digest] = row["user_id"]
+        return row["user_id"]
+    return None
+
+
 def auth(request, body):
     token = request.headers.get("authorization", "").removeprefix("Bearer ") or body.get("token", "")
     if not isinstance(token, str) or len(token) > 150:
         fail("Nieprawidłowa sesja.", 401)
-    user = db.execute("SELECT * FROM users WHERE token_hash=?", (hash_token(token),)).fetchone()
-    if not user:
+    uid = token_user(token)
+    if not uid or not profile(uid):
         fail("Sesja wygasła. Połącz konto ponownie.", 401)
-    return dict(user)
+    return profile(uid)
+
+
+def profile(uid):
+    if uid not in user_cache:
+        u = db.execute("SELECT id,name,avatar,login FROM users WHERE id=?", (uid,)).fetchone()
+        if not u:
+            return None
+        user_cache[uid] = dict(id=u["id"], name=u["name"], avatar=json.loads(u["avatar"]), login=u["login"])
+    return user_cache[uid]
+
+
+def save_profile(uid, name, look):
+    current = profile(uid)
+    name, look = clean(name, 16) or current["name"], avatar(look)
+    if (name, look) != (current["name"], current["avatar"]):
+        db.execute("UPDATE users SET name=?,avatar=? WHERE id=?", (name, json.dumps(look), uid))
+        db.commit()
+        current.update(name=name, avatar=look)
 
 
 def user_view(uid):
-    u = db.execute("SELECT id,name,avatar FROM users WHERE id=?", (uid,)).fetchone()
+    u = profile(uid)
     if not u:
         return None
     p = presence.get(uid, {})
     online = now() - p.get("seen", 0) < 15
     room = rooms.get(p.get("room", "")) if online else None
-    return dict(id=u["id"], name=u["name"], avatar=json.loads(u["avatar"]),
+    return dict(id=u["id"], name=u["name"], avatar=u["avatar"],
                 status="ingame" if room else "online" if online else "offline",
                 gameId=room["game"] if room else None, roomCode=room["code"] if room else None)
 
 
+def relations(uid):
+    if uid not in relation_cache:
+        fs = db.execute("SELECT a,b FROM friends WHERE a=? OR b=?", (uid, uid)).fetchall()
+        ins = db.execute("SELECT sender FROM requests WHERE target=?", (uid,)).fetchall()
+        outs = db.execute("SELECT target FROM requests WHERE sender=?", (uid,)).fetchall()
+        msgs = db.execute("SELECT * FROM (SELECT * FROM messages WHERE sender=? OR target=? ORDER BY id DESC LIMIT 500) ORDER BY id", (uid, uid)).fetchall()
+        relation_cache[uid] = dict(friends=[r["b"] if r["a"] == uid else r["a"] for r in fs],
+                                   incoming=[r["sender"] for r in ins], outgoing=[r["target"] for r in outs],
+                                   messages=[dict(r) for r in msgs])
+    return relation_cache[uid]
+
+
+def forget_relations(*uids):
+    for uid in uids:
+        relation_cache.pop(uid, None)
+
+
 def relation(a, b):
-    a, b = sorted((a, b))
-    return db.execute("SELECT 1 FROM friends WHERE a=? AND b=?", (a, b)).fetchone() is not None
+    return b in relations(a)["friends"]
 
 
 def social(uid):
-    fs = db.execute("SELECT a,b FROM friends WHERE a=? OR b=?", (uid, uid)).fetchall()
-    ins = db.execute("SELECT sender FROM requests WHERE target=?", (uid,)).fetchall()
-    outs = db.execute("SELECT target FROM requests WHERE sender=?", (uid,)).fetchall()
-    msgs = db.execute("SELECT * FROM (SELECT * FROM messages WHERE sender=? OR target=? ORDER BY id DESC LIMIT 500) ORDER BY id", (uid, uid)).fetchall()
-    return dict(friends=[user_view(r["b"] if r["a"] == uid else r["a"]) for r in fs],
-                incoming=[user_view(r["sender"]) for r in ins],
-                outgoing=[user_view(r["target"]) for r in outs], messages=[dict(r) for r in msgs])
+    r = relations(uid)
+    people = lambda ids: [v for v in map(user_view, ids) if v]
+    return dict(friends=people(r["friends"]), incoming=people(r["incoming"]),
+                outgoing=people(r["outgoing"]), messages=r["messages"])
+
+
+def password_hash(password):
+    salt = secrets.token_bytes(16)
+    digest = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1)
+    return f"scrypt$16384$8$1${salt.hex()}${digest.hex()}"
+
+
+def password_ok(password, stored):
+    try:
+        _, n, r, p, salt, digest = (stored or "").split("$")
+        check = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=int(n), r=int(r), p=int(p))
+        return hmac.compare_digest(check.hex(), digest)
+    except ValueError:
+        return False
+
+
+def credentials(body):
+    login, password = clean(body.get("login"), 40).lower(), body.get("password")
+    if not re.fullmatch(LOGIN_PATTERN, login):
+        fail("Login: 3–20 znaków, tylko litery a–z, cyfry, kropka, myślnik i podkreślenie.")
+    if not isinstance(password, str) or not 6 <= len(password) <= 128:
+        fail("Hasło musi mieć od 6 do 128 znaków.")
+    return login, password
+
+
+def account_view(uid):
+    return dict(login=profile(uid)["login"])
+
+
+DUMMY_HASH = password_hash(secrets.token_hex(8))
 
 
 def leave(uid):
@@ -471,6 +559,8 @@ async def simulation():
                 rooms.pop(code, None)
         if len(rates) > 10000:
             rates.clear()
+        if len(login_failures) > 10000:
+            login_failures.clear()
 
 
 @asynccontextmanager
@@ -491,10 +581,17 @@ async def error_response(request, exc):
     return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
 
 
+@app.exception_handler(Exception)
+async def unexpected_error(request, exc):
+    # Details go to the Render log only; players get a short, safe message.
+    log.exception("Unhandled error in %s", request.url.path)
+    return JSONResponse({"error": "Błąd serwera. Spróbuj ponownie za chwilę."}, status_code=500)
+
+
 @app.get("/health")
 async def health():
     db.execute("SELECT 1").fetchone()
-    return dict(ok=True, version=11, rooms=len(rooms),
+    return dict(ok=True, version=14, rooms=len(rooms),
                 storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
 
 
@@ -531,8 +628,8 @@ async def api(operation: str, request: Request):
         visitor_hash = hashlib.sha256(identity.encode()).hexdigest() if identity else None
         if not token and identity:
             token = hmac.new(SERVER_SECRET, identity.encode(), hashlib.sha256).hexdigest()
-        existing = db.execute("SELECT * FROM users WHERE token_hash=?", (hash_token(token),)).fetchone() if token else None
-        if not existing:
+        uid = token_user(token)
+        if not uid:
             if body.get("token"):
                 fail("Nieprawidłowy kod konta online.", 401)
             token = token or secrets.token_urlsafe(32)
@@ -540,23 +637,58 @@ async def api(operation: str, request: Request):
             uid = preferred if re.fullmatch(r"BLOX-[A-Z0-9_-]{3,48}", preferred) else "BLOX-"+secrets.token_hex(5).upper()
             if db.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
                 uid = "BLOX-"+secrets.token_hex(5).upper()
-            db.execute("INSERT INTO users VALUES(?,?,?,?,?,?)", (uid, hash_token(token), visitor_hash, clean(body.get("name"), 16) or "Gracz", json.dumps(avatar(body.get("avatar"))), time.time()))
+            db.execute("INSERT INTO users(id,token_hash,visitor_hash,name,avatar,created) VALUES(?,?,?,?,?,?)", (uid, hash_token(token), visitor_hash, clean(body.get("name"), 16) or "Gracz", json.dumps(avatar(body.get("avatar"))), time.time()))
             db.commit()
-        else:
-            uid = existing["id"]
-            db.execute("UPDATE users SET name=?,avatar=? WHERE id=?", (clean(body.get("name"), 16) or existing["name"], json.dumps(avatar(body.get("avatar"))), uid))
-            db.commit()
+        elif not body.get("keepProfile"):
+            save_profile(uid, body.get("name"), body.get("avatar"))
         presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
-        return dict(token=token, user=user_view(uid), social=social(uid))
+        return dict(token=token, user=user_view(uid), social=social(uid), account=account_view(uid))
+    if operation == "login":
+        login, password = credentials(body)
+        attempts = login_failures[login]
+        while attempts and attempts[0] < now()-900:
+            attempts.popleft()
+        if len(attempts) >= 10:
+            fail("Za dużo nieudanych prób logowania. Odczekaj 15 minut.", 429)
+        row = db.execute("SELECT id,password_hash FROM users WHERE login=?", (login,)).fetchone()
+        # The hash runs even for unknown logins so timing does not reveal them.
+        valid = await asyncio.to_thread(password_ok, password, row["password_hash"] if row else DUMMY_HASH)
+        if not row or not valid:
+            attempts.append(now())
+            fail("Nieprawidłowy login lub hasło.", 401)
+        attempts.clear()
+        uid, token = row["id"], secrets.token_urlsafe(32)
+        db.execute("INSERT INTO sessions(token_hash,user_id,created) VALUES(?,?,?)", (hash_token(token), uid, time.time()))
+        db.commit()
+        token_cache[hash_token(token)] = uid
+        presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
+        return dict(token=token, user=user_view(uid), social=social(uid), account=account_view(uid))
     user = auth(request, body)
     uid = user["id"]
     presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
+    if operation == "register":
+        if user["login"]:
+            fail("To konto ma już login. Zaloguj się nim na innych urządzeniach.")
+        login, password = credentials(body)
+        if db.execute("SELECT 1 FROM users WHERE login=?", (login,)).fetchone():
+            fail("Ten login jest już zajęty. Wybierz inny.", 409)
+        stored = await asyncio.to_thread(password_hash, password)
+        db.execute("UPDATE users SET login=?,password_hash=? WHERE id=? AND login IS NULL", (login, stored, uid))
+        db.commit()
+        user["login"] = login
+        return dict(account=account_view(uid), user=user_view(uid))
+    if operation == "logout":
+        token = request.headers.get("authorization", "").removeprefix("Bearer ") or body.get("token", "")
+        db.execute("DELETE FROM sessions WHERE token_hash=?", (hash_token(token),))
+        db.commit()
+        token_cache.pop(hash_token(token), None)
+        leave(uid)
+        return dict(ok=True)
     if operation == "sync":
         if body.get("profile"):
-            profile = body["profile"]
-            if isinstance(profile, dict):
-                db.execute("UPDATE users SET name=?,avatar=? WHERE id=?", (clean(profile.get("name"), 16) or user["name"], json.dumps(avatar(profile.get("avatar"))), uid))
-                db.commit()
+            changes = body["profile"]
+            if isinstance(changes, dict):
+                save_profile(uid, changes.get("name"), changes.get("avatar"))
         room = rooms.get(presence[uid].get("room"))
         if room and uid in room["players"]:
             p = room["players"][uid]
@@ -635,6 +767,7 @@ async def api(operation: str, request: Request):
         else:
             fail("Nieznana operacja.")
         db.commit()
+        forget_relations(uid, target)
         return dict(social=social(uid))
     if operation == "message":
         target, text = clean(body.get("target"), 54).upper(), clean(body.get("text"), 1000)
@@ -646,6 +779,7 @@ async def api(operation: str, request: Request):
         # a dedicated call and are never automatically retried.
         db.execute("INSERT INTO messages(sender,target,text,created) VALUES(?,?,?,?)", (uid, target, text, time.time()))
         db.commit()
+        forget_relations(uid, target)
         return dict(social=social(uid))
     if operation == "room":
         action = body.get("action")
@@ -676,4 +810,9 @@ async def api(operation: str, request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8093")), log_level="warning")
+    logging.basicConfig(level=logging.WARNING)
+    # Render's proxy is the only route in, so its X-Forwarded-For carries the
+    # real player address that the per-IP rate limits need.
+    behind_proxy = os.environ.get("RENDER") == "true"
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8093")), log_level="warning",
+                proxy_headers=behind_proxy, forwarded_allow_ips="*" if behind_proxy else "127.0.0.1")

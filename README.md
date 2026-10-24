@@ -1,5 +1,15 @@
 # BloxWeb 13: serwer i strona
 
+## Konta bez e-maila (14)
+
+Gość może w „Konto i logowanie” przypisać do swojego ID login i hasło (bez e-maila i danych osobowych, więc działa też na kontach dzieci z kontrolą rodzicielską).
+Na innym urządzeniu logowanie tym loginem przywraca to samo ID, znajomych i wiadomości. Stary kod dostępu nadal działa.
+Hasła są haszowane scryptem; 10 błędnych prób blokuje login na 15 minut. Monety i ekwipunek pozostają lokalne.
+
+Przed wdrożeniem tej wersji administrator uruchamia raz `migrations/2026-10-24_accounts.sql` (tylko dodaje kolumny, tabelę `sessions` i indeksy).
+
+Testy: `pip install -r requirements-dev.txt`, potem `python -m pytest tests` (SQLite w katalogu tymczasowym).
+
 ## Awatar i sklep
 
 Zakładka Awatar ma podgląd rzeczywistego modelu R6 3D, obracany myszą/dotykiem lub przyciskami.

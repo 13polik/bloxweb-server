@@ -31,3 +31,4 @@ CREATE POLICY runtime_access ON bloxweb.users TO bloxweb_runtime USING (true) WI
 CREATE POLICY runtime_access ON bloxweb.friends TO bloxweb_runtime USING (true) WITH CHECK (true);
 CREATE POLICY runtime_access ON bloxweb.requests TO bloxweb_runtime USING (true) WITH CHECK (true);
 CREATE POLICY runtime_access ON bloxweb.messages TO bloxweb_runtime USING (true) WITH CHECK (true);
+-- Later, additive changes live in migrations/ and are applied in date order.
