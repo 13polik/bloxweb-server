@@ -148,6 +148,17 @@ def test_login_errors_and_brute_force_limit(client):
     call(client, "login", 429, login="ala", password="tajne123")
 
 
+def test_failed_logins_are_limited_per_address_across_logins(client):
+    for n in range(30):
+        call(client, "login", 401, login=f"konto{n}", password="zle-haslo")
+    call(client, "login", 429, login="jeszcze_inne", password="zle-haslo")
+
+
+def test_a_class_behind_one_address_can_all_connect(client):
+    for n in range(40):
+        guest(client, f"Uczen{n}", f"BLOX-{100000+n}")
+
+
 def test_register_validation(client):
     ala, olek = guest(client, "Ala", "BLOX-111111"), guest(client, "Olek", "BLOX-222222")
     call(client, "register", 400, token=ala["token"], login="a", password="tajne123")
@@ -173,5 +184,17 @@ def test_login_never_leaks_into_public_profiles(client):
     assert found and "login" not in found[0] and "ala" not in str(found[0]).replace("Ala", "")
 
 
+def test_room_create_join_chat_and_join_friend(client):
+    ala, olek = guest(client, "Ala", "BLOX-111111"), guest(client, "Olek", "BLOX-222222")
+    room = call(client, "room", token=ala["token"], action="create", game="cs2", public=True)["room"]
+    joined = call(client, "room", token=olek["token"], action="join", code=room["code"])["room"]
+    assert {p["id"] for p in joined["players"]} == {"BLOX-111111", "BLOX-222222"}
+    call(client, "sync", token=olek["token"], actions=[{"seq": 1, "kind": "chat", "text": "hej"}])
+    assert call(client, "sync", token=ala["token"])["room"]["chat"][-1]["text"] == "hej"
+    call(client, "room", 403, token=olek["token"], action="friend", target="BLOX-111111")
+    call(client, "room", token=olek["token"], action="leave")
+    assert [p["id"] for p in call(client, "sync", token=ala["token"])["room"]["players"]] == ["BLOX-111111"]
+
+
 def test_health_reports_version(client):
-    assert client.get("/health").json()["version"] == 15
+    assert client.get("/health").json()["version"] == 16

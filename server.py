@@ -611,6 +611,12 @@ async def simulation():
             rates.clear()
         if len(login_failures) > 10000:
             login_failures.clear()
+        # Caches refill from the database on demand; the caps only bound memory.
+        if len(relation_cache) > 2000:
+            relation_cache.clear()
+        if len(user_cache) > 20000 or len(token_cache) > 20000:
+            user_cache.clear()
+            token_cache.clear()
 
 
 @asynccontextmanager
@@ -641,7 +647,7 @@ async def unexpected_error(request, exc):
 @app.get("/health")
 async def health():
     db.execute("SELECT 1").fetchone()
-    return dict(ok=True, version=15, rooms=len(rooms),
+    return dict(ok=True, version=16, rooms=len(rooms),
                 storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
 
 
@@ -667,7 +673,9 @@ async def api(operation: str, request: Request):
     q = rates[rate_key]
     while q and q[0] < now()-60:
         q.popleft()
-    if len(q) > (25 if operation == "session" else 1000):
+    # New sessions are limited per address; a whole class behind one school
+    # address must still be able to connect within a minute.
+    if len(q) > (60 if operation == "session" else 1000):
         fail("Za dużo żądań. Spróbuj za chwilę.", 429)
     q.append(now())
     if operation == "session":
@@ -696,18 +704,22 @@ async def api(operation: str, request: Request):
                     progress=profile(uid)["progress"])
     if operation == "login":
         login, password = credentials(body)
-        attempts = login_failures[login]
-        while attempts and attempts[0] < now()-900:
-            attempts.popleft()
-        if len(attempts) >= 10:
-            fail("Za dużo nieudanych prób logowania. Odczekaj 15 minut.", 429)
+        # One login may fail 10 times, one address 30 times (a school or home
+        # network shares an address), per 15 minutes.
+        buckets = [(login_failures[login], 10), (login_failures["ip:"+str(request.client.host)], 30)]
+        for attempts, limit in buckets:
+            while attempts and attempts[0] < now()-900:
+                attempts.popleft()
+            if len(attempts) >= limit:
+                fail("Za dużo nieudanych prób logowania. Odczekaj 15 minut.", 429)
         row = db.execute("SELECT id,password_hash FROM users WHERE login=?", (login,)).fetchone()
         # The hash runs even for unknown logins so timing does not reveal them.
         valid = await asyncio.to_thread(password_ok, password, row["password_hash"] if row else DUMMY_HASH)
         if not row or not valid:
-            attempts.append(now())
+            for attempts, _ in buckets:
+                attempts.append(now())
             fail("Nieprawidłowy login lub hasło.", 401)
-        attempts.clear()
+        buckets[0][0].clear()
         uid, token = row["id"], secrets.token_urlsafe(32)
         db.execute("INSERT INTO sessions(token_hash,user_id,created) VALUES(?,?,?)", (hash_token(token), uid, time.time()))
         db.commit()

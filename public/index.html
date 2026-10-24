@@ -135,6 +135,10 @@ function createSafeStore(getStorage) {
 }
 const accountStore=createSafeStore(()=>window.localStorage);
 const tabStore=createSafeStore(()=>window.sessionStorage);
+// setPointerCapture throws when the browser no longer treats the pointer as
+// active (cancelled gestures on some phones); losing capture is harmless, but
+// the exception would abort the rest of the touch handler.
+function capturePointer(element, pointerId) { try { element.setPointerCapture(pointerId); } catch {} }
 function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function normalizeAvatar(value) {
   const av={...defaultAvatar};
@@ -6947,7 +6951,7 @@ function normalizeAvatar(value) {
     const add=(id,text,label,fn)=>{
       const b=button(text,null);b.id=id;b.className='v10-cs-touch';b.setAttribute('aria-label',label);
       if(id==='cs16FireBtn'){
-        b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(paused||closeActiveDialog||firePointerId!==null)return;b.setPointerCapture(e.pointerId);firePointerId=e.pointerId;fireHeld=true;shootCS2();});
+        b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(paused||closeActiveDialog||firePointerId!==null)return;capturePointer(b,e.pointerId);firePointerId=e.pointerId;fireHeld=true;shootCS2();});
         for(const event of['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,e=>{if(e.pointerId===firePointerId){fireHeld=false;firePointerId=null;}});
         b.onclick=e=>{if(e.detail===0&&!paused&&!closeActiveDialog)shootCS2();};
       }else{
@@ -6957,7 +6961,7 @@ function normalizeAvatar(value) {
           if(e.pointerType==='mouse'&&e.button!==0)return;
           e.preventDefault();e.stopPropagation();
           if(contact!==null||paused||closeActiveDialog)return;
-          contact=e.pointerId;b.setPointerCapture(e.pointerId);fn();
+          contact=e.pointerId;capturePointer(b,e.pointerId);fn();
         });
         for(const event of['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,e=>{if(contact===e.pointerId)contact=null;});
         b.onclick=e=>{e.preventDefault();e.stopPropagation();if(e.detail===0&&!paused&&!closeActiveDialog)fn();};
@@ -7322,7 +7326,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const response=await fetch(base+'/api/'+operation,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({...body,...(withToken?{token}:{})}),signal:controller.signal,credentials:'same-origin'});
       const data=await response.json().catch(()=>({error:'Serwer zwrócił nieprawidłową odpowiedź.'}));
-      if(!response.ok)throw Error(data.error||'Błąd połączenia z serwerem.');
+      if(!response.ok)throw Object.assign(Error(data.error||'Błąd połączenia z serwerem.'),{status:response.status});
       return data;
     }catch(error){
       if(error.name==='AbortError'||error instanceof TypeError)throw Error('Brak odpowiedzi serwera. Sprawdź połączenie i spróbuj ponownie.');
@@ -7344,7 +7348,17 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       receiveProgress(data.progress);
       setStatus('Online',true);applySocial(data.social);renderFriendsAll();renderProfileOnline();renderPublicRooms();
       feedback(settingsFeedback,'Połączenie gotowe. ID online: '+me.id);
-    }catch(error){connected=false;setStatus('Tryb solo · serwer niedostępny');feedback(settingsFeedback,error.message,true);renderFriendsAll();renderPublicRooms();}
+    }catch(error){
+      connected=false;
+      // A saved session the server no longer knows would otherwise keep the
+      // player in solo mode forever behind a misleading "server down" note.
+      if(error.status===401&&token){
+        accountStore.removeItem(tokenKey());token='';account=null;
+        showToast('Sesja wygasła. Zaloguj się w Ustawienia → Konto i logowanie, aby wrócić do swojego konta.');
+        setTimeout(()=>connect(true),0);
+      }else{setStatus('Tryb solo · serwer niedostępny');feedback(settingsFeedback,error.message,true);}
+      renderFriendsAll();renderPublicRooms();
+    }
     finally{clearTimeout(waking);connecting=false;schedulePoll();}
   }
   // The server holds the shared nick and look. Each device remembers which
@@ -8184,7 +8198,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   function flood(x,y){const original=current.tiles[gridIndex(x,y)];if(original===tool)return;if(tool===4||tool===5){paint(x,y);return;}const queue=[[x,y]],seen=new Set();while(queue.length){const [cx,cy]=queue.pop(),i=gridIndex(cx,cy);if(cx<0||cx>=W||cy<0||cy>=H||seen.has(i)||current.tiles[i]!==original)continue;seen.add(i);current.tiles[i]=tool;queue.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);}cursor={x,y};drawEditor();}
   function cellFromEvent(e){const r=$('studioMap').getBoundingClientRect();return{x:Math.max(0,Math.min(W-1,Math.floor((e.clientX-r.left)*W/r.width))),y:Math.max(0,Math.min(H-1,Math.floor((e.clientY-r.top)*H/r.height)))};}
   const mapCanvas=$('studioMap');
-  mapCanvas.addEventListener('pointerdown',e=>{if(!current||e.button!==0||pointer!==null)return;e.preventDefault();mapCanvas.focus({preventScroll:true});pointer=e.pointerId;mapCanvas.setPointerCapture(pointer);snapshot();previousCell=cellFromEvent(e);rectangleStart=previousCell;if(paintMode==='fill')flood(previousCell.x,previousCell.y);else if(paintMode==='brush')brush(previousCell.x,previousCell.y);});
+  mapCanvas.addEventListener('pointerdown',e=>{if(!current||e.button!==0||pointer!==null)return;e.preventDefault();mapCanvas.focus({preventScroll:true});pointer=e.pointerId;capturePointer(mapCanvas,pointer);snapshot();previousCell=cellFromEvent(e);rectangleStart=previousCell;if(paintMode==='fill')flood(previousCell.x,previousCell.y);else if(paintMode==='brush')brush(previousCell.x,previousCell.y);});
   mapCanvas.addEventListener('pointermove',e=>{if(e.pointerId!==pointer)return;const next=cellFromEvent(e);const steps=Math.max(Math.abs(next.x-previousCell.x),Math.abs(next.y-previousCell.y));
     if(paintMode==='brush')for(let i=1;i<=steps;i++)brush(Math.round(previousCell.x+(next.x-previousCell.x)*i/steps),Math.round(previousCell.y+(next.y-previousCell.y)*i/steps));
     if(paintMode==='rectangle'){drawEditor();const ctx=mapCanvas.getContext('2d');ctx.fillStyle='#ffb68155';ctx.fillRect(Math.min(rectangleStart.x,next.x)*S,Math.min(rectangleStart.y,next.y)*S,(Math.abs(next.x-rectangleStart.x)+1)*S,(Math.abs(next.y-rectangleStart.y)+1)*S);}previousCell=next;});
@@ -8211,7 +8225,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   const checkpointButton=button('Wróć do checkpointu',()=>{if(!run?.checkpoint)return;const c=run.checkpoint;Object.assign(run,{state:'playing',x:c.x,y:c.y,vx:0,vy:0,grounded:false,coyote:0,jumpBuffer:0,wasJump:false,collected:new Set(c.coins)});keys.clear();$('studioResult').hidden=true;pauseButton.disabled=false;drawGame();},true);checkpointButton.id='studioCheckpointResume';checkpointButton.hidden=true;$('studioResultActions').prepend(checkpointButton);
   for(const [key,label,aria] of [['left','←','Idź w lewo'],['right','→','Idź w prawo'],['jump','Skok','Skok']]){
     const b=node('button','studio-hold',label);b.type='button';b.dataset.key=key;b.setAttribute('aria-label',aria);b.setAttribute('aria-pressed','false');
-    b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(key);b.setAttribute('aria-pressed','true');});
+    b.addEventListener('pointerdown',e=>{e.preventDefault();capturePointer(b,e.pointerId);keys.add(key);b.setAttribute('aria-pressed','true');});
     for(const name of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(name,()=>{keys.delete(key);b.setAttribute('aria-pressed','false');});
     $('studioMovement').append(b);
   }
@@ -8697,6 +8711,8 @@ body[data-game=football] .ingame-hud-bottom,body[data-game=castle_defense] .inga
 body.device-mobile .v13-tactical{top:201px;right:12px;width:103px;padding:8px}
 body.device-mobile .v13-tactical h3{font-size:12px;margin-bottom:7px}
 body.device-mobile .v13-tactical p{display:none}
+/* On short screens the tower bar would run under the minimap: keep a column free for it. */
+@media (min-height:501px) and (max-height:640px){body.device-mobile[data-game=castle_defense] #cdTurretBar{left:12px!important;right:auto!important;transform:none!important;width:calc(100% - 139px)!important;max-width:none!important}}
 body.device-mobile .v13-tower-info{left:12px;bottom:290px;max-width:calc(100% - 130px);padding:9px 11px;font-size:12px}
 body.device-mobile .v13-tower-info strong{font-size:12px}
 body.device-mobile .v13-tower-info small{display:none}
@@ -8883,7 +8899,7 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
     const controls=gameNode('div','v13-foot-controls','v13FootControls');
     game.button('Strzał [E]',()=>kickFootball('shot'),controls).id='v13FootShoot';game.button('Podaj [Q]',()=>kickFootball('pass'),controls).id='v13FootPass';
     const sprint=game.button('Sprint',null,controls);sprint.id='v13FootSprint';
-    sprint.onpointerdown=e=>{e.preventDefault();sprint.setPointerCapture(e.pointerId);sprintHeld=true;};for(const type of ['pointerup','pointercancel','lostpointercapture'])sprint.addEventListener(type,()=>sprintHeld=false);
+    sprint.onpointerdown=e=>{e.preventDefault();capturePointer(sprint,e.pointerId);sprintHeld=true;};for(const type of ['pointerup','pointercancel','lostpointercapture'])sprint.addEventListener(type,()=>sprintHeld=false);
     const label=el('label','v13-stamina','Kondycja');staminaBar=el('progress');staminaBar.max=100;staminaBar.value=100;staminaBar.setAttribute('aria-label','Kondycja sprintu');label.append(staminaBar);controls.append(label);
   }
   function line(points,color=0xf1f4df){const g=new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(...p)));const mesh=new THREE.Line(g,new THREE.LineBasicMaterial({color}));scene.add(mesh);return mesh;}
@@ -9202,7 +9218,7 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
       const floor=new THREE.Mesh(new THREE.CylinderGeometry(1.65,1.7,.12,32),new THREE.MeshLambertMaterial({color:0x343d4b}));floor.position.y=-.1;previewScene.add(floor);
       const rim=new THREE.Mesh(new THREE.TorusGeometry(1.62,.025,6,40),new THREE.MeshBasicMaterial({color:0xff995c}));rim.rotation.x=Math.PI/2;rim.position.y=-.035;previewScene.add(rim);
       rigHash='';rebuildRig();resize();resizeObserver=new ResizeObserver(resize);resizeObserver.observe(canvasWrap);
-      let drag=null;renderer.domElement.onpointerdown=e=>{drag={id:e.pointerId,x:e.clientX};renderer.domElement.setPointerCapture(e.pointerId);};
+      let drag=null;renderer.domElement.onpointerdown=e=>{drag={id:e.pointerId,x:e.clientX};capturePointer(renderer.domElement,e.pointerId);};
       renderer.domElement.onpointermove=e=>{if(drag?.id===e.pointerId){angle-=(e.clientX-drag.x)*.012;drag.x=e.clientX;}};
       renderer.domElement.onpointerup=renderer.domElement.onpointercancel=()=>{drag=null;};draw();
     }catch{stopPreview();showToast('Podgląd 3D niedostępny. Wyświetlam podgląd 2D.');}
