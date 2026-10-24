@@ -88,6 +88,17 @@ def test_profile_changes_are_visible_to_friends(client):
     assert friends[0]["name"] == "AlaNowa" and friends[0]["avatar"]["pants"] == "jeans"
 
 
+def test_reconnect_with_keep_profile_does_not_revert_a_rename_from_another_device(client):
+    ala = guest(client, "Ala", "BLOX-111111")
+    call(client, "register", token=ala["token"], login="ala", password="tajne123")
+    phone = call(client, "login", login="ala", password="tajne123")
+    call(client, "sync", token=phone["token"], profile={"name": "AlaZTelefonu", "avatar": {}})
+    # The computer reconnects with its stale local nick but nothing edited locally.
+    back = call(client, "session", token=ala["token"], name="Ala", avatar={}, keepProfile=True)
+    assert back["user"]["name"] == "AlaZTelefonu"
+    assert call(client, "sync", token=ala["token"])["user"]["name"] == "AlaZTelefonu"
+
+
 def test_login_errors_and_brute_force_limit(client):
     ala = guest(client, "Ala", "BLOX-111111")
     call(client, "register", token=ala["token"], login="ala", password="tajne123")

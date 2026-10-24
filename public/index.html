@@ -7335,20 +7335,42 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     connecting=true;setStatus(base?'Łączenie z serwerem…':'Tryb solo · skonfiguruj serwer');
     const waking=setTimeout(()=>setStatus('Budzenie serwera… to może potrwać do minuty'),3000);
     try{
-      const data=await api('session',{token,id:myPlayerId,name:username,avatar:avatarData,scope:isSecondaryTestTab?myPlayerId:'main'},false,WAKE_TIMEOUT);
+      // An existing account keeps the server's nick and look unless this
+      // device changed them since its last successful sync (e.g. offline).
+      const synced=accountStore.getItem(syncedKey()),keepProfile=!!token&&(synced===null||synced===localProfileKey());
+      const data=await api('session',{token,id:myPlayerId,name:username,avatar:avatarData,keepProfile,scope:isSecondaryTestTab?myPlayerId:'main'},false,WAKE_TIMEOUT);
       token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;account=data.account||null;connected=true;failures=0;
+      if(keepProfile)useServerProfile(me);else markProfileSynced();
       setStatus('Online',true);applySocial(data.social);renderFriendsAll();renderProfileOnline();renderPublicRooms();
       feedback(settingsFeedback,'Połączenie gotowe. ID online: '+me.id);
-      profileHash=JSON.stringify({name:username,avatar:avatarData});
     }catch(error){connected=false;setStatus('Tryb solo · serwer niedostępny');feedback(settingsFeedback,error.message,true);renderFriendsAll();renderPublicRooms();}
     finally{clearTimeout(waking);connecting=false;schedulePoll();}
+  }
+  // The server holds the shared nick and look. Each device remembers which
+  // version it last sent or received, so only its own edits are uploaded and
+  // a change made on another device replaces the local copy.
+  function profileKey(name,look){return JSON.stringify([name,...Object.keys(look||{}).sort().map(k=>k+'='+look[k])]);}
+  function localProfileKey(){return profileKey(username,normalizeAvatar(avatarData));}
+  function syncedKey(){return tokenKey()+':profile';}
+  function markProfileSynced(){
+    accountStore.setItem(syncedKey(),localProfileKey());
+    profileHash=JSON.stringify({name:username,avatar:avatarData});
+  }
+  function useServerProfile(user){
+    if(!user)return;
+    if(profileKey(user.name,normalizeAvatar(user.avatar))!==localProfileKey()){
+      username=user.name;Object.assign(avatarData,normalizeAvatar(user.avatar));
+      // Older scripts restore the nick from this key on every page load.
+      if(!isSecondaryTestTab)accountStore.setItem('blox_permanent_nick',username);
+      try{saveAllData(false);}catch{}
+    }
+    markProfileSynced();
   }
   // Switch this device to an account returned by login: its server profile
   // (nick and look) replaces the local one so all devices show the same player.
   function adoptAccount(data){
     token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;account=data.account||null;connected=true;failures=0;
-    if(me){username=me.name;Object.assign(avatarData,normalizeAvatar(me.avatar));}
-    profileHash=JSON.stringify({name:username,avatar:avatarData});
+    useServerProfile(me);
     socialHash='';applySocial(data.social);
     try{saveAllData(false);}catch{}
     setStatus('Online',true);renderFriendsAll();renderProfileOnline();renderPublicRooms();
@@ -7414,14 +7436,17 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     syncing=true;const started=performance.now(),epoch=roomEpoch;
     try{
       const wantSocial=performance.now()-lastSocial>1200;
-      const profile={name:username,avatar:avatarData},hash=JSON.stringify(profile);
+      const profile={name:username,avatar:avatarData},hash=JSON.stringify(profile),sentKey=localProfileKey();
       const position=active&&playerGroup?{x:playerGroup.position.x,y:playerGroup.position.y,z:playerGroup.position.z,rotY:playerGroup.rotation.y,moving:!!(keysPressed.KeyW||keysPressed.KeyS||keysPressed.KeyA||keysPressed.KeyD),dancing:isDancing}:null;
       const payload={position,actions:active?actions:[],social:wantSocial};
       if(hash!==profileHash)payload.profile=profile;
       const data=await api('sync',payload);
       profileHash=hash;latency=Math.round(performance.now()-started);lastSeen=performance.now();failures=0;connected=true;
       if(wantSocial){lastSocial=performance.now();applySocial(data.social);}
-      me=data.user;const publicHash=JSON.stringify(data.rooms);
+      me=data.user;
+      // Skip when the player edited their profile while this request was in flight.
+      if(localProfileKey()===sentKey){if(payload.profile)markProfileSynced();else useServerProfile(me);}
+      const publicHash=JSON.stringify(data.rooms);
       if(publicHash!==JSON.stringify(publicRooms)){publicRooms=data.rooms;renderPublicRooms();}
       if(epoch===roomEpoch){
         if(active&&data.room){room=data.room;applyRoom(room);}
