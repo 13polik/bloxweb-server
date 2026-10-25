@@ -1,4 +1,4 @@
-# NexusScript 1.2 – język gier 3D w BloxWeb Studio
+# NexusScript 1.3 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -7,7 +7,7 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - Gracz ma ok. 3,4 jednostki wzrostu i skacze na ok. 2,5 jednostki w górę. Skok w dal to ok. 6–7 jednostek.
 - Pozycja klocka to jego środek. `spawn("block", 0, 0, 0, 4, 1, 4)` tworzy płytę 4×1×4, której górna powierzchnia jest na Y=0,5.
 - Pod światem nie ma podłogi: kto spadnie poniżej najniższego klocka o 30 jednostek, traci życie i wraca do ostatniego checkpointu.
-- Limit: 600 klocków w grze.
+- Limit: 1500 klocków w grze.
 
 ## Typy klocków
 - `"block"` – zwykły klocek, można po nim chodzić.
@@ -21,6 +21,7 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - `"enemy"` – wróg z życiem (100). Domyślnie goni gracza w promieniu 18 jednostek i zadaje 25 obrażeń przy dotyku. Można go pokonać bronią.
 - `"ammo"` – paczka amunicji (+30 naboi po dotknięciu).
 - `"health"` – apteczka (+35 zdrowia po dotknięciu).
+- `"car"` – samochód (2.4 × 1.4 × 4.4). Gracz wsiada i wysiada klawiszem E / AKCJA, jedzie W/S (gaz, hamulec, wsteczny) i A/D (skręt), spacja to ręczny hamulec. Rozjeżdża wrogów.
 - `"npc"` – postać do rozmowy (np. `spawn("npc", 4, 1, 6, 1.5, 3, 1.5, "#3b82f6", "Ola")`). Gracz rozmawia klawiszem E lub przyciskiem AKCJA.
 
 ## Składnia
@@ -49,6 +50,8 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when kill { ... }` lub `when kill "Nazwa" { ... }` – gdy wróg zostanie pokonany (zmienna `target` to jego nazwa).
 - `when timeup { ... }` – gdy minutnik z `setTimer` dojdzie do zera.
 - `when talk "Imię" { ... }` – gdy gracz zagada do NPC (E / AKCJA w pobliżu).
+- `when enter { ... }` / `when exit { ... }` (opcjonalnie z nazwą auta) – wsiadanie i wysiadanie z auta.
+- `when arrive { ... }` – gdy gracz dotrze do znacznika z `setWaypoint` (znacznik wtedy znika).
 
 ## Broń i walka
 - `giveWeapon("pistol" | "rifle" | "shotgun" | "sniper" | "sword" | "none")` – daje graczowi broń (pistolet, karabin, strzelbę, snajperkę, miecz) albo ją zabiera.
@@ -57,6 +60,25 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `setAmmo(ile)` / `addAmmo(ile)` – amunicja (`setAmmo(-1)` = bez końca). Odczyt: `player.ammo`, `player.weapon`, `player.kills`.
 - `firstPerson(true)` – widok z oczu (FPS), `firstPerson(false)` – widok zza pleców.
 - `explode(x, y, z, promień, obrażenia)` – wybuch raniący wrogów i gracza w promieniu.
+
+## Pojazdy, trasy i drużyny
+- `spawn("car", x, y, z, 2.4, 1.4, 4.4, "#dc2626", "Auto")` – auto (y = połowa wysokości nad ziemią, np. 0.7).
+- `enterCar("Auto")` / `exitCar()` – wsadza gracza do auta lub z niego wysadza. `setCarSpeed("Auto", 30)` – prędkość maksymalna. `player.driving` – nazwa auta albo `null`.
+- `drivePath("Auto", [[0, 0], [40, 0], [40, 40]], 10)` – auto jeździ w kółko po trasie (ruch uliczny, rywale w wyścigu).
+- `walkPath("Ola", [[0, 0], [10, 0], [10, 10]], 3)` – NPC lub wróg chodzi po trasie.
+- `setTeam(nazwa, "ally")` – postać typu `"enemy"` staje się sojusznikiem gracza: idzie za nim i strzela do wrogów. `count("ally")` – ilu sojuszników żyje (`count("enemy")` liczy tylko wrogów).
+
+## Misje, pieniądze i sklep
+- `setWaypoint(x, y, z)` lub `setWaypoint("Nazwa")` – żółty znacznik w świecie i na minimapie, odległość na ekranie; po dotarciu działa `when arrive`. `clearWaypoint()` usuwa znacznik.
+- `minimap(true)` – okrągła minimapa (wrogowie czerwoni, sojusznicy zieloni, auta niebieskie, NPC żółci).
+- `setMoney(ile)`, `addMoney(ile)`, `player.money` – pieniądze na ekranie.
+- `var co = shop("Sklep", ["Karabin", 400], ["Granaty", 300])` – sklep z cenami; pobiera pieniądze i zwraca nazwę kupionej rzeczy albo `null`.
+
+## Gotowe światy i czas
+- `buildCity(x, z, rozmiar)` – miasto: asfalt, linie, chodniki i budynki (rozmiar 1–8 kwartałów; kwartał co 38 jednostek, ulice na x i z = ..., -38, 0, 38, ...).
+- `buildArena(x, z, rozmiar)` – arena z murem, osłonami i bazami `"BazaNiebieska"` (z −) i `"BazaCzerwona"` (z +).
+- `dayCycle(sekundy)` – automatyczny cykl dzień–noc, `setRegen(ile)` – odnawianie życia na sekundę.
+- Broń `"grenade"` – granaty rzucane łukiem, wybuchają przy uderzeniu.
 
 ## Wrogowie
 - Wroga tworzysz przez `var w = spawn("enemy", x, y, z, 2, 3, 2)`, czyli typem `"enemy"`. Kolor czerwony jest domyślny.
@@ -221,7 +243,56 @@ when touch "Brama" {
 }
 ```
 
+## Przykład: miasto w stylu GTA
+```nexus
+buildCity(0, 0, 3)
+spawn("spawn", -2.5, -0.4, -12, 4, 1, 4)
+spawn("car", 2.5, 0.7, -12, 2.4, 1.4, 4.4, "#dc2626", "Auto")
+var ruch = spawn("car", -38, 0.7, -38, 2.4, 1.4, 4.4, "#f59e0b")
+drivePath(ruch, [[-38, -38], [38, -38], [38, 38], [-38, 38]], 9)
+
+when start {
+  minimap(true)
+  setMoney(0)
+  setWaypoint(57, 0, 38)
+  hint("Wsiądź do auta (E) i dojedź do znacznika")
+}
+when arrive {
+  addMoney(500)
+  win("Dostawa wykonana! $" + player.money)
+}
+```
+
+## Przykład: drużyny w stylu CS
+```nexus
+buildArena(0, 0, 70)
+spawn("spawn", 0, 0, -28, 6, 1, 6)
+repeat 4 {
+  var s = spawn("enemy", random(-20, 20), 1.5, -24, 2, 3, 2, "#2563eb")
+  setTeam(s, "ally")
+}
+repeat 5 {
+  var w = spawn("enemy", random(-20, 20), 1.5, 27, 2, 3, 2, "#dc2626")
+  enemyMode(w, "shooter")
+}
+when start {
+  setMoney(800)
+  var bron = shop("Kup broń", ["Karabin", 700], ["Strzelba", 500])
+  if bron == "Karabin" {
+    giveWeapon("rifle")
+  } else {
+    giveWeapon("pistol")
+  }
+}
+when kill {
+  if count("enemy") == 0 {
+    win("Twoja drużyna wygrywa!")
+  }
+}
+```
+
 ## Zasady dla AI piszącego kod
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru.
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).

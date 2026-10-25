@@ -42,7 +42,9 @@ AI_URL = os.environ.get("BLOX_AI_URL", "")
 AI_KEY = os.environ.get("BLOX_AI_KEY", "")
 AI_DAILY_LIMIT = int(os.environ.get("BLOX_AI_DAILY_LIMIT", "250"))
 # The same language reference is embedded in the page for the copyable AI prompt.
-NEXUS_REFERENCE = (ROOT / "nexusscript.md").read_text(encoding="utf-8") if (ROOT / "nexusscript.md").exists() else ""
+# The model on the server gets the compact cheat sheet (the worker accepts up to 12 000 characters);
+# the full reference is embedded in the page for help and for prompts to other AIs.
+NEXUS_REFERENCE = (ROOT / "nexusscript_ai.md").read_text(encoding="utf-8") if (ROOT / "nexusscript_ai.md").exists() else ""
 rooms = {}
 presence = {}
 rates = defaultdict(deque)
@@ -263,7 +265,7 @@ def relations(uid):
 
 
 # ---------- Player-made games (Studio 3D + NexusScript) ----------
-PART_TYPES = {"block", "lava", "coin", "spawn", "finish", "checkpoint", "spring", "enemy", "glass", "ammo", "health", "npc"}
+PART_TYPES = {"block", "lava", "coin", "spawn", "finish", "checkpoint", "spring", "enemy", "glass", "ammo", "health", "npc", "car"}
 HEX = re.compile(r"#[0-9a-fA-F]{6}")
 # Short stems of common Polish/English swear words; titles, descriptions,
 # part names and script text are all checked because other children see them.
@@ -296,8 +298,8 @@ def game_data(value):
     sky = settings.get("sky") if HEX.fullmatch(str(settings.get("sky", ""))) else "#8fd3ff"
     parts = []
     raw_parts = value.get("parts") if isinstance(value.get("parts"), list) else []
-    if len(raw_parts) > 600:
-        fail("Gra może mieć najwyżej 600 elementów.")
+    if len(raw_parts) > 1500:
+        fail("Gra może mieć najwyżej 1500 elementów.")
     for raw in raw_parts:
         if not isinstance(raw, dict) or raw.get("t") not in PART_TYPES:
             continue

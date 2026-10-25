@@ -117,3 +117,16 @@ def test_nexusscript_11_pickups_are_kept(client):
     game_id = call(client, "games_publish", token=ala["token"], title="Strzelanka", game=game)["id"]
     stored = call(client, "games_get", token=ala["token"], id=game_id)["game"]
     assert [p["t"] for p in stored["parts"]][-3:] == ["ammo", "health", "npc"]
+
+
+def test_ai_cheat_sheet_fits_the_worker_and_covers_the_language():
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    sheet = (root / "nexusscript_ai.md").read_text(encoding="utf-8")
+    assert len(sheet) <= 11500
+    page = (root / "public" / "index.html").read_text(encoding="utf-8")
+    names = re.search(r"const BUILTIN_NAMES=new Set\(\[(.*?)\]\)", page).group(1)
+    events = re.search(r"const EVENTS=new Set\(\[(.*?)\]\)", page).group(1)
+    missing = [n for n in re.findall(r"'(\w+)'", names + "," + events) if not re.search(r"\b" + n + r"\b", sheet)]
+    assert missing == []
