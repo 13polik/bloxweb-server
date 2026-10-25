@@ -3803,8 +3803,8 @@ function normalizeAvatar(value) {
             for (let i = 0; i < 5; i++) spawnCS2Enemy();
 
             // Wiadomości na czacie (nie toasty!)
-            appendChatMessage('Serwer', '🔫 COUNTER STRIKE 1.6! Mapa 200×200. Rundy: 6. Cel: 20 zabójstw = +250 ◈', '#f5c542', true);
-            appendChatMessage('Serwer', '🛒 Kliknij [SKLEP] na dole albo naciśnij B (w strefie zakupów). [R] = reload.', '#00e691', true);
+            appendChatMessage('Serwer', 'COUNTER STRIKE 1.6', '#f5c542', true);
+            appendChatMessage('Serwer', 'B: sklep (żółta strefa), 1/2/3: broń, Q: poprzednia broń, R: przeładowanie, Tab: wyniki.', '#00e691', true);
         
             try { if (typeof createCS16MobileButtons === "function") createCS16MobileButtons(); } catch(e) { console.warn("Mobile buttons error:", e); }
         }
@@ -5010,6 +5010,7 @@ function normalizeAvatar(value) {
                 baseSpeed = 0.23;   // szybszy w piłce
                 boostSpeed = 0.38;  // szybszy boost
             }
+            if (activeGameMode === 'cs2' && typeof window.bloxCsSpeed === 'function') { const k = window.bloxCsSpeed(); baseSpeed *= k; boostSpeed *= k; }
             const speed = speedBoostTimer > 0 ? boostSpeed : baseSpeed;
 
             let moveX = 0, moveZ = 0;
@@ -6684,7 +6685,7 @@ function normalizeAvatar(value) {
   const oldStep=simulateGameStep;
   function fixedStep(){
     gameTimeMs+=STEP;
-    if(cs2?.reloading&&!window.bloxOnline?.active){cs2.reloadRemaining-=1/60;if(cs2.reloadRemaining<=0){const w=cs2.reloadWeapon;if(w&&cs2.weapons.includes(w))w.ammo=CS16_WEAPONS[w.id].ammo;cs2.reloading=false;cs2.reloadWeapon=null;updateWeaponHUD();tone(620,.06);}}
+    if(cs2?.reloading&&!window.bloxOnline?.active){cs2.reloadRemaining-=1/60;if(cs2.reloadRemaining<=0){const w=cs2.reloadWeapon;if(w&&cs2.weapons.includes(w)){const need=CS16_WEAPONS[w.id].ammo-w.ammo,take=w.reserve==null?need:Math.min(need,w.reserve);w.ammo+=take;if(w.reserve!=null)w.reserve-=take;}cs2.reloading=false;cs2.reloadWeapon=null;updateWeaponHUD();tone(620,.06);}}
     if(fireHeld&&activeGameMode==='cs2')shootCS2();
     oldStep();
     if(activeGameMode==='football'&&playerGroup){playerGroup.position.x=clamp(playerGroup.position.x,-46,46);playerGroup.position.z=clamp(playerGroup.position.z,-27,27);}
@@ -6911,12 +6912,14 @@ function normalizeAvatar(value) {
   function enemyKill(enemy){
     const index=cs2.enemies.indexOf(enemy);if(index<0)return;
     disposeObject(enemy.rig.group);cs2.enemies.splice(index,1);cs2.kills++;cs2.money+=300;coins+=15;advanceQuest('q_coins',1);
+    if(window.bloxCsRounds?.onKill(enemy)){updateWeaponHUD();updateRoundsHUD();saveAllData(false);return;}
     const round=Math.min(cs2.maxRounds,1+Math.floor(cs2.kills/4));
     if(round>cs2.round){cs2.round=round;cs2.money+=1500;appendChatMessage('Serwer',`Etap ${round}/6 · +$1500`,'#f5c542',true);}
     if(cs2.kills>=20&&!cs2.won){cs2.won=true;coins+=250;finishMatch(true,'Cel wykonany!',`20 eliminacji. Nagroda końcowa: +250 BloxBux. Portfel: ${formatCoins(coins)}.`);}
     else spawnCS2Enemy();
     updateWeaponHUD();updateRoundsHUD();saveAllData(false);
   }
+  window.bloxCsKill=enemyKill;window.bloxFinishMatch=finishMatch;window.bloxTone=tone;
   shootCS2=function(){
     if(!cs2||activeGameMode!=='cs2'||!currentPlayingGame||!camera||paused||cs2.won||cs2.reloading||$('cs16BuyMenu'))return;
     if(cs2.shootCd>0)return;
@@ -6946,7 +6949,8 @@ function normalizeAvatar(value) {
   };
   reloadCS2=function(){
     if(!cs2||activeGameMode!=='cs2'||paused||cs2.won||cs2.reloading)return;
-    const weapon=cs2.weapons[cs2.currentWeapon],spec=CS16_WEAPONS[weapon.id];if(!spec||weapon.ammo===spec.ammo)return;
+    const weapon=cs2.weapons[cs2.currentWeapon],spec=CS16_WEAPONS[weapon.id];if(!spec||weapon.ammo===spec.ammo||weapon.ammo<0)return;
+    if(weapon.reserve===0){addKillFeed('Brak zapasowej amunicji','#ff9f89');return;}
     cs2.reloading=true;cs2.reloadWeapon=weapon;cs2.reloadRemaining=spec.reload;
     addKillFeed('Przeładowanie · '+spec.reload+' s','#a5caee');tone(220,.1);updateWeaponHUD();
   };
@@ -8625,7 +8629,7 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
   let lastPlayerAmmo=null,lastPlayerWeapon=-1,lastPlayerPos=null,playerSpeed=0;
   function turnTo(group,angle,dt){const cur=group.rotation.y,diff=((angle-cur)%(Math.PI*2)+Math.PI*3)%(Math.PI*2)-Math.PI;group.rotation.y=cur+diff*Math.min(1,dt*10);}
   function soloBots(dt){
-    const nav=cs2.navigation,clock=gameTimeMs/1000,target=playerGroup.position;if(!nav||cs2.won)return;
+    const nav=cs2.navigation,clock=gameTimeMs/1000,target=playerGroup.position;if(!nav||cs2.won||window.bloxCsRounds?.frozen())return;
     const wpn=cs2.weapons[cs2.currentWeapon],shot=!!wpn&&lastPlayerAmmo!==null&&lastPlayerWeapon===cs2.currentWeapon&&wpn.ammo<lastPlayerAmmo;
     lastPlayerAmmo=wpn?wpn.ammo:null;lastPlayerWeapon=cs2.currentWeapon;
     if(lastPlayerPos&&dt>0)playerSpeed+=(Math.min(12,Math.hypot(target.x-lastPlayerPos.x,target.z-lastPlayerPos.z)/dt)-playerSpeed)*Math.min(1,dt*8);
@@ -8683,7 +8687,7 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
         const from=new THREE.Vector3(p.x,2.8,p.z),end=target.clone();end.y+=2;
         const hit=Math.random()<chance;if(!hit){end.x+=(Math.random()-.5)*4;end.z+=(Math.random()-.5)*4;end.y+=Math.random()*1.5;}
         window.BloxGame.tracer(from,end,0xffa46b);e.flashUntil=clock+.07;
-        if(hit&&clock>cs2.spawnShieldUntil){const head=Math.random()<.06+skill*.3;cs2.hp-=Math.round((cs2.boughtKevlar?5:8)*(head?2.2:1));if(cs2.hp<=0){cs2.hp=100;cs2.money=Math.max(0,cs2.money-200);cs2.boughtKevlar=false;cs2.reloading=false;cs2.spawnShieldUntil=clock+2.5;playerGroup.position.set(-70,1.5,-70);addKillFeed('Powrót do bazy · -$200','#ffb08e');}playerHP=cs2.hp;updateIngameHUD();updateWeaponHUD();}
+        if(hit&&clock>cs2.spawnShieldUntil){const head=Math.random()<.06+skill*.3;cs2.hp-=Math.round((cs2.boughtKevlar?5:8)*(head?2.2:1));if(cs2.hp<=0&&window.bloxCsRounds?.playerDied(e,head)){playerHP=0;updateIngameHUD();updateWeaponHUD();continue;}if(cs2.hp<=0){cs2.hp=100;cs2.money=Math.max(0,cs2.money-200);cs2.boughtKevlar=false;cs2.reloading=false;cs2.spawnShieldUntil=clock+2.5;playerGroup.position.set(-70,1.5,-70);addKillFeed('Powrót do bazy · -$200','#ffb08e');}playerHP=cs2.hp;updateIngameHUD();updateWeaponHUD();}
       }
     }
   }
@@ -10373,6 +10377,13 @@ button:focus-visible,.nav-btn:focus-visible,.cat-pill:focus-visible,.game-card:f
     const P=(geo,mat,p,r)=>part(g,geo,mat,p,r);
     const tube=(r,len,mat,p,rot=[Math.PI/2,0,0])=>P(new THREE.CylinderGeometry(r,r,len,12),mat,p,rot);
     let tip=-.5;
+    if(id==='knife'){
+      P(rbox(.12,.16,.3,.04),black,[0,-.1,.04],[-.25,0,0]);for(let i=0;i<4;i++)P(new THREE.BoxGeometry(.125,.02,.03),poly,[0,-.06-i*.05,.0+i*.012],[-.25,0,0]);
+      P(rbox(.26,.05,.07,.02),steel,[0,.06,-.1]);
+      const blade=P(new THREE.BoxGeometry(.03,.13,.5),silver,[0,.08,-.37]);P(new THREE.BoxGeometry(.032,.04,.16),steel,[0,.155,-.2]);
+      P(new THREE.CylinderGeometry(0,.065,.14,4),silver,[0,.08,-.67],[-Math.PI/2,Math.PI/4,0]);blade.scale.x=.8;
+      g.userData.tip=-.7;return g;
+    }
     if(['glock','usp','deagle'].includes(id)){
       const len=id==='glock'?.46:.6,slide=id==='deagle'?silver:id==='usp'?steel:poly,frame=id==='deagle'?black:poly;
       P(rbox(id==='deagle'?.19:.16,.14,len,.025),slide,[0,.11,-.15-(len-.46)/2]);
@@ -10405,7 +10416,7 @@ button:focus-visible,.nav-btn:focus-visible,.cat-pill:focus-visible,.game-card:f
   }
   // Gloved hands in the view model's own space (grip near the origin, barrel toward -Z).
   function viewHands(id){
-    const g=new THREE.Group(),rifle=!['glock','usp','deagle'].includes(id);
+    const g=new THREE.Group(),rifle=!['glock','usp','deagle','knife'].includes(id);
     const sleeveColor=new THREE.Color((typeof avatarData==='object'&&avatarData.torso)||'#525e51').getHex();
     const glove=phong(0x2a2d2b,25),knuckle=phong(0x1d201f,30),sleeve=phong(sleeveColor,8),cuff=phong(new THREE.Color(sleeveColor).multiplyScalar(.7).getHex(),8),strap=phong(0x4a4f4a,30);
     const P=(geo,mat,p,r=[0,0,0])=>part(g,geo,mat,p,r);
@@ -10600,7 +10611,8 @@ body.device-mobile #v10Debug{display:none!important}
 })();
 </script>
 <style id="v16-cs-style">
-.v16-radar{position:fixed;z-index:540;left:16px;top:120px;width:150px;height:150px;border-radius:50%;border:2px solid #ffffff3a;background:#0b1410c8;box-shadow:0 4px 14px #0007;pointer-events:none}
+/* Below the in-game chat box on desktop. */
+.v16-radar{position:fixed;z-index:540;left:16px;top:304px;width:150px;height:150px;border-radius:50%;border:2px solid #ffffff3a;background:#0b1410c8;box-shadow:0 4px 14px #0007;pointer-events:none}
 .v16-hurt{position:fixed;z-index:561;left:50%;top:50%;width:190px;height:190px;margin:-95px 0 0 -95px;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .5s ease-out;
   background:conic-gradient(from -28deg,#ff3b30e6 0 56deg,transparent 56deg);-webkit-mask:radial-gradient(circle,transparent 78px,#000 80px 92px,transparent 94px);mask:radial-gradient(circle,transparent 78px,#000 80px 92px,transparent 94px)}
 .v16-hurt.on{opacity:1;transition:none}
@@ -10718,6 +10730,329 @@ body.device-mobile .v16-radar{left:12px;top:150px;width:96px;height:96px}
   // Right mouse button aims too.
   addEventListener('contextmenu',e=>{if(active()&&e.target?.closest?.('#gameCanvasContainer')){e.preventDefault();if(!isPaused())setScope(!scoped);}});
   setInterval(()=>{if(!active()&&(radar||scoped))clearUi();},500);
+})();
+</script>
+<style id="v17-cs-style">
+/* CS 1.6 look: classic orange HUD numbers, round score, text-style buy menu. */
+body.v17-cs #cs16WeaponHUD,body.v17-cs #cs16RoundsHUD,body.v17-cs #cs16Buttons,body.v17-cs #v10Debug{display:none!important}
+.v17-hud{--hud:#ffb23c;font-family:"Arial Narrow","Roboto Condensed",Arial,sans-serif;color:var(--hud);pointer-events:none}
+.v17-hud b{font-weight:700;font-variant-numeric:tabular-nums}
+.v17-hud svg{width:.8em;height:.8em;fill:currentColor;flex:none}
+.v17-cell{position:fixed;z-index:545;display:flex;align-items:center;gap:8px;font-size:34px;line-height:1;text-shadow:0 2px 3px #000b;opacity:.92}
+.v17-hp{left:20px;bottom:18px}.v17-hp .sep{width:14px}
+.v17-hp.low{color:#ff4a3a}
+.v17-time{left:50%;bottom:18px;transform:translateX(-50%)}
+.v17-time.low{color:#ff4a3a}
+.v17-money{right:24px;bottom:62px;font-size:28px}
+.v17-money.gain{color:#7dff6b}
+.v17-ammo{right:24px;bottom:18px}
+.v17-ammo .name{font-size:14px;opacity:.8;margin-right:4px;align-self:flex-end;padding-bottom:4px}
+.v17-ammo em{font-style:normal;opacity:.55;margin:0 2px}
+.v17-score{position:fixed;z-index:545;top:60px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:6px 16px;border-radius:6px;background:#000000a6;font-size:16px;text-shadow:none;color:#e9e3d6;pointer-events:auto;cursor:pointer;white-space:nowrap}
+.v17-score .ct{color:#8cc4ff}.v17-score .tt{color:#ff9a7a}.v17-score b{font-size:20px}
+.v17-score .t2{display:none;color:var(--hud)}
+.v17-center{position:fixed;z-index:562;left:50%;top:26%;transform:translateX(-50%);text-align:center;color:#fff;font:700 28px/1.2 Arial,sans-serif;text-shadow:0 2px 4px #000,0 0 12px #000a;pointer-events:none;transition:opacity .3s;max-width:92vw}
+.v17-center small{display:block;font-size:16px;font-weight:600;color:#ffd99a;margin-top:6px}
+.v17-center.ct{color:#9fd0ff}.v17-center.tt{color:#ff9f86}
+.v17-feed{background:#000000b3;padding:5px 10px;border-radius:4px;font:600 13px Arial,sans-serif;color:#eee;white-space:nowrap}
+.v17-feed .ct{color:#8cc4ff}.v17-feed .tt{color:#ff8f72}.v17-feed .w{color:#fff;opacity:.85}.v17-feed .hs{color:#ffcf5a}
+.v17-feed.mine{outline:1px solid #ff3b30}
+#cs16BuyMenu.v17-buy{position:fixed;left:24px;top:50%;transform:translateY(-50%);z-index:600;width:320px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto;padding:14px 16px;border-radius:6px;border:1px solid #ffb23c55;background:#000000d9;color:#ffb23c;font:600 16px/1.25 Arial,sans-serif;box-shadow:0 6px 24px #000a}
+.v17-buy h3{margin:0 0 4px;font-size:18px;color:#ffd38a}
+.v17-buy .bal{font-size:13px;color:#d9cdb5;margin-bottom:10px}
+.v17-buy button{display:flex;width:100%;min-height:40px;align-items:center;gap:10px;padding:6px 8px;margin:2px 0;border:0;border-radius:4px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+.v17-buy button:hover,.v17-buy button:focus-visible{background:#ffb23c22;outline:none}
+.v17-buy button .k{width:18px;color:#fff}.v17-buy button .p{margin-left:auto;color:#d9cdb5}
+.v17-buy button.no{color:#7d725f}.v17-buy button.no .p{color:#7d725f}
+.v17-buy .note{font-size:12px;color:#c9bca2;margin-top:8px}
+.v17-board{position:fixed;z-index:590;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:14px 16px;border-radius:6px;background:#000000d9;color:#e9e3d6;font:600 14px Arial,sans-serif;display:none;pointer-events:auto}
+body.v17-board-open .v17-board{display:block}
+.v17-board h3{margin:10px 0 4px;font-size:15px}.v17-board h3.ct{color:#8cc4ff}.v17-board h3.tt{color:#ff9a7a}
+.v17-board table{width:100%;border-collapse:collapse}.v17-board td,.v17-board th{padding:4px 6px;text-align:right}.v17-board td:first-child,.v17-board th:first-child{text-align:left}
+.v17-board th{color:#a99f8c;font-size:12px;font-weight:600}.v17-board tr.dead td{opacity:.45}
+.v17-board .top{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#ffd38a}
+body.v17-dead #gameCanvasContainer canvas{filter:grayscale(.85) brightness(.65)}
+body.device-mobile .v17-score{top:58px;gap:10px;padding:5px 12px;font-size:14px}
+body.device-mobile .v17-score b{font-size:17px}
+body.device-mobile .v17-score .t2{display:inline}
+body.device-mobile .v17-time{display:none}
+body.device-mobile .v17-row{position:fixed;z-index:545;top:102px;left:12px;display:flex;gap:12px;align-items:center;padding:6px 10px;border-radius:8px;background:#000000a0}
+body.device-mobile .v17-row .v17-cell{position:static;transform:none;font-size:20px;gap:4px}
+body.device-mobile .v17-row .v17-ammo .name{display:none}
+body.device-mobile .v17-center{font-size:20px;top:30%}
+body.device-mobile .v17-center small{font-size:13px}
+body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);width:340px}
+@media (max-height:430px){body.device-mobile .v17-score{top:56px}body.device-mobile .v17-row{top:100px}#cs16BuyMenu.v17-buy{font-size:14px}.v17-buy button{min-height:34px}}
+</style>
+<script id="v17-cs-script">
+// CS 1.6 rules for solo play: CT vs T rounds, freeze time, economy, knife and weapon slots.
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const FREEZE=4,ROUND=115,BUY=20,WIN_AT=4,MAX_MONEY=16000;
+  const PRIMARY=['mp5','ak47','m4a1','awp'],PISTOL=['glock','usp','deagle'];
+  const RESERVE={glock:120,usp:100,deagle:35,mp5:120,ak47:90,m4a1:90,awp:30};
+  const SPEED={ak47:.88,m4a1:.92,awp:.84};
+  const BOTS=['Bartek','Kuba','Olek','Szymon','Wiktor'];
+  CS16_WEAPONS.knife=CS16_WEAPONS.knife||{name:'Nóż',price:0,damage:55,headshot:120,spread:0,ammo:-1,reload:1};
+  const ICON={hp:'<svg viewBox="0 0 10 10"><path d="M3.5 0h3v3.5H10v3H6.5V10h-3V6.5H0v-3h3.5z"/></svg>',ar:'<svg viewBox="0 0 10 10"><path d="M5 0l4.5 1.6v3.2C9.5 7.6 7.6 9.3 5 10 2.4 9.3.5 7.6.5 4.8V1.6z"/></svg>',
+    time:'<svg viewBox="0 0 10 10"><path d="M5 0a5 5 0 1 0 0 10A5 5 0 0 0 5 0zm0 1.4a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2zM4.4 2.4v3l2.4 1.5.6-1-1.8-1.1V2.4z"/></svg>'};
+  const R={on:false};
+  const now=()=>gameTimeMs/1000;
+  const solo=()=>activeGameMode==='cs2'&&!!cs2&&!!currentPlayingGame&&!window.bloxOnline?.active;
+  const inCs=()=>activeGameMode==='cs2'&&!!cs2&&!!currentPlayingGame;
+  const sound=(f,d,t,v)=>{try{window.bloxTone?.(f,d,t,v);}catch{}};
+  const weaponName=id=>CS16_WEAPONS[id]?.name||id;
+  const fmt=t=>{t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0');};
+  function addMoney(n){cs2.money=Math.min(MAX_MONEY,cs2.money+n);R.moneyFlash=now()+1;}
+  function removeRig(group){if(!group)return;scene.remove(group);group.traverse(o=>{o.geometry?.dispose?.();});}
+  // ---------- Weapons ----------
+  function sortWeapons(){
+    const cur=cs2.weapons[cs2.currentWeapon],rank=w=>PRIMARY.includes(w.id)?0:PISTOL.includes(w.id)?1:2;
+    cs2.weapons.sort((a,b)=>rank(a)-rank(b));cs2.currentWeapon=Math.max(0,cs2.weapons.indexOf(cur));
+  }
+  function ensureKit(){
+    for(const w of cs2.weapons)if(w.reserve==null&&RESERVE[w.id]!=null)w.reserve=RESERVE[w.id];
+    if(!cs2.weapons.some(w=>w.id==='knife'))cs2.weapons.push({id:'knife',ammo:-1});
+    if(!cs2.weapons.some(w=>PISTOL.includes(w.id)))cs2.weapons.push({id:'glock',ammo:20,reserve:RESERVE.glock});
+    sortWeapons();
+  }
+  function slot(n){
+    const pick=cs2.weapons.findIndex(w=>n===1?PRIMARY.includes(w.id):n===2?PISTOL.includes(w.id):w.id==='knife');
+    if(pick>=0&&pick!==cs2.currentWeapon)switchCS2Weapon(pick);
+  }
+  const switchBase=switchCS2Weapon;
+  switchCS2Weapon=function(index){const before=cs2?.weapons?.[cs2.currentWeapon];const out=switchBase.apply(this,arguments);const after=cs2?.weapons?.[cs2.currentWeapon];if(before&&after&&before!==after){R.lastWeapon=before;sound(420,.03,'square',.02);}return out;};
+  window.switchCS2Weapon=switchCS2Weapon;
+  function lastWeapon(){const i=cs2.weapons.indexOf(R.lastWeapon);if(i>=0)switchCS2Weapon(i);}
+  window.bloxCsSpeed=()=>{const id=cs2?.weapons?.[cs2.currentWeapon]?.id;if(!id)return 1;if(id==='awp'&&document.body.classList.contains('v16-scoped'))return .6;return SPEED[id]||1;};
+  // ---------- Knife ----------
+  function slash(){
+    const clock=now();if(clock<(R.knifeReady||0))return;R.knifeReady=clock+.45;
+    if(cs2GunMesh)cs2GunMesh.userData.kick=1;sound(260,.05,'triangle',.03);
+    scene.updateMatrixWorld(true);const d=new THREE.Vector3();camera.getWorldDirection(d);
+    const ray=new THREE.Raycaster(camera.position.clone(),d,0,3.4);
+    const wall=ray.intersectObjects(platforms.map(p=>p.mesh),false)[0];
+    let best=null;for(const e of cs2.enemies){const h=ray.intersectObject(e.rig.group,true)[0];if(h&&(!best||h.distance<best.h.distance))best={e,h};}
+    if(!best||(wall&&wall.distance<best.h.distance))return;
+    const head=best.h.object===best.e.rig.headMesh||best.h.object.userData?.head===true;
+    best.e.hp-=head?120:55;sound(head?880:520,.04);
+    const marker=$('v10HitMarker');if(marker){marker.hidden=false;marker.style.color=head?'#f5cd69':'#fff';}
+    if(best.e.hp<=0){R.lastHead=head;window.bloxCsKill?.(best.e);}
+  }
+  const shootBase=shootCS2;
+  shootCS2=function(){
+    if(solo()&&R.on){if(R.phase==='freeze'||(R.phase==='end'&&R.died))return;if(window.BloxGame?.paused||$('cs16BuyMenu'))return;if(cs2.weapons[cs2.currentWeapon]?.id==='knife')return slash();}
+    return shootBase.apply(this,arguments);
+  };
+  window.shootCS2=shootCS2;
+  // ---------- Rounds ----------
+  function center(text,sub,cls,secs){
+    let el=$('v17Center');if(!el){el=document.createElement('div');el.id='v17Center';document.body.append(el);}
+    el.className='v17-center'+(cls?' '+cls:'');el.textContent=text;if(sub){const s=document.createElement('small');s.textContent=sub;el.append(s);}
+    el.style.opacity='1';R.centerUntil=now()+(secs||2.5);
+  }
+  function startMatch(){
+    Object.assign(R,{on:true,no:1,ct:0,tt:0,lossStreak:0,died:false,over:false,kills:0,deaths:0,bots:Object.fromEntries(BOTS.map(n=>[n,{k:0,d:0}])),lastWeapon:null});
+    cs2.maxRounds=WIN_AT*2-1;startRound();
+  }
+  function startRound(){
+    const clock=now();
+    for(const e of cs2.enemies)removeRig(e.rig?.group);cs2.enemies=[];
+    for(let i=0;i<BOTS.length;i++){spawnCS2Enemy();const e=cs2.enemies[cs2.enemies.length-1];if(e)e.name=BOTS[i];}
+    if(R.died){cs2.weapons=[{id:'glock',ammo:20,reserve:RESERVE.glock},{id:'knife',ammo:-1}];cs2.currentWeapon=0;cs2.boughtKevlar=false;}
+    ensureKit();R.lastWeapon=null;
+    const start=cs2.weapons.findIndex(w=>w.id!=='knife');if(start>=0)cs2.currentWeapon=start;
+    cs2.hp=100;playerHP=100;cs2.reloading=false;cs2.reloadWeapon=null;R.died=false;document.body.classList.remove('v17-dead');
+    playerGroup.position.set(-70,1.5,-70);try{playerVelY=0;}catch{}camYaw=-Math.PI*.75;
+    R.phase='freeze';R.until=clock+FREEZE;R.buyUntil=clock+FREEZE+BUY;cs2.round=R.no;cs2.spawnShieldUntil=clock+FREEZE+1.5;cs2.shootCd=0;
+    if(cs2GunMesh)cs2GunMesh.visible=true;
+    center(`Runda ${R.no}`,R.no===1?'Pierwsza drużyna z 4 wygranymi wygrywa · B: sklep':'Kup wyposażenie: B','',FREEZE);
+    updateGunMesh();updateWeaponHUD();updateRoundsHUD();
+  }
+  function endRound(winner,text){
+    const clock=now();if(R.phase==='end')return;R.phase='end';R.until=clock+4.5;
+    if(winner==='ct'){R.ct++;R.lossStreak=0;addMoney(3250);sound(660,.12,'triangle',.05);setTimeout(()=>sound(880,.18,'triangle',.05),140);}
+    else{R.tt++;addMoney(Math.min(3400,1400+500*R.lossStreak));R.lossStreak++;sound(220,.25,'sawtooth',.04);}
+    if(R.ct>=WIN_AT||R.tt>=WIN_AT)R.over=true;
+    center(text,`Antyterroryści ${R.ct} : ${R.tt} Terroryści`,winner,4.5);
+    updateWeaponHUD();
+  }
+  function finish(){
+    const won=R.ct>R.tt;R.on=false;cs2.won=true;document.body.classList.remove('v17-dead');
+    if(won)coins+=250;
+    try{window.bloxFinishMatch(won,won?'Antyterroryści wygrywają mecz!':'Terroryści wygrywają mecz',`Wynik ${R.ct}:${R.tt}. Zabójstwa: ${R.kills}, zgony: ${R.deaths}.`+(won?` Nagroda: +250 BloxBux. Portfel: ${formatCoins(coins)}.`:' Spróbuj jeszcze raz!'));}catch(error){console.warn('CS finish',error);}
+  }
+  function feed(a,aCt,weapon,b,head,mine){
+    const kf=$('cs16KillFeed');if(!kf)return;const d=document.createElement('div');d.className='v17-feed'+(mine?' mine':'');
+    const node=(tag,cls,t)=>{const s=document.createElement(tag);s.className=cls;s.textContent=t;return s;};
+    d.append(node('b',aCt?'ct':'tt',a),node('span','w',` [${weapon}] `));
+    if(head)d.append(node('span','hs','HS '));
+    d.append(node('b',aCt?'tt':'ct',b));
+    kf.append(d);while(kf.children.length>5)kf.firstChild.remove();setTimeout(()=>d.remove(),6000);
+  }
+  window.bloxCsRounds={
+    frozen:()=>solo()&&R.on&&R.phase!=='live',
+    onKill(enemy){
+      if(!solo()||!R.on)return false;
+      R.kills++;const st=R.bots[enemy.name];if(st)st.d++;
+      feed('Ty',true,weaponName(cs2.weapons[cs2.currentWeapon]?.id),enemy.name||'Terrorysta',R.lastHead,true);R.lastHead=false;
+      R.moneyFlash=now()+1;return true;
+    },
+    playerDied(enemy,head){
+      if(!solo()||!R.on||R.phase!=='live')return false;
+      cs2.hp=0;R.died=true;R.deaths++;const st=R.bots[enemy?.name];if(st)st.k++;
+      feed(enemy?.name||'Terrorysta',false,'Glock-18','Ty',head,true);
+      if(cs2GunMesh)cs2GunMesh.visible=false;document.body.classList.add('v17-dead');window.bloxCsAim?.(false);
+      R.deadAt={x:playerGroup.position.x,z:playerGroup.position.z};
+      endRound('tt','Terroryści wygrywają');return true;
+    },
+    state:()=>R.on?{round:R.no,phase:R.phase,ct:R.ct,tt:R.tt,time:Math.max(0,R.until-now()),kills:R.kills,deaths:R.deaths}:null
+  };
+  // Hit spam is replaced by the classic kill feed; headshots are remembered for it.
+  const feedBase=addKillFeed;
+  addKillFeed=function(text,color){
+    if(solo()&&R.on){if(/^HEADSHOT/.test(text)){R.lastHead=true;return;}if(/^Trafienie/.test(text))return;}
+    return feedBase.apply(this,arguments);
+  };
+  // ---------- Buying ----------
+  const buyBase=buyCS2Item;
+  buyCS2Item=function(item){
+    if(solo()&&R.on){
+      if(now()>R.buyUntil){feedBase('Czas na zakupy minął','#ffb27f');return;}
+      if(item==='ammo'){
+        if(!cs2.buyZone){feedBase('Zakupy tylko w żółtej bazie.','#ffb27f');return;}
+        if(cs2.money<100){feedBase('Za mało pieniędzy','#ff9f89');return;}
+        cs2.money-=100;for(const w of cs2.weapons)if(RESERVE[w.id]!=null)w.reserve=RESERVE[w.id];feedBase('Kupiono amunicję','#b6f3c9');updateWeaponHUD();if($('cs16BuyMenu'))renderMenu();return;
+      }
+      const group=PRIMARY.includes(item)?PRIMARY:PISTOL.includes(item)?PISTOL:null;
+      const spec=CS16_WEAPONS[item];
+      if(group&&spec&&cs2.money>=spec.price&&cs2.buyZone){
+        // Buying a weapon replaces the one in the same slot, like dropping it.
+        const cur=cs2.weapons[cs2.currentWeapon];
+        const old=cs2.weapons.findIndex(w=>group.includes(w.id)&&w.id!==item);if(old>=0)cs2.weapons.splice(old,1);
+        cs2.currentWeapon=Math.max(0,cs2.weapons.indexOf(cur));
+      }
+      const out=buyBase.apply(this,arguments);
+      const bought=cs2.weapons.find(w=>w.id===item);if(bought&&RESERVE[item]!=null)bought.reserve=RESERVE[item];
+      ensureKit();const i=cs2.weapons.indexOf(bought);if(i>=0)cs2.currentWeapon=i;
+      updateGunMesh();updateWeaponHUD();if($('cs16BuyMenu'))renderMenu();return out;
+    }
+    return buyBase.apply(this,arguments);
+  };
+  window.buyCS2Item=buyCS2Item;
+  let page='main';
+  const PAGES={main:'Kup',pistol:'Pistolety',smg:'Pistolety maszynowe',rifle:'Karabiny',gear:'Wyposażenie'};
+  function menuItems(){
+    const w=id=>({id,label:CS16_WEAPONS[id].name,price:CS16_WEAPONS[id].price});
+    if(page==='pistol')return PISTOL.map(w);
+    if(page==='smg')return [w('mp5')];
+    if(page==='rifle')return ['ak47','m4a1','awp'].map(w);
+    if(page==='gear'){const list=[{id:'kevlar',label:'Kamizelka kevlarowa',price:650}];if(solo())list.push({id:'ammo',label:'Amunicja (pełny zapas)',price:100});return list;}
+    return [{go:'pistol',label:'Pistolety'},{go:'smg',label:'Pistolety maszynowe'},{go:'rifle',label:'Karabiny'},{go:'gear',label:'Wyposażenie'}];
+  }
+  function closeMenu(){$('cs16BuyMenu')?.remove();$('cs16BuyBackdrop')?.remove();page='main';}
+  function choose(n){
+    if(n===0){if(page==='main')closeMenu();else{page='main';renderMenu();}return;}
+    const it=menuItems()[n-1];if(!it)return;
+    if(it.go){page=it.go;renderMenu();return;}
+    buyCS2Item(it.id);
+  }
+  function renderMenu(){
+    let m=$('cs16BuyMenu');if(!m){m=document.createElement('div');m.id='cs16BuyMenu';m.className='v17-buy';m.setAttribute('role','dialog');m.setAttribute('aria-label','Sklep');
+      for(const t of['touchstart','touchmove','touchend'])m.addEventListener(t,e=>e.stopPropagation(),{passive:true});m.addEventListener('pointerdown',e=>e.stopPropagation());document.body.append(m);}
+    if(!m.classList.contains('v17-buy'))m.className='v17-buy';
+    m.textContent='';const h=document.createElement('h3');h.textContent=PAGES[page];m.append(h);
+    const bal=document.createElement('div');bal.className='bal';
+    const left=solo()&&R.on?Math.ceil(R.buyUntil-now()):null;
+    bal.textContent=`$${cs2.money}`+(cs2.buyZone?'':' · poza strefą zakupów')+(left!=null?(left>0?` · ${left} s na zakupy`:' · czas na zakupy minął'):'');m.append(bal);
+    const row=(key,label,price,cls,fn)=>{const b=document.createElement('button');b.type='button';const k=document.createElement('span');k.className='k';k.textContent=key;const l=document.createElement('span');l.textContent=label;b.append(k,l);
+      if(price!=null){const p=document.createElement('span');p.className='p';p.textContent='$'+price;b.append(p);}if(cls)b.classList.add(cls);b.onclick=e=>{e.preventDefault();e.stopPropagation();fn();};m.append(b);};
+    menuItems().forEach((it,i)=>{const owned=it.id==='kevlar'&&cs2.boughtKevlar;row(String(i+1),it.label,it.price,it.price!=null&&(cs2.money<it.price||owned)?'no':'',()=>choose(i+1));});
+    row('0',page==='main'?'Zamknij':'Wstecz',null,'',()=>choose(0));
+    const note=document.createElement('div');note.className='note';note.textContent=window.isMobileDevice?'Dotknij pozycji, aby kupić.':'Klawisze 1–9 wybierają, 0 cofa, B lub Esc zamyka.';m.append(note);
+  }
+  showBuyMenu=function(){if(!cs2)return;if($('cs16BuyMenu')){closeMenu();return;}page='main';renderMenu();};
+  window.showBuyMenu=showBuyMenu;
+  // ---------- HUD ----------
+  let hud=null,board=null;
+  function cell(cls,html){const d=document.createElement('div');d.className='v17-cell '+cls;d.innerHTML=html;return d;}
+  function ensureHud(){
+    if(hud&&hud.isConnected)return;
+    hud=document.createElement('div');hud.className='v17-hud';hud.id='v17Hud';
+    const score=document.createElement('div');score.className='v17-score';score.innerHTML='<span class="ct">AT <b data-k="ct">0</b></span><span data-k="round">Runda 1</span><span class="t2" data-k="t2">1:55</span><span class="tt"><b data-k="tt">0</b> TT</span>';
+    score.setAttribute('role','button');score.setAttribute('aria-label','Tabela wyników');score.onclick=()=>toggleBoard();
+    const row=document.createElement('div');row.className='v17-row';
+    row.append(cell('v17-hp',`${ICON.hp}<b data-k="hp">100</b><span class="sep"></span>${ICON.ar}<b data-k="ar">0</b>`),cell('v17-time',`${ICON.time}<b data-k="time">1:55</b>`),cell('v17-money','$<b data-k="money">800</b>'),cell('v17-ammo','<span class="name" data-k="name"></span><b data-k="clip">20</b><em>|</em><b data-k="res">∞</b>'));
+    hud.append(score,row);document.body.append(hud);
+    board=document.createElement('div');board.className='v17-board';board.id='v17Board';board.setAttribute('aria-label','Tabela wyników');board.onclick=()=>toggleBoard(false);hud.append(board);
+    document.body.classList.add('v17-cs');
+  }
+  function set(k,v){const el=hud.querySelector(`[data-k="${k}"]`);if(el&&el.textContent!==String(v))el.textContent=v;}
+  function renderHud(){
+    ensureHud();const w=cs2.weapons[cs2.currentWeapon],clock=now();
+    set('hp',Math.max(0,cs2.hp));set('ar',cs2.boughtKevlar?100:0);set('money',cs2.money);
+    hud.querySelector('.v17-hp').classList.toggle('low',cs2.hp<=25);hud.querySelector('.v17-money').classList.toggle('gain',clock<(R.moneyFlash||0));
+    const melee=!w||w.ammo<0;
+    set('name',w?weaponName(w.id):'');set('clip',melee?'—':w.ammo);set('res',melee?'':w.reserve==null?'∞':w.reserve);
+    hud.querySelector('.v17-ammo em').style.display=melee?'none':'';
+    const roundsOn=solo()&&R.on;
+    if(roundsOn){const left=R.phase==='freeze'?R.until-clock:R.phase==='live'?R.until-clock:0;set('ct',R.ct);set('tt',R.tt);set('round',`Runda ${R.no}`);set('time',fmt(left));set('t2',fmt(left));hud.querySelector('.v17-time').classList.toggle('low',R.phase==='live'&&left<15);}
+    else{set('ct',cs2.kills||0);set('tt','–');set('round',`Etap ${cs2.round||1}`);set('time','—');set('t2','');}
+    hud.querySelector('.v17-time').style.visibility=roundsOn?'':'hidden';
+    const c=$('v17Center');if(c&&clock>(R.centerUntil||0))c.style.opacity='0';
+    if(document.body.classList.contains('v17-board-open'))renderBoard();
+  }
+  function renderBoard(){
+    if(!board)return;
+    const head='<tr><th>Gracz</th><th>Zabójstwa</th><th>Zgony</th><th>Stan</th></tr>',roundsOn=solo()&&R.on,rows=[];
+    const me=roundsOn?`<tr class="${R.died?'dead':''}"><td>Ty</td><td>${R.kills}</td><td>${R.deaths}</td><td>${R.died?'nie żyje':'$'+cs2.money}</td></tr>`:`<tr><td>Ty</td><td>${cs2.kills||0}</td><td>–</td><td>$${cs2.money}</td></tr>`;
+    if(roundsOn)for(const n of BOTS){const alive=cs2.enemies.some(x=>x.name===n),st=R.bots[n];rows.push(`<tr class="${alive?'':'dead'}"><td>${n} (BOT)</td><td>${st.k}</td><td>${st.d}</td><td>${alive?'żyje':'nie żyje'}</td></tr>`);}
+    const top=roundsOn?`<div class="top"><span>Runda ${R.no} · do ${WIN_AT} wygranych</span><span>AT ${R.ct} : ${R.tt} TT</span></div>`:'<div class="top"><span>Gra online</span></div>';
+    const html=`${top}<h3 class="ct">Antyterroryści</h3><table>${head}${me}</table>`+(rows.length?`<h3 class="tt">Terroryści</h3><table>${head}${rows.join('')}</table>`:'');
+    if(board.innerHTML!==html)board.innerHTML=html;
+  }
+  function toggleBoard(on){on=on==null?!document.body.classList.contains('v17-board-open'):on;document.body.classList.toggle('v17-board-open',on);if(on)renderBoard();}
+  function clearAll(){R.on=false;R.pending=false;hud?.remove();hud=board=null;$('v17Center')?.remove();document.body.classList.remove('v17-cs','v17-dead','v17-board-open');closeMenu();}
+  // ---------- Game hooks ----------
+  const initBase=initCS2;
+  initCS2=function(){const out=initBase.apply(this,arguments);try{if(cs2&&!window.bloxOnline?.active){R.on=false;R.pending=true;appendChatMessage('Serwer','Antyterroryści kontra terroryści: wygrywa drużyna, która pierwsza zdobędzie 4 rundy.','#f5c542',true);}}catch(error){console.warn('CS rounds',error);}return out;};
+  const updateBase=updateCS2;
+  updateCS2=function(dt){
+    // The player model exists only after initCS2, so the match starts on the first frame.
+    if(R.pending&&solo()&&playerGroup){R.pending=false;startMatch();}
+    if(solo()&&R.on&&R.phase!=='live'){
+      // Freeze time and death: the player stays put but can look around and buy.
+      const lock=R.phase==='freeze'?{x:-70,z:-70}:R.died?R.deadAt:null;
+      if(lock){playerGroup.position.x=lock.x;playerGroup.position.z=lock.z;}
+    }
+    updateBase(dt);
+    if(!inCs())return;
+    renderHud();
+    if(!solo()||!R.on)return;
+    const clock=now();
+    if(R.phase==='freeze'&&clock>=R.until){R.phase='live';R.until=clock+ROUND;center('Do boju!','','',1.2);sound(520,.08,'square',.03);}
+    else if(R.phase==='live'){if(!cs2.enemies.length)endRound('ct','Antyterroryści wygrywają');else if(clock>=R.until)endRound('tt','Czas minął: terroryści wygrywają');}
+    else if(R.phase==='end'&&clock>=R.until){if(R.over)finish();else{R.no++;startRound();}}
+    if($('cs16BuyMenu')&&Math.floor(clock)!==R.menuTick){R.menuTick=Math.floor(clock);renderMenu();}
+  };
+  const leaveBase=leaveGame;
+  leaveGame=function(){clearAll();return leaveBase.apply(this,arguments);};
+  setInterval(()=>{if(!inCs()&&hud)clearAll();},600);
+  // Keys: 1/2/3 weapon slots, Q last weapon, Tab score, digits in the buy menu.
+  addEventListener('keydown',e=>{
+    if(!inCs()||window.BloxGame?.paused)return;const t=e.target;if(t&&/INPUT|TEXTAREA|SELECT/.test(t.tagName))return;
+    if(e.code==='Tab'){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)toggleBoard(true);return;}
+    const menu=$('cs16BuyMenu');
+    if(menu&&/^(Digit|Numpad)\d$/.test(e.code)){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)choose(Number(e.code.slice(-1)));return;}
+    if(menu&&e.code==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeMenu();return;}
+    if(!solo())return;
+    if(/^Digit[123]$/.test(e.code)){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)slot(Number(e.code.slice(-1)));return;}
+    if(e.code==='KeyQ'){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)lastWeapon();}
+  },true);
+  addEventListener('keyup',e=>{if(e.code==='Tab'&&inCs()){e.preventDefault();toggleBoard(false);}},true);
+  const card=defaultGames.find(g=>g.id==='cs2');
+  if(card)card.desc='Rundy jak w CS 1.6: antyterroryści przeciw terrorystom, freeze time, zegar 1:55 i ekonomia za wygrane i przegrane. Wygrywa drużyna, która pierwsza zdobędzie 4 rundy. Nóż, sloty broni 1/2/3, Q, sklep pod B i tabela wyników pod Tab. Online: kooperacja przeciw botom.';
 })();
 </script>
 </body>
