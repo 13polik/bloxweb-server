@@ -112,11 +112,11 @@ def test_updates_bump_the_revision_and_keep_the_code(client):
 
 def test_nexusscript_11_pickups_are_kept(client):
     ala = guest(client, "Ala", "BLOX-111111")
-    game = dict(GAME, parts=GAME["parts"] + [dict(t="ammo", p=[2, 0, 2], s=[1.2, 1, 1.2], c="#6b7d3a"), dict(t="health", p=[-2, 0, 2], s=[1.2, 1, 1.2], c="#f4f4f4"), dict(t="npc", n="Ola", p=[0, 1, 4], s=[1.5, 3, 1.5], c="#3b82f6")],
+    game = dict(GAME, parts=GAME["parts"] + [dict(t="ammo", p=[2, 0, 2], s=[1.2, 1, 1.2], c="#6b7d3a"), dict(t="health", p=[-2, 0, 2], s=[1.2, 1, 1.2], c="#f4f4f4"), dict(t="npc", n="Ola", p=[0, 1, 4], s=[1.5, 3, 1.5], c="#3b82f6"), dict(t="ball", n="Pilka", p=[0, 0.6, 6], s=[1.2, 1.2, 1.2], c="#ffffff"), dict(t="zone", n="Bramka", p=[0, 1.5, 12], s=[8, 3, 2], c="#ef4444")],
                 script='when start {\n  giveWeapon("rifle")\n}\nwhen kill {\n  addScore(10)\n}\n')
     game_id = call(client, "games_publish", token=ala["token"], title="Strzelanka", game=game)["id"]
     stored = call(client, "games_get", token=ala["token"], id=game_id)["game"]
-    assert [p["t"] for p in stored["parts"]][-3:] == ["ammo", "health", "npc"]
+    assert [p["t"] for p in stored["parts"]][-5:] == ["ammo", "health", "npc", "ball", "zone"]
 
 
 def test_ai_cheat_sheet_fits_the_worker_and_covers_the_language():

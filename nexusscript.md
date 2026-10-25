@@ -1,4 +1,4 @@
-# NexusScript 1.3 – język gier 3D w BloxWeb Studio
+# NexusScript 1.4 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -22,6 +22,8 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - `"ammo"` – paczka amunicji (+30 naboi po dotknięciu).
 - `"health"` – apteczka (+35 zdrowia po dotknięciu).
 - `"car"` – samochód (2.4 × 1.4 × 4.4). Gracz wsiada i wysiada klawiszem E / AKCJA, jedzie W/S (gaz, hamulec, wsteczny) i A/D (skręt), spacja to ręczny hamulec. Rozjeżdża wrogów.
+- `"ball"` – piłka z fizyką (np. `spawn("ball", 0, 0.6, 0, 1.2, 1.2, 1.2, "#ffffff", "Pilka")`): toczy się, odbija, gracz kopie ją, wbiegając w nią, auta ją odbijają.
+- `"zone"` – przezroczysta strefa, przez którą wszystko przechodzi (bramka, meta wyścigu, obszar misji). Działa z `when touch` (gracz) i `when bump` (piłka).
 - `"npc"` – postać do rozmowy (np. `spawn("npc", 4, 1, 6, 1.5, 3, 1.5, "#3b82f6", "Ola")`). Gracz rozmawia klawiszem E lub przyciskiem AKCJA.
 
 ## Składnia
@@ -52,6 +54,8 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when talk "Imię" { ... }` – gdy gracz zagada do NPC (E / AKCJA w pobliżu).
 - `when enter { ... }` / `when exit { ... }` (opcjonalnie z nazwą auta) – wsiadanie i wysiadanie z auta.
 - `when arrive { ... }` – gdy gracz dotrze do znacznika z `setWaypoint` (znacznik wtedy znika).
+- `when bump "Nazwa" { ... }` (lub bez nazwy, wtedy `target` to nazwa) – gdy piłka wpadnie do nazwanego klocka lub strefy (np. bramki).
+- `when button "Tekst" { ... }` – gdy gracz naciśnie własny przycisk z `button("Tekst")`.
 
 ## Broń i walka
 - `giveWeapon("pistol" | "rifle" | "shotgun" | "sniper" | "sword" | "none")` – daje graczowi broń (pistolet, karabin, strzelbę, snajperkę, miecz) albo ją zabiera.
@@ -74,6 +78,14 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `setMoney(ile)`, `addMoney(ile)`, `player.money` – pieniądze na ekranie.
 - `var co = shop("Sklep", ["Karabin", 400], ["Granaty", 300])` – sklep z cenami; pobiera pieniądze i zwraca nazwę kupionej rzeczy albo `null`.
 
+## Kamera, piłka, przyciski i zapis
+- `camera("third" | "first" | "top" | "side")` – widok zza pleców, z oczu (FPS), z góry (top-down: gracz celuje myszką lub w stronę ruchu) albo z boku (platformówka 2D: ruch tylko lewo/prawo, W lub góra na joysticku to skok).
+- `kick(nazwa, x, y, z)` – kopnięcie: dodaje piłce prędkość (np. `kick("Pilka", 0, 6, 15)`). `move` piłki zatrzymuje ją w nowym miejscu.
+- `enemyMode(w, "ball")` – piłkarz: biegnie za piłką i kopie ją w stronę celu z `kickTarget(w, x, z)` (domyślnie w stronę startu gracza).
+- `button("Tekst")` – własny przycisk na ekranie (działa też na telefonie), `button("Tekst", false)` go usuwa.
+- `particles(x, y, z, "#kolor", ile)` – wybuch kolorowych iskier (np. przy golu lub zebraniu monety).
+- `save("klucz", wartość)` i `load("klucz", domyślna)` – zapis postępu w przeglądarce gracza (liczby, teksty, listy, słowniki), osobno dla każdej gry. Np. rekord, odblokowane poziomy.
+
 ## Gotowe światy i czas
 - `buildCity(x, z, rozmiar)` – miasto: asfalt, linie, chodniki i budynki (rozmiar 1–8 kwartałów; kwartał co 38 jednostek, ulice na x i z = ..., -38, 0, 38, ...).
 - `buildArena(x, z, rozmiar)` – arena z murem, osłonami i bazami `"BazaNiebieska"` (z −) i `"BazaCzerwona"` (z +).
@@ -82,7 +94,7 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 
 ## Wrogowie
 - Wroga tworzysz przez `var w = spawn("enemy", x, y, z, 2, 3, 2)`, czyli typem `"enemy"`. Kolor czerwony jest domyślny.
-- `enemyMode(nazwa, "chase" | "guard" | "patrol" | "shooter")`:
+- `enemyMode(nazwa, "chase" | "guard" | "patrol" | "shooter" | "ball")`:
   - `"chase"` goni gracza,
   - `"guard"` stoi w miejscu i patrzy na gracza,
   - `"patrol"` chodzi w tę i z powrotem,
@@ -291,8 +303,62 @@ when kill {
 }
 ```
 
+## Przykład: piłka nożna
+```nexus
+spawn("block", 0, -0.5, 0, 40, 1, 60, "#16a34a")
+spawn("spawn", 0, 0, -12, 4, 0.2, 4)
+spawn("ball", 0, 0.6, 0, 1.2, 1.2, 1.2, "#ffffff", "Pilka")
+spawn("zone", 0, 1.5, 30, 12, 3, 2, "#ef4444", "Bramka")
+var r = spawn("enemy", 0, 1.5, 15, 1.6, 3, 1.6)
+enemyMode(r, "ball")
+kickTarget(r, 0, -30)
+var gole = 0
+when start {
+  button("Strzał")
+}
+when button "Strzał" {
+  if distance("Pilka") < 4 {
+    kick("Pilka", 0, 5, 18)
+  }
+}
+when bump "Bramka" {
+  gole += 1
+  particles(0, 2, 30, "#facc15", 40)
+  say("GOL! " + gole, 2)
+  move("Pilka", 0, 0.6, 0)
+  if gole >= 3 {
+    win("Hat-trick!")
+  }
+}
+```
+
+## Przykład: platformówka 2D z rekordem
+```nexus
+camera("side")
+spawn("spawn", 0, 0, 0, 3, 0.2, 3)
+spawn("block", 0, -1, 0, 10, 2, 6)
+for i in range(1, 12) {
+  spawn("block", i * 9, -1 + (i % 3), 0, 6, 2, 6, "#a16207")
+  spawn("coin", i * 9, 1.6 + (i % 3), 0)
+}
+spawn("finish", 110, -0.5, 0, 6, 1, 6)
+spawn("lava", 55, -7, 0, 140, 1, 8)
+var rekord = load("rekord", 0)
+when start {
+  hint("Rekord: " + rekord)
+}
+when collect {
+  addScore(10)
+}
+when win {
+  if getScore() > rekord {
+    save("rekord", getScore())
+  }
+}
+```
+
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru.
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`.
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
