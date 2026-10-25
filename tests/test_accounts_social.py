@@ -132,7 +132,8 @@ def test_progress_is_validated_and_private(client):
     ala, olek = guest(client, "Ala", "BLOX-111111"), guest(client, "Olek", "BLOX-222222")
     bad = {"coins": -5, "owned": ["ok_item", "<script>", 7], "badges": "x", "quests": {"q_coins": "9", "claimed": ["q_a"]}}
     saved = call(client, "sync", token=ala["token"], progress={"base": None, "current": bad})["progress"]
-    assert saved == {"coins": 0, "owned": ["ok_item"], "badges": [], "quests": {"q_coins": 9, "claimed": ["q_a"]}}
+    # Only real shop items can be owned, so the made-up "ok_item" is refused.
+    assert saved == {"coins": 0, "owned": [], "badges": [], "quests": {"q_coins": 9, "claimed": ["q_a"]}}
     call(client, "friend", token=ala["token"], target="BLOX-222222", action="request")
     call(client, "friend", token=olek["token"], target="BLOX-111111", action="accept")
     assert "progress" not in str(call(client, "sync", token=olek["token"])["social"])

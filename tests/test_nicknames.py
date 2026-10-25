@@ -56,3 +56,11 @@ def test_existing_repeats_and_fakes_are_renamed_on_start(client):
     assert names["BLOX-A1"] == "Zosia"
     assert re.fullmatch(r"zosia\d{4,5}", names["BLOX-A2"])
     assert names["BLOX-A3"].startswith("Gracz") and names[server.OFFICIAL_ID] == "BloxWeb"
+
+
+def test_look_alike_alphabets_cannot_fake_a_nick(client):
+    # Cyrillic о/х/А and Greek Β look like Latin letters.
+    for i, fake in enumerate(["BlохWeb", "13pоlik", "ΒloxWeb", "Аdmin"]):
+        player = guest(client, fake, "BLOX-55555" + str(i))
+        assert player["user"]["name"].startswith("Gracz"), (fake, player["user"]["name"])
+    assert guest(client, "Żaneta_Łódź", "BLOX-666666")["user"]["name"] == "Żaneta_Łódź"

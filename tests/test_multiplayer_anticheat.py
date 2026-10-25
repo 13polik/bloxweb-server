@@ -49,16 +49,27 @@ def test_socket_rejects_unknown_token(client):
             pass
 
 
-def test_bloxbux_gains_are_rate_limited_after_first_import(client):
+def test_bloxbux_gains_are_rate_limited_from_the_first_sync(client):
     me = guest(client, "Ala", "BLOX-111111")
     first = dict(coins=120000, owned=[], badges=[], quests={})
     synced = call(client, "sync", token=me["token"], progress=dict(base=None, current=first))
-    assert synced["progress"]["coins"] == 120000  # existing saves are imported unchanged
-    hacked = dict(first, coins=999999)
-    synced = call(client, "sync", token=me["token"], progress=dict(base=first, current=hacked))
-    assert synced["progress"]["coins"] == 125000  # only the 5000 bucket got through
-    small = dict(first, coins=125025)
-    assert call(client, "sync", token=me["token"], progress=dict(base=dict(first, coins=125000), current=small))["progress"]["coins"] <= 125025
+    assert synced["progress"]["coins"] == 5000  # a fresh account cannot import a made-up fortune
+    start = synced["progress"]
+    hacked = dict(start, coins=999999)
+    synced = call(client, "sync", token=me["token"], progress=dict(base=start, current=hacked))
+    assert synced["progress"]["coins"] <= 5100  # the bucket is spent, only the slow refill gets through
+
+
+def test_shop_items_cost_bloxbux_and_unknown_items_are_refused(client):
+    me = guest(client, "Ala", "BLOX-111111")
+    # The first sync spends the whole earning budget (5000), as an auto-clicker would.
+    start = call(client, "sync", token=me["token"], progress=dict(base=None, current=dict(coins=5000, owned=[], badges=[], quests={})))["progress"]
+    price = client.server.ITEM_PRICES["dominus"]
+    # The cheat adds an expensive item but keeps the balance: with no earning budget left
+    # the server takes the price from the balance.
+    free = dict(start, owned=["dominus", "made_up_item"])
+    after = call(client, "sync", token=me["token"], progress=dict(base=start, current=free))["progress"]
+    assert after["owned"] == ["dominus"] and after["coins"] <= start["coins"]-price+50
 
 
 def test_teleporting_and_flying_get_the_player_removed(client):
@@ -115,3 +126,35 @@ def test_socket_accepts_the_page_origin_even_with_a_site_allowlist(client, monke
         raise
     except Exception:
         pass
+
+
+def test_walking_through_a_wall_is_refused(client):
+    me, room = room_for(client, "Ala", "BLOX-111111")
+    server = client.server
+    player = server.rooms[room["code"]]["players"]["BLOX-111111"]
+    # The wall at x=-50 runs from z=-70 to z=-50; walk straight through it at normal speed.
+    player.update(x=-52.5, z=-60, lastMove=server.now()-.2)
+    server.room_input("BLOX-111111", dict(position=dict(x=-47.5, y=1.5, z=-60)))
+    assert player["x"] == -52.5
+    assert any(e["kind"] == "ściana" for e in server.anticheat_log)
+
+
+def test_a_steady_speed_hack_is_held_to_the_game_speed(client):
+    me, room = room_for(client, "Ala", "BLOX-111111")
+    server = client.server
+    player = server.rooms[room["code"]]["players"]["BLOX-111111"]
+    player.update(x=-70, z=-80)
+    for i in range(40):  # 4 seconds at 20 units/s, twice the real top speed
+        player["lastMove"] = server.now()-.1
+        server.room_input("BLOX-111111", dict(position=dict(x=player["x"]+2, y=1.5, z=-80)))
+    assert player["x"]+70 < 4*server.SPEED_LIMIT["cs2"]+20
+
+
+def test_respawn_while_alive_is_refused(client):
+    me, room = room_for(client, "Ala", "BLOX-111111")
+    server = client.server
+    state = server.rooms[room["code"]]
+    player = state["players"]["BLOX-111111"]
+    player.update(x=-60, z=-60, hp=40)
+    assert "tylko po śmierci" in server.act(state, player, dict(kind="respawn"))
+    assert (player["x"], player["hp"]) == (-60, 40)

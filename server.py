@@ -55,6 +55,18 @@ sockets = {}
 cheat_strikes = defaultdict(deque)
 coin_buckets = {}
 COIN_BUCKET, COIN_REFILL = 5000, 30
+# Avatar shop prices, read from the page's catalogues so the server knows what an item costs.
+# Items a save gains must be paid for with BloxBux; unknown items are refused.
+_page = (ROOT / "public" / "index.html").read_text(encoding="utf-8") if (ROOT / "public" / "index.html").exists() else ""
+ITEM_PRICES = {"none": 0}
+for _name in ("hatsCatalog", "backCatalog", "shirtsCatalog", "pantsCatalog", "facesCatalog"):
+    _start = _page.find("const " + _name)
+    if _start >= 0:
+        for _id, _price in re.findall(r"id:\s*'([a-z0-9_]+)'[^}]*?price:\s*(\d+)", _page[_start:_page.find("];", _start)]):
+            ITEM_PRICES[_id] = int(_price)
+# Fastest legal running speed per multiplayer game (units per second; the client moves in fixed
+# 60 Hz steps: 0.16 per step in CS, 0.27 on a speed pad).
+SPEED_LIMIT = {"cs2": 10.5, "castle_defense": 17}
 # Staff roles live only in the database; the matching badges are shown from the
 # role, never from a browser save. owner (CEO) > admin.
 ROLES = {"owner", "admin"}
@@ -244,14 +256,25 @@ def save_progress(uid, change):
         return
     current = profile(uid)
     merged = merge_progress(current["progress"], change.get("base"), change.get("current"))
-    # The first upload imports an existing browser save as it is, so players
-    # who earned coins before accounts existed keep them; later gains are rate-limited.
-    if current["progress"] is None:
-        if merged["coins"] > 100000:
-            log.warning("anticheat %s first import with %s BloxBux", uid, merged["coins"])
-    elif merged["coins"] > current["progress"]["coins"]:
-        before = current["progress"]["coins"]
-        merged["coins"] = before + coin_allowance(uid, merged["coins"]-before)
+    # A first upload counts as earned from nothing (new players start with 500), so a
+    # fresh account cannot import a made-up fortune. Every later gain is rate-limited.
+    server = current["progress"] or dict(coins=0, owned=[], badges=[], quests={})
+    before = server["coins"]
+    # Items the save gains must be bought: known shop items only, paid from the balance.
+    spend, owned = 0, list(server["owned"])
+    for item in merged["owned"]:
+        if item in owned:
+            continue
+        price = ITEM_PRICES.get(item)
+        if price is None or before + COIN_BUCKET - spend < price:
+            strike(uid, "przedmiot", f"{item} bez zapłaty")
+            continue
+        spend += price
+        owned.append(item)
+    merged["owned"] = sorted(owned)
+    floor = before - spend
+    if merged["coins"] > floor:
+        merged["coins"] = max(0, floor + coin_allowance(uid, merged["coins"]-floor))
     if merged != current["progress"]:
         db.execute("UPDATE users SET progress=? WHERE id=?", (json.dumps(merged), uid))
         db.commit()
@@ -260,6 +283,8 @@ def save_progress(uid, change):
 
 def name_problem(uid, name, role=None):
     """Why this account may not use this nick, or None when it may."""
+    if re.search(r"[^0-9A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż _.\-]", name):
+        return "Nick może mieć tylko litery (także polskie), cyfry, spację oraz _ . -"
     key = name_key(name)
     for reserved, owner in RESERVED_NAMES.items():
         if reserved in key and uid != owner:
@@ -562,14 +587,22 @@ def room_input(uid, body):
         elapsed = min(2, max(.05, now()-p["lastMove"]))
         x, z = number(pos.get("x"), p["x"], -89, 89), number(pos.get("z"), p["z"], -89, 89)
         distance = math.hypot(x-p["x"], z-p["z"])
-        maximum = elapsed*18+1
-        if distance > maximum:
-            # Lag spikes are covered by `elapsed`; a far bigger jump is a teleport/speed hack.
-            if distance > maximum*1.6:
-                strike(uid, "ruch", f"{distance:.1f}>{maximum:.1f}")
-            ratio = maximum/distance
+        # Movement budget: it refills at the game's top speed and holds up to 1.5 s of running,
+        # so a lag burst arrives intact but a steady speed hack drains it and gets clamped.
+        limit = SPEED_LIMIT.get(room["game"], 18)
+        budget = min(limit*1.5+2, p.get("moveBudget", limit*1.5+2)+elapsed*limit)
+        if distance > budget:
+            if distance > budget+1:
+                strike(uid, "ruch", f"{distance:.1f}>{budget:.1f}")
+            ratio = budget/distance
             x, z = p["x"]+(x-p["x"])*ratio, p["z"]+(z-p["z"])*ratio
+            distance = budget
+        p["moveBudget"] = budget-distance
         y = number(pos.get("y"), .5, .5, 16)
+        if room["game"] == "cs2" and through_wall(p["x"], p["z"], x, z, y):
+            # The client collides with every wall, so crossing one means noclip.
+            strike(uid, "ściana", f"({p['x']:.0f},{p['z']:.0f})->({x:.0f},{z:.0f})")
+            x, z = p["x"], p["z"]
         if room["game"] == "cs2" and y > 11:
             # Arena walls are 12 high and crates plus a jump reach about 8: higher means flying.
             strike(uid, "lot", f"y={y:.1f}")
@@ -592,6 +625,28 @@ def room_input(uid, body):
         if uid not in room["players"]:
             return None
     return room
+
+
+def through_wall(x0, z0, x1, z1, y):
+    """Does the walk from (x0,z0) to (x1,z1) at height y cut into a wall the player cannot
+    stand on? Walls are shrunk a little so brushing past a corner never counts."""
+    for cx, cy, cz, sx, sy, sz in MAP:
+        if sy <= 1 or y >= cy+sy/2-.3:
+            continue
+        lo_x, hi_x, lo_z, hi_z = cx-sx/2+.25, cx+sx/2-.25, cz-sz/2+.25, cz+sz/2-.25
+        if lo_x >= hi_x or lo_z >= hi_z:
+            continue
+        t0, t1, dx, dz = 0.0, 1.0, x1-x0, z1-z0
+        for d, start, lo, hi in ((dx, x0, lo_x, hi_x), (dz, z0, lo_z, hi_z)):
+            if abs(d) < 1e-9:
+                if not lo < start < hi:
+                    t0 = 2
+                continue
+            a, b = (lo-start)/d, (hi-start)/d
+            t0, t1 = max(t0, min(a, b)), min(t1, max(a, b))
+        if t0 < t1:
+            return True
+    return False
 
 
 def spawn_bot(room):
@@ -697,7 +752,10 @@ def act(room, p, action):
             presence[pid]["room"] = code
         return
     if kind == "respawn" and room["game"] == "cs2":
-        p.update(x=-70, y=1.5, z=-70, hp=100, reloadUntil=0)
+        # The server already respawns a killed player; a respawn while alive would be a free heal
+        # and a teleport back to base, so it only confirms a recent death.
+        if now()-p.get("diedAt", -99) > 5:
+            return "Odrodzenie jest możliwe tylko po śmierci."
         return
     if room["game"] == "castle_defense":
         if kind == "build":
@@ -799,8 +857,8 @@ def act(room, p, action):
         stats["shots"] += 1
         stats["hits"] += bool(target)
         stats["heads"] += bool(target and head)
-        if stats["shots"] >= 40 and stats["heads"] >= stats["shots"]*.9:
-            # Bots move and strafe; 90% headshots over 40+ shots is an aimbot.
+        if (stats["shots"] >= 40 and stats["heads"] >= stats["shots"]*.9) or (stats["hits"] >= 15 and stats["heads"] >= stats["hits"]*.85):
+            # Bots move and strafe; 85% of hits in the head over 15+ hits is an aimbot (good players reach ~40-50%).
             kick(p["id"], "Wykryto nienaturalną celność (aimbot). Zostałeś usunięty z pokoju.")
             return
         if target:
@@ -900,7 +958,7 @@ def tick(room, dt):
                 end[0] += random.choice([-1,1])*2
             emit(room,"bot",origin=origin,end=end,enemy=enemy["id"])
             if player["hp"] <= 0:
-                player.update(hp=100,x=-70,y=1.5,z=-70,deaths=player["deaths"]+1,reloadUntil=0,shieldUntil=now()+2.5)
+                player.update(hp=100,x=-70,y=1.5,z=-70,deaths=player["deaths"]+1,reloadUntil=0,shieldUntil=now()+2.5,diedAt=now(),moveBudget=0)
                 player["money"] = max(0,player["money"]-200)
                 player["kevlar"] = False
         director.update(room["enemies"],list(room["players"].values()),dt,now(),sight,bot_fire)
