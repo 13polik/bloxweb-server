@@ -329,7 +329,9 @@ def ai_request(prompt, code):
     import urllib.request
     payload = json.dumps(dict(prompt=prompt, code=code, reference=NEXUS_REFERENCE)).encode()
     request = urllib.request.Request(AI_URL, data=payload, method="POST", headers={
-        "Content-Type": "application/json", "X-Blox-Key": AI_KEY})
+        "Content-Type": "application/json", "X-Blox-Key": AI_KEY,
+        # Cloudflare refuses the default "Python-urllib" agent with 403.
+        "User-Agent": "BloxWeb-Server/19"})
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.loads(response.read().decode())
 
