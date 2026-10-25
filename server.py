@@ -941,11 +941,9 @@ async def room_socket(ws: WebSocket):
         await ws.close(code=1008)
         return
     await ws.accept()
-    log.warning("ws accepted origin=%s", origin)
     uid, conn, writer = None, None, None
     try:
         first = await asyncio.wait_for(ws.receive(), 15)
-        log.warning("ws first message type=%s keys=%s", first.get("type"), sorted(first))
         if first.get("type") == "websocket.disconnect":
             return
         hello = json.loads(first.get("text") or (first.get("bytes") or b"").decode() or "null")
