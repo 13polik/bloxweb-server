@@ -10365,25 +10365,57 @@ button:focus-visible,.nav-btn:focus-visible,.cat-pill:focus-visible,.game-card:f
       const barrelLen=awp?.9:ak?.5:mp5?.25:.45;tube(.022,barrelLen,black,[0,.09,-.82-barrelLen/2]);tip=-.82-barrelLen;
       if(ak){tube(.016,.4,black,[0,.16,-.68]);P(new THREE.BoxGeometry(.02,.08,.02),black,[0,.17,tip+.12]);P(rbox(.05,.05,.08,.01),black,[0,.09,tip]);
         for(let i=0;i<4;i++)P(rbox(.1,.1,.11,.02),phong(0x2a2622,30),[0,-.13-i*.075,-.3-i*.03],[-.3-i*.12,0,0]);
-        P(rbox(.12,.16,.55,.04),wood,[0,0,.42],[-.08,0,0]);}
+        P(rbox(.12,.15,.4,.04),wood,[0,-.13,.32],[-.32,0,0]);}
       else if(mp5){for(let i=0;i<3;i++)P(rbox(.08,.1,.1,.015),black,[0,-.13-i*.08,-.36-i*.035],[-.4-i*.1,0,0]);
-        tube(.04,.12,black,[0,.2,-.05]);P(new THREE.TorusGeometry(.035,.01,6,12),black,[0,.21,-.66]);P(rbox(.04,.04,.5,.01),steel,[0,.05,.32]);}
+        tube(.04,.12,black,[0,.2,-.05]);P(new THREE.TorusGeometry(.035,.01,6,12),black,[0,.21,-.66]);P(rbox(.04,.04,.38,.01),steel,[0,-.08,.27],[-.3,0,0]);}
       else if(awp){tube(.06,.5,black,[0,.26,-.2]);tube(.075,.08,black,[0,.26,-.48]);tube(.075,.08,black,[0,.26,.06]);
         part(g,new THREE.CircleGeometry(.06,16),lens,[0,.26,-.525],[0,Math.PI,0]);P(rbox(.09,.16,.12,.02),black,[0,-.08,-.38]);
-        P(rbox(.14,.2,.6,.05),olive,[0,0,.4]);tube(.02,.12,silver,[.09,.12,-.05],[0,0,Math.PI/2]);}
+        P(rbox(.14,.19,.45,.05),olive,[0,-.12,.33],[-.3,0,0]);tube(.02,.12,silver,[.09,.12,-.05],[0,0,Math.PI/2]);}
       else{P(rbox(.06,.06,.42,.01),black,[0,.2,-.25]);P(rbox(.1,.07,.1,.02),black,[0,.25,-.1]);P(rbox(.09,.3,.12,.02),black,[0,-.17,-.36],[-.12,0,0]);
-        P(rbox(.08,.13,.45,.02),black,[0,.03,.38]);P(rbox(.1,.18,.12,.02),black,[0,-.02,.6]);P(rbox(.05,.05,.07,.01),black,[0,.09,tip]);}
+        P(rbox(.08,.12,.34,.02),black,[0,-.08,.3],[-.3,0,0]);P(rbox(.1,.17,.1,.02),black,[0,-.17,.46],[-.3,0,0]);P(rbox(.05,.05,.07,.01),black,[0,.09,tip]);}
     }
     g.userData.tip=tip;return g;
+  }
+  // Gloved hands in the view model's own space (grip near the origin, barrel toward -Z).
+  function viewHands(id){
+    const g=new THREE.Group(),rifle=!['glock','usp','deagle'].includes(id);
+    const sleeveColor=new THREE.Color((typeof avatarData==='object'&&avatarData.torso)||'#525e51').getHex();
+    const glove=phong(0x2a2d2b,25),knuckle=phong(0x1d201f,30),sleeve=phong(sleeveColor,8),cuff=phong(new THREE.Color(sleeveColor).multiplyScalar(.7).getHex(),8),strap=phong(0x4a4f4a,30);
+    const P=(geo,mat,p,r=[0,0,0])=>part(g,geo,mat,p,r);
+    // Box along +Z from a to b (forearms), so arms can be aimed at any joint.
+    const limb=(a,b,w,h,mat)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),len=A.distanceTo(B),m=part(g,rbox(w,h,len,.06),mat);m.position.copy(A).add(B).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),B.clone().sub(A).normalize());return m;};
+    // Right hand around the pistol grip (grip centre ~ (0,-.15,.05), tilted back).
+    const tilt=rifle?-.3:-.23;
+    P(rbox(.2,.22,.17,.05),glove,[.035,-.13,.075],[tilt,0,-.12]);
+    P(rbox(.205,.05,.12,.02),knuckle,[.045,-.03,.03],[tilt,0,-.12]);
+    for(let i=0;i<3;i++)P(rbox(.085,.052,.15,.025),glove,[-.065,-.11-i*.056,.005+i*.012],[tilt,0,0]);
+    P(rbox(.04,.046,.17,.02),glove,[-.085,-.035,-.095],[.22,0,0]);
+    P(rbox(.058,.13,.065,.025),glove,[.115,-.06,.02],[0,0,-.5]);
+    P(rbox(.215,.075,.2,.03),strap,[.035,-.245,.15],[tilt,0,-.12]);
+    limb([.04,-.27,.17],[.12,-.52,.95],.25,.25,sleeve);
+    P(rbox(.27,.07,.27,.03),cuff,[.055,-.31,.27],[-.32,0,-.12]);
+    if(rifle){
+      // Support hand under the handguard; forearm enters from the lower left of the screen.
+      const hz=id==='mp5'?-.58:-.64;
+      P(rbox(.2,.1,.22,.04),glove,[0,-.045,hz]);
+      P(rbox(.05,.15,.19,.02),glove,[-.098,.035,hz]);
+      for(let i=0;i<3;i++)P(rbox(.012,.11,.04,.005),knuckle,[-.124,.04,hz-.06+i*.06]);
+      P(rbox(.05,.09,.13,.02),glove,[.096,.03,hz+.03]);
+      P(rbox(.2,.08,.18,.03),strap,[-.02,-.12,hz+.12]);
+      limb([-.04,-.12,hz+.14],[-.78,-.66,hz+.85],.21,.21,sleeve);
+      limb([-.07,-.14,hz+.17],[-.14,-.19,hz+.24],.25,.25,cuff);
+    }
+    return g;
   }
   const gunBase=updateGunMesh;
   updateGunMesh=function(){
     gunBase();
     try{const root=cs2GunMesh,weapon=root?.userData.parts;if(!root||!weapon||root.userData.v15)return;root.userData.v15=true;
-      const id=root.userData.weapon,oldWeapon=new Set([0x444b50,0x61533b,0x242b31,0x252e34]),keep=new Set([weapon.flash]);
+      // Older weapon boxes and the old block hand are replaced; the muzzle flash is reused.
+      const id=root.userData.weapon,oldParts=new Set([0x444b50,0x61533b,0x242b31,0x252e34,0x525e51,0x303b35,0x9d7655,0x3a4540,0xc69b74]),keep=new Set([weapon.flash]);
       weapon.root.traverse(o=>{if(o.isMesh&&!keep.has(o))o.visible=false;});
-      for(const o of root.children)if(o.isMesh&&oldWeapon.has(o.material.color.getHex()))o.visible=false;
-      const model=weaponModel(id);root.add(model);
+      for(const o of root.children)if(o.isMesh&&oldParts.has(o.material.color.getHex()))o.visible=false;
+      const model=weaponModel(id);model.add(viewHands(id));root.add(model);
       // Same depth trick as the original view model: never clip into nearby walls.
       model.traverse(o=>{if(o.isMesh){o.renderOrder=1000;o.onBeforeRender=r=>{if(root.userData.depthFrame!==r.info.render.frame){r.clearDepth();root.userData.depthFrame=r.info.render.frame;}};}});
       weapon.flash.position.z=model.userData.tip-.05;weapon.flash.scale.setScalar(['glock','usp','deagle'].includes(id)?1:1.5);
