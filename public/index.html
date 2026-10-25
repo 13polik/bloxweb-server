@@ -4693,7 +4693,7 @@ function normalizeAvatar(value) {
 
         function launch3DGame(gameId) {
             // Blokuj stare gry (usunięte)
-            const allowedGames = ['cs2', 'castle_defense', 'football'];
+            const allowedGames = ['cs2', 'castle_defense', 'football', 'obby'];
             if (!allowedGames.includes(gameId)) {
                 showToast('🚧 Ta gra nie jest już dostępna.');
                 return;
@@ -4762,7 +4762,10 @@ function normalizeAvatar(value) {
             spawnPoint = { x: 0, y: 1.5, z: 0 };
             camYaw = 0; camDist = 8.5;
 
-            if (gameId === 'obby') {
+            if (gameId === 'obby' && window.bloxBuildObby) {
+                // BloxWeb 15 course (stages, lava lake, moving steps, trophy cup).
+                window.bloxBuildObby();
+            } else if (gameId === 'obby') {
                 document.getElementById('ingameControlsHint').innerHTML = `<b>WASD</b> - Ruch | <b>SPACJA</b> - Skok | <b>Niebieskie pola</b> = Trampolina | <b>[/]</b> - Czat`;
                 addBlock(0, 0, 0, 14, 2, 14, '#27ae60');
                 let zPos = -10;
@@ -7000,7 +7003,7 @@ function normalizeAvatar(value) {
   window.addEventListener('resize',()=>{if(currentPlayingGame==='cs2')createCS16MobileButtons();});
   const oldLaunch=launch3DGame;
   launch3DGame=function(game){
-    if(!['castle_defense','cs2','football'].includes(game)){oldLaunch(game);return;}
+    if(!['castle_defense','cs2','football','obby'].includes(game)){oldLaunch(game);return;}
     if(currentPlayingGame)leaveGame();
     paused=false;accumulator=0;lastFrame=0;gameTimeMs=0;ambientBeat=0;session++;clearInputs();
     cs2=null;castleDefense=null;document.body.dataset.game=game;
@@ -9959,6 +9962,239 @@ button:focus-visible,.nav-btn:focus-visible,.cat-pill:focus-visible,.game-card:f
   let pending=false;const observer=new MutationObserver(()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;observer.disconnect();tidy(document.body);observer.observe(content,{childList:true,subtree:true});});});
   tidy(document.body);observer.observe(content,{childList:true,subtree:true});
   try{renderGames(getFilteredGamesList());renderContinuePlaying();}catch{}
+})();
+</script>
+<style id="v15-games">
+.v15-banner{position:fixed;left:50%;top:20%;transform:translate(-50%,-50%);z-index:900;pointer-events:none;text-align:center;color:#fff;opacity:0;font-family:var(--font-body,'Segoe UI',sans-serif)}
+.v15-banner strong{display:block;font-size:clamp(30px,6vw,64px);font-weight:900;letter-spacing:-1px;text-shadow:0 4px 0 #0006,0 0 24px #ff995c99}
+.v15-banner span{display:block;margin-top:6px;font-size:clamp(14px,2.2vw,20px);font-weight:700;color:#ffe2cc;text-shadow:0 2px 6px #000a}
+.v15-banner.show{animation:v15Banner 2.2s ease-out forwards}
+.v15-banner.gold strong{color:#ffd76a}.v15-banner.danger strong{color:#ff7a6b}
+@keyframes v15Banner{0%{opacity:0;transform:translate(-50%,-40%) scale(.85)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.04)}22%{transform:translate(-50%,-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translate(-50%,-58%)}}
+.v15-flash{position:fixed;inset:0;z-index:899;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 45%,var(--flash,#ff2a2a) 120%)}
+.v15-flash.show{animation:v15Flash .45s ease-out}
+@keyframes v15Flash{0%{opacity:.85}100%{opacity:0}}
+.v15-timer{position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:530;background:#13161cde;border:1px solid #4a3a2f;color:#ffe2cc;padding:8px 16px;border-radius:10px;font-weight:800;font-size:15px;pointer-events:none;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){.v15-banner.show{animation-duration:1.6s}.v15-flash.show{animation:none}}
+</style>
+<script>/* BloxWeb 15: game feel (damage numbers, bursts, banners, shake) for all games,
+   new Castle Defense enemy types and the returning Mega Obby course. */
+(() => {
+  'use strict';
+  const game=window.BloxGame;if(!game||typeof THREE==='undefined')return;
+  const $=id=>document.getElementById(id);
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Shared effects ----------
+  const live=[];let shakeUntil=0,shakePower=0;
+  const banner=document.createElement('div');banner.className='v15-banner';banner.setAttribute('role','status');banner.setAttribute('aria-live','polite');document.body.append(banner);
+  const flash=document.createElement('div');flash.className='v15-flash';document.body.append(flash);
+  const fx={
+    banner(title,sub='',tone=''){banner.className='v15-banner';banner.replaceChildren();const s=document.createElement('strong');s.textContent=title;banner.append(s);if(sub){const p=document.createElement('span');p.textContent=sub;banner.append(p);}void banner.offsetWidth;banner.className='v15-banner show '+tone;},
+    flash(color='#ff2a2a'){flash.style.setProperty('--flash',color);flash.classList.remove('show');void flash.offsetWidth;flash.classList.add('show');},
+    shake(power=.25,ms=220){if(reduced)return;shakePower=Math.max(power,performance.now()<shakeUntil?shakePower:0);shakeUntil=performance.now()+ms;},
+    text(pos,text,color='#ffffff',size=1){
+      if(!scene)return;const c=document.createElement('canvas');c.width=256;c.height=96;const x=c.getContext('2d');
+      x.font='900 58px Arial';x.textAlign='center';x.textBaseline='middle';x.lineWidth=10;x.strokeStyle='#000000cc';x.strokeText(text,128,50);x.fillStyle=color;x.fillText(text,128,50);
+      const t=new THREE.CanvasTexture(c),s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));
+      s.scale.set(2.6*size,.98*size,1);s.position.copy(pos);s.renderOrder=999;scene.add(s);
+      live.push({obj:s,born:performance.now(),life:900,vy:1.6,kind:'text',scene});
+    },
+    burst(pos,color=0xffffff,count=10,speed=6){
+      if(!scene)return;if(reduced)count=Math.min(count,6);
+      // All bits of one burst share a geometry and material, freed when the last bit goes.
+      const shared={geo:new THREE.BoxGeometry(.22,.22,.22),mat:new THREE.MeshLambertMaterial({color,transparent:true}),left:count};
+      for(let i=0;i<count;i++){const m=new THREE.Mesh(shared.geo,shared.mat);m.position.copy(pos);scene.add(m);
+        const a=Math.random()*Math.PI*2,u=Math.random()*.8+.4;live.push({obj:m,born:performance.now(),life:650+Math.random()*250,v:new THREE.Vector3(Math.cos(a)*speed*u,speed*(.6+Math.random()*.7),Math.sin(a)*speed*u),kind:'bit',scene,shared});}
+    },
+    clear(){for(const p of live.splice(0))drop(p);}
+  };
+  window.BloxFx=fx;
+  function drop(p){p.obj.parent?.remove(p.obj);if(p.kind==='text'){p.obj.material.map.dispose();p.obj.material.dispose();}else if(--p.shared.left<=0){p.shared.geo.dispose();p.shared.mat.dispose();}}
+  let last=performance.now();
+  (function tick(now){
+    requestAnimationFrame(tick);const dt=Math.min(.05,(now-last)/1000);last=now;if(game.paused)return;
+    for(let i=live.length-1;i>=0;i--){const p=live[i],age=now-p.born;
+      if(age>=p.life||p.scene!==scene){drop(p);live.splice(i,1);continue;}
+      const k=age/p.life;
+      if(p.kind==='text'){p.obj.position.y+=p.vy*dt;p.obj.material.opacity=k<.6?1:1-(k-.6)/.4;}
+      else{p.v.y-=18*dt;p.obj.position.addScaledVector(p.v,dt);p.obj.rotation.x+=dt*8;p.obj.rotation.y+=dt*6;p.obj.scale.setScalar(Math.max(.05,1-k));}
+    }
+  })(performance.now());
+  // Camera shake is applied only around the game's own render call.
+  const render=THREE.WebGLRenderer.prototype.render;
+  THREE.WebGLRenderer.prototype.render=function(s,c){
+    const now=performance.now();
+    if(s!==scene||now>=shakeUntil||!c){return render.call(this,s,c);}
+    const f=shakePower*((shakeUntil-now)/220),ox=(Math.random()-.5)*f,oy=(Math.random()-.5)*f;
+    c.position.x+=ox;c.position.y+=oy;render.call(this,s,c);c.position.x-=ox;c.position.y-=oy;
+  };
+  const above=(obj,h=3)=>obj.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3((Math.random()-.5)*.6,h,(Math.random()-.5)*.6));
+
+  // ---------- Castle Defense ----------
+  const VARIANTS={runner:{name:'Biegacz',speed:1.65,hp:.6,scale:.82,tint:0xffd27a},tank:{name:'Opancerzony',speed:.7,hp:2.3,scale:1.18,tint:0x8fa3b8}};
+  let spawned=0;
+  const spawnBase=spawnCdEnemy;
+  spawnCdEnemy=function(wave){
+    const cd=castleDefense,before=cd?.enemies.length||0;spawnBase(wave);
+    if(!cd||cd.enemies.length<=before)return;const e=cd.enemies[cd.enemies.length-1];if(e.isBoss)return;spawned++;
+    const variant=wave>=6&&spawned%5===0?'tank':wave>=3&&spawned%4===0?'runner':null;if(!variant)return;
+    const v=VARIANTS[variant];e.variant=variant;e.speed*=v.speed;e.hp=e.maxHp=Math.round(e.maxHp*v.hp);e.mesh.scale.setScalar(v.scale);
+  };
+  const cdSeen=new Map();let cdWave=0,cdHp=0,cdWon=0,cdFlashAt=0;
+  const cdUpdate=updateCastleDefense;
+  // Effects only read the match state; any error in them must never stop the game.
+  updateCastleDefense=function(now){cdUpdate(now);try{castleFx(now);}catch{}};
+  function castleFx(now){
+    const cd=castleDefense;if(!cd||!cd.enemies.every(e=>e.mesh)){cdSeen.clear();return;}
+    if(cd.wave!==cdWave){if(cd.wave>cdWave&&!cd.betweenWaves)fx.banner('Fala '+cd.wave,cd.wave%5===0?'Uwaga: BOSS na polu bitwy!':cd.wave>=6?'Biegacze i opancerzeni w natarciu':cd.wave>=3?'Uważaj na szybkich biegaczy':'Obroń zamek!',cd.wave%5===0?'danger':'');cdWave=cd.wave;}
+    if(cd.betweenWaves&&cdWon!==cd.wave&&cd.wave>0&&!cd.lost){cdWon=cd.wave;if(!cd.won)fx.banner('Fala odparta!',`+${20+cd.wave*2} BloxBux · kolejna za chwilę`,'gold');}
+    if(cdHp&&cd.hp<cdHp&&now-cdFlashAt>1500){cdFlashAt=now;fx.flash('#ff3a2a');fx.shake(.35,200);}cdHp=cd.hp;
+    const alive=new Set(cd.enemies);
+    for(const e of cd.enemies){
+      if(e.variant&&!e._v15tint){e._v15tint=true;e.mesh.traverse(m=>{if(m.isMesh&&m!==e.health&&m.material?.color){m.material=m.material.clone();m.material.color.lerp(new THREE.Color(VARIANTS[e.variant].tint),.55);}});}
+      const prev=cdSeen.get(e);
+      if(prev&&e.hp<prev.hp){prev.acc+=prev.hp-e.hp;}
+      if(prev&&prev.acc>0&&now-prev.shown>140){fx.text(above(e.mesh,e.isBoss?5.6:3.4),'-'+Math.round(prev.acc),e.burnUntil>now?'#ffb15c':'#ffffff',.8);prev.acc=0;prev.shown=now;}
+      cdSeen.set(e,{hp:e.hp,acc:prev?.acc||0,shown:prev?.shown||0,pos:e.mesh.position.clone(),boss:e.isBoss});
+    }
+    for(const[e,info]of cdSeen)if(!alive.has(e)){cdSeen.delete(e);if(e.hp<=0){const p=info.pos.clone().add(new THREE.Vector3(0,1.5,0));fx.burst(p,info.boss?0xffd76a:0xbc695c,info.boss?22:10,info.boss?9:6);fx.text(p.clone().add(new THREE.Vector3(0,2,0)),'+'+(info.boss?90:20)+' zł','#ffd76a',.9);if(info.boss){fx.shake(.5,300);fx.banner('Boss pokonany!','+90 złota meczu','gold');}}}
+  }
+
+  // ---------- Counter Strike ----------
+  const csSeen=new Map();let csHp=0,csAmmo=null,csRound=0,csKills=0,streak=[];
+  const csUpdate=updateCS2;
+  updateCS2=function(dt){csUpdate(dt);try{shooterFx();}catch{}};
+  function shooterFx(){
+    const s=cs2;if(!s||!s.enemies.every(e=>e.rig)){csSeen.clear();csHp=0;csAmmo=null;return;}
+    const w=s.weapons?.[s.currentWeapon];
+    if(csAmmo!==null&&w&&w.id===csAmmo.id&&w.ammo<csAmmo.ammo)fx.shake(w.id==='awp'||w.id==='deagle'?.32:.14,110);
+    csAmmo=w?{id:w.id,ammo:w.ammo}:null;
+    if(csHp&&s.hp<csHp&&s.hp>0){fx.flash('#ff2a2a');fx.shake(.22,160);}csHp=s.hp;
+    if(s.round&&s.round!==csRound){if(csRound)fx.banner('Runda '+s.round,'Boty są coraz sprytniejsze','');csRound=s.round;}
+    const alive=new Set(s.enemies);
+    for(const e of s.enemies){const prev=csSeen.get(e);if(prev&&e.hp<prev.hp){const dmg=prev.hp-e.hp,head=w&&dmg>=(CS16_WEAPONS[w.id]?.damage||30)*2;fx.text(above(e.rig.group,head?3.6:2.9),head?'HEADSHOT':'-'+dmg,head?'#ff5d5d':'#ffffff',head?.85:.75);}
+      csSeen.set(e,{hp:e.hp,pos:e.rig.group.position.clone()});}
+    for(const[e,info]of csSeen)if(!alive.has(e)){csSeen.delete(e);const p=info.pos.clone().add(new THREE.Vector3(0,1.6,0));fx.burst(p,0xb33a3a,8,5);fx.text(p.clone().add(new THREE.Vector3(0,1.6,0)),'+$300','#7dff9c',.8);}
+    if(s.kills>csKills){const now=performance.now();for(let i=csKills;i<s.kills;i++)streak.push(now);streak=streak.filter(t=>now-t<4500);
+      if(streak.length===2)fx.banner('Podwójne zabójstwo!','','gold');else if(streak.length===3)fx.banner('Potrójne zabójstwo!','','gold');else if(streak.length>=4)fx.banner('Nie do zatrzymania!',streak.length+' eliminacje z rzędu','gold');}
+    csKills=s.kills;
+  }
+
+  // ---------- Football ----------
+  let goals=null,lastBall=null,trailAt=0;
+  const footUpdate=updateFootball;
+  updateFootball=function(){footUpdate();try{footballFx();}catch{}};
+  function footballFx(){
+    const f=footballGame;if(!f){goals=null;lastBall=null;return;}
+    const ball=f.ballMesh?.position;if(!ball)return;
+    const score=f.playerScore+':'+f.oppScore;
+    if(goals!==null&&score!==goals){const ours=f.playerScore>Number(goals.split(':')[0]);
+      fx.banner(ours?'GOL!':'Gol dla rywali',`Niebiescy ${f.playerScore} : ${f.oppScore} Czerwoni`,ours?'gold':'danger');
+      const p=ball.clone().add(new THREE.Vector3(0,1,0));fx.burst(p,ours?0x3e8ef7:0xe2483d,18,9);fx.burst(p,0xffd76a,14,8);if(ours)fx.shake(.4,300);}
+    goals=score;
+    const v=f.ballVel?Math.hypot(f.ballVel.x,f.ballVel.z):0,now=performance.now();
+    if(lastBall&&v-lastBall>14)fx.burst(ball.clone(),0xd9f2c2,6,3.5);lastBall=v;
+    if(v>16&&now-trailAt>45){trailAt=now;fx.burst(ball.clone(),0xffffff,1,0.4);}
+  }
+
+  // ---------- Mega Obby ----------
+  const OBBY={id:'obby',title:'Mega Obby',creator:'@BloxWeb',thumbKey:'obby',likes:2650,dislikes:61,visits:31800,genre:'Obby',
+    desc:'Parkour w chmurach: 4 etapy, lawa, ruchome platformy, trampoliny i wąskie belki. Punkty kontrolne zapisują postęp, a złoty puchar na szczycie daje +100 BloxBux. Pobij swój najlepszy czas!'};
+  if(!defaultGames.some(g=>g.id==='obby'))defaultGames.push(OBBY);
+  if(!gamesStats.obby)gamesStats.obby={likes:OBBY.likes,dislikes:OBBY.dislikes,visits:OBBY.visits};
+  GAME_THUMBNAILS.obby=`<svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kolorowe platformy parkouru w chmurach"><defs><linearGradient id="obSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3e8ef7"/><stop offset="1" stop-color="#bfe3ff"/></linearGradient></defs><rect width="640" height="360" fill="url(#obSky)"/>
+    <g fill="#fff" opacity=".85"><ellipse cx="90" cy="70" rx="60" ry="18"/><ellipse cx="520" cy="56" rx="70" ry="20"/><ellipse cx="400" cy="300" rx="120" ry="24"/></g>
+    <path d="M0 320h640v40H0z" fill="#e2481c"/><path d="M0 320q40-12 80 0t80 0 80 0 80 0 80 0 80 0 80 0 80 0v12H0z" fill="#ffb02e"/>
+    <g stroke="#0003" stroke-width="3"><path d="M40 268h120l-10 26H50z" fill="#2ecc71"/><path d="M190 232h90l-8 22h-74z" fill="#3498db"/><path d="M300 200h80l-8 20h-64z" fill="#f1c40f"/><path d="M400 166h80l-8 20h-64z" fill="#9b59b6"/><path d="M500 126h110l-10 24h-90z" fill="#f5c542"/></g>
+    <rect x="300" y="190" width="80" height="6" fill="#e74c3c"/><rect x="214" y="222" width="40" height="8" rx="3" fill="#00e5ff"/>
+    <g transform="translate(548 70)"><path d="M-22 0h44v18a22 22 0 0 1-44 0z" fill="#ffd76a" stroke="#b8860b" stroke-width="3"/><path d="M-22 6h-10a10 10 0 0 0 10 14M22 6h10a10 10 0 0 1-10 14" fill="none" stroke="#b8860b" stroke-width="3"/><rect x="-4" y="38" width="8" height="12" fill="#b8860b"/><rect x="-16" y="50" width="32" height="7" fill="#b8860b"/></g>
+    <g transform="translate(222 176)"><rect x="-11" y="0" width="22" height="22" fill="#f5cd30"/><rect x="-15" y="22" width="30" height="26" fill="#ff995c"/><rect x="-13" y="48" width="12" height="20" fill="#3a6ea3"/><rect x="1" y="48" width="12" height="20" fill="#3a6ea3"/><rect x="-6" y="7" width="3" height="4" fill="#1c1c22"/><rect x="3" y="7" width="3" height="4" fill="#1c1c22"/></g></svg>`;
+  // Category pill for the new genre.
+  const sports=$('sportsCategory');
+  if(sports&&!$('obbyCategory')){const pill=document.createElement('button');pill.type='button';pill.className='cat-pill';pill.id='obbyCategory';pill.textContent='Parkour';pill.onclick=()=>filterByCategory('Obby',pill);sports.after(pill);}
+  try{renderGames(getFilteredGamesList());renderContinuePlaying();}catch{}
+
+  let obbyStart=0,obbyDeaths=0,obbyDone=false,timerEl=null;
+  const fmt=ms=>{const s=ms/1000;return s<60?s.toFixed(1)+' s':Math.floor(s/60)+':'+(s%60).toFixed(1).padStart(4,'0');};
+  window.bloxBuildObby=function(){
+    const P=(x,top,z,w,d,color,type='normal',h=1.2)=>addBlock(x,top-h/2,z,w,h,d,color,type);
+    const coin=(x,top,z,v=10)=>spawnCoin3D(x,top+1.8,z,'obby15_'+x+'_'+z,v);
+    P(0,1,0,14,14,'#2ecc71','normal',2);
+    // Stage 1: warm-up steps.
+    const c1=['#3498db','#f1c40f','#9b59b6','#2ecc71','#e67e22','#1abc9c'];
+    for(let i=0;i<6;i++){const z=-10-i*6.5,x=i%2?2:-2,top=1.6+i*.6;P(x,top,z,5,5,c1[i]);if(i%2)coin(x,top,z);}
+    let cp=P(0,5.2,-51,8,8,'#f5c542','checkpoint');cp.stageNum=2;
+    // Stage 2: lava strips and sliding platforms over a lava lake.
+    P(0,2.2,-78,26,46,'#e2481c','kill',.6);
+    for(const[i,z]of[-60,-68,-76].entries()){P(0,5.2,z,6,6,['#3498db','#9b59b6','#1abc9c'][i]);P(0,5.5,z,6,1,'#e74c3c','kill',.25);coin(i%2?2:-2,5.2,z);}
+    for(const[i,z]of[-84,-92].entries()){const b=P(0,5.2,z,5,5,'#00e691');movingPlatforms.push({block:b,baseX:0,rangeX:4,speed:.0018+i*.0005,offset:i*2});}
+    cp=P(0,5.8,-101,8,8,'#f5c542','checkpoint');cp.stageNum=3;
+    // Stage 3: trampoline up to narrow beams.
+    P(0,5.9,-106.5,3,3,'#00e5ff','bounce',.3);
+    P(0,9.5,-114,7,6,'#3498db');coin(0,9.5,-114,20);
+    P(0,9.5,-124,1.8,9,'#f1c40f');P(2.5,9.9,-134,1.8,8,'#e67e22');coin(2.5,9.9,-134);P(0,10.2,-143,1.8,6,'#9b59b6');
+    cp=P(0,10.2,-151,8,8,'#f5c542','checkpoint');cp.stageNum=4;
+    // Stage 4: zig-zag climb with moving steps to the summit.
+    for(const[i,s]of[[-3,11,-159],[3,11.8,-166],[-3,12.6,-173],[0,13.4,-180],[0,14.2,-187]].entries()){const b=P(s[0],s[1],s[2],4.5,4.5,['#e74c3c','#3498db','#2ecc71','#00e691','#f1c40f'][i]);if(i===1||i===3)movingPlatforms.push({block:b,baseX:s[0],rangeX:i===3?4:2.5,speed:.0021+i*.0003,offset:i});if(i%2===0)coin(s[0],s[1],s[2]);}
+    P(0,15,-197,14,14,'#f5c542','normal',1.5);P(-4.5,15.15,-195,3,3,'#00e5ff','bounce',.3);
+    // Trophy: a real cup instead of the old cube.
+    const cup=new THREE.Group(),gold=new THREE.MeshPhongMaterial({color:0xffd24a,shininess:90,specular:0xfff2b0,emissive:0x3a2600});
+    const bowl=new THREE.Mesh(new THREE.LatheGeometry([[0,0],[.9,.05],[1.05,.6],[1.0,1.3],[1.1,1.5]].map(([r,y])=>new THREE.Vector2(r,y)),24),gold);bowl.position.y=1.3;cup.add(bowl);
+    for(const s of[-1,1]){const h=new THREE.Mesh(new THREE.TorusGeometry(.38,.08,8,16,Math.PI),gold);h.position.set(s*1.08,2.1,0);h.rotation.z=s>0?-Math.PI/2:Math.PI/2;cup.add(h);}
+    const stem=new THREE.Mesh(new THREE.CylinderGeometry(.18,.28,.9,12),gold);stem.position.y=.85;cup.add(stem);
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(.75,.85,.4,20),new THREE.MeshPhongMaterial({color:0x6b4a22,shininess:30}));base.position.y=.2;cup.add(base);
+    cup.position.set(0,15,-200.5);scene.add(cup);obbyTrophyMesh=cup;
+    // Clouds and a few far islands for depth.
+    const cloud=new THREE.MeshLambertMaterial({color:0xffffff});
+    for(let i=0;i<14;i++){const g=new THREE.Group();for(let k=0;k<3;k++){const m=new THREE.Mesh(new THREE.SphereGeometry(3+Math.random()*2,8,6),cloud);m.position.set(k*4-4,Math.random(),Math.random()*2);m.scale.y=.55;g.add(m);}
+      g.position.set((i%2?1:-1)*(28+Math.random()*25),-6+Math.random()*30,-i*16+10);scene.add(g);}
+    spawnPoint={x:0,y:1.5,z:0};
+    obbyStart=gameTimeMs;obbyDeaths=0;obbyDone=false;
+  };
+  window.bloxObbyHud=function(){
+    if(!timerEl){timerEl=document.createElement('div');timerEl.className='v15-timer';timerEl.setAttribute('aria-live','off');}
+    if(!timerEl.isConnected)document.body.append(timerEl);
+    const best=Number(accountStore.getItem('blox_obby_best')||0);
+    timerEl.textContent=`Etap ${currentStage}/4 · ${fmt(Math.max(0,gameTimeMs-obbyStart))}${best?' · rekord '+fmt(best):''}`;
+  };
+  let stageSeen=1,obbyRunning=false,hudAt=0;
+  const baseRespawn=respawnPlayer;
+  respawnPlayer=function(){if(obbyRunning&&currentPlayingGame==='obby'){obbyDeaths++;fx.flash('#ff5a2a');}return baseRespawn();};
+  // The engine's fixed step is captured by an older layer, so Obby is checked on every frame instead.
+  (function obbyFrame(){
+    requestAnimationFrame(obbyFrame);
+    if(currentPlayingGame!=='obby'||activeGameMode!=='obby'){obbyRunning=false;if(timerEl?.isConnected)timerEl.remove();return;}
+    if(!obbyRunning||game.paused)return;
+    if(currentStage!==stageSeen){if(currentStage>stageSeen)fx.banner('Etap '+currentStage+'/4',['','','Lawa i ruchome platformy','Trampolina i wąskie belki','Wspinaczka na szczyt'][currentStage]||'','gold');stageSeen=currentStage;}
+    if(obbyWon&&!obbyDone){obbyDone=true;obbyRunning=false;const time=gameTimeMs-obbyStart,best=Number(accountStore.getItem('blox_obby_best')||0),record=!best||time<best;
+      if(record)accountStore.setItem('blox_obby_best',String(Math.round(time)));
+      fx.burst(obbyTrophyMesh.position.clone().add(new THREE.Vector3(0,2,0)),0xffd76a,26,10);fx.banner('Puchar zdobyty!','+100 BloxBux','gold');
+      setTimeout(()=>{if(currentPlayingGame==='obby')game.finish(true,'Mega Obby ukończone!',`Czas: ${fmt(time)}${record?' (nowy rekord!)':' · rekord: '+fmt(best)} · upadki: ${obbyDeaths}. Nagroda: +100 BloxBux.`);},1200);}
+    const now=performance.now();if(now-hudAt>200){hudAt=now;window.bloxObbyHud();}
+  })();
+  // Card metadata for the new genre (the catalogue renderer labels other games itself).
+  const cardRender=renderGames;
+  renderGames=function(list){cardRender(list);for(const [i,card]of[...document.querySelectorAll('#gamesContainer .game-card')].entries()){if(list[i]?.id!=='obby')continue;const meta=card.querySelector('.game-stats');if(meta){meta.replaceChildren();for(const t of['Parkour · 4 etapy','Solo']){const s=document.createElement('span');s.textContent=t;meta.append(s);}}}};
+  try{renderGames(getFilteredGamesList());}catch{}
+  // The last launch wrapper decides which games may start; Mega Obby joins the list.
+  const launch=window.launch3DGame;
+  window.launch3DGame=function(id){
+    obbyRunning=false;
+    if(id==='castle_defense'){cdWave=0;cdHp=0;cdWon=0;cdSeen.clear();spawned=0;}
+    else if(id==='cs2'){csSeen.clear();csHp=0;csAmmo=null;csRound=0;csKills=0;streak=[];}
+    else if(id==='football'){goals=null;lastBall=null;}
+    else if(id==='obby'){stageSeen=1;fx.clear();}
+    // The loading screen starts the game asynchronously; finish setup once it really runs.
+    return Promise.resolve(launch(id)).then(result=>{
+      if(id==='obby'&&currentPlayingGame==='obby'){
+        obbyStart=gameTimeMs;obbyDeaths=0;obbyDone=false;obbyRunning=true;
+        $('ingameControlsHint').textContent='WASD: ruch · SPACJA: skok · niebieskie pola: trampolina · złote: punkt kontrolny · P: pauza';
+        window.bloxObbyHud();setTimeout(()=>fx.banner('Mega Obby','Etap 1/4 · dotrzyj do złotego pucharu'),300);
+      }
+      return result;
+    });
+  };
 })();
 </script>
 </body>
