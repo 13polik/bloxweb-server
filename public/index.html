@@ -11133,7 +11133,7 @@ body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);
 })();
 </script>
 <script type="text/plain" id="nexusReference">
-# NexusScript 1.1 – język gier 3D w BloxWeb Studio
+# NexusScript 1.2 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -11156,11 +11156,12 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - `"enemy"` – wróg z życiem (100). Domyślnie goni gracza w promieniu 18 jednostek i zadaje 25 obrażeń przy dotyku. Można go pokonać bronią.
 - `"ammo"` – paczka amunicji (+30 naboi po dotknięciu).
 - `"health"` – apteczka (+35 zdrowia po dotknięciu).
+- `"npc"` – postać do rozmowy (np. `spawn("npc", 4, 1, 6, 1.5, 3, 1.5, "#3b82f6", "Ola")`). Gracz rozmawia klawiszem E lub przyciskiem AKCJA.
 
 ## Składnia
 - Komentarze: `// do końca linii` oraz `/* blok */`.
 - Instrukcje oddziela się nową linią lub średnikiem.
-- Typy wartości: liczby (`3`, `2.5`), teksty (`"Cześć"` lub `'Cześć'`), `true`, `false`, `null`, listy `[1, 2, 3]`.
+- Typy wartości: liczby (`3`, `2.5`), teksty (`"Cześć"` lub `'Cześć'`), `true`, `false`, `null`, listy `[1, 2, 3]`, słowniki `{imie: "Ala", hp: 100}` (odczyt `d.hp` lub `d["hp"]`, zapis `d.hp = 5`, `for k in d` po kluczach).
 - Zmienne: `var punkty = 0`, potem `punkty = punkty + 1` albo `punkty += 1` (także `-=`, `*=`, `/=`).
 - Operatory: `+ - * / %`, porównania `== != < > <= >=`, logiczne `and or not`. Tekst + liczba skleja tekst.
 - Listy: `var l = [1, 2]`, `l[0]`, `l[1] = 5`, `push(l, 3)`, `len(l)`.
@@ -11182,6 +11183,7 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when hit { ... }` lub `when hit "Nazwa" { ... }` – gdy strzał gracza trafi klocek lub wroga (zmienna `target` to nazwa trafionego).
 - `when kill { ... }` lub `when kill "Nazwa" { ... }` – gdy wróg zostanie pokonany (zmienna `target` to jego nazwa).
 - `when timeup { ... }` – gdy minutnik z `setTimer` dojdzie do zera.
+- `when talk "Imię" { ... }` – gdy gracz zagada do NPC (E / AKCJA w pobliżu).
 
 ## Broń i walka
 - `giveWeapon("pistol" | "rifle" | "shotgun" | "sniper" | "sword" | "none")` – daje graczowi broń (pistolet, karabin, strzelbę, snajperkę, miecz) albo ją zabiera.
@@ -11200,6 +11202,16 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
   - `"shooter"` trzyma dystans i strzela do gracza, gdy go widzi.
 - `setHealth(nazwa, życie)`, `getHealth(nazwa)`, `setEnemySpeed(nazwa, prędkość)` (domyślnie 4), `setEnemyDamage(nazwa, obrażenia)` (domyślnie 25).
 - Nad trafionym wrogiem pojawia się pasek życia. Pokonany wróg znika i uruchamia `when kill`.
+
+## Rozmowy, pytania i ekwipunek
+- `dialog(nazwa, "tekst", sekundy)` – dymek nad NPC lub klockiem.
+- `var odp = ask("Pytanie?", "A", "B", "C")` – okno z 2–4 przyciskami; zdarzenie czeka, aż gracz wybierze, i zwraca tekst odpowiedzi.
+- `giveItem("klucz")`, `takeItem("klucz")` (zwraca `false`, gdy brak), `hasItem("klucz")` (ile sztuk), `items()` – plecak widoczny na ekranie.
+
+## Świat i efekty
+- `lighting("day" | "sunset" | "night" | "dark")` – pora dnia (w nocy gracz ma latarkę), `fog(odległość)` – mgła.
+- `shake(siła)` – trzęsienie kamery, `rotate(nazwa, stopnie)` – obrót klocka (sam wygląd).
+- Dźwięki: `"coin"`, `"jump"`, `"win"`, `"hit"`, `"beep"`, `"explosion"`, `"laser"`, `"powerup"`, `"door"`, `"click"`, `"error"`.
 
 ## Czas, liczenie i napisy
 - `setTimer(sekundy)` – minutnik na ekranie; `getTimer()` – ile zostało; po zerze działa `when timeup`.
@@ -11235,7 +11247,9 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `time()` – sekundy od startu gry.
 - `random(a, b)` – losowa liczba całkowita od a do b (z obu końcami). `random()` – ułamek 0–1.
 - `round(x)`, `floor(x)`, `ceil(x)`, `abs(x)`, `min(a, b)`, `max(a, b)`, `sqrt(x)`, `sin(stopnie)`, `cos(stopnie)`.
-- `text(x)`, `number("12")`, `len(lista_lub_tekst)`, `push(lista, x)`, `pop(lista)`, `contains(lista_lub_tekst, x)`, `range(od, do, krok)`.
+- `text(x)`, `number("12")`, `len(x)`, `push(lista, x)`, `pop(lista)`, `contains(lista_lub_tekst, x)`, `range(od, do, krok)`.
+- Teksty: `upper`, `lower`, `trim`, `split(t, " ")`, `join(lista, ", ")`, `replace(t, "a", "b")`, `slice(t, od, do)`.
+- Listy: `pick(l)` (losowy element), `shuffle(l)`, `sort(l)`, `indexOf(l, x)`, `insert(l, i, x)`, `removeAt(l, i)`. Słowniki: `keys(d)`, `hasKey(d, k)`, `removeKey(d, k)`. `randomColor()`.
 
 ## Przykład: obby z ruchomą platformą i monetami
 ```nexus
@@ -11317,7 +11331,33 @@ when kill {
 }
 ```
 
+## Przykład: przygoda z NPC i kluczem
+```nexus
+spawn("block", 0, -1, 0, 60, 1, 60, "#5f9e4f")
+spawn("spawn", 0, 0, -20, 6, 1, 6)
+spawn("npc", -4, 1, -10, 1.5, 3, 1.5, "#3b82f6", "Ola")
+spawn("coin", 15, 1.5, 0, 1, 1, 1, "#ffd700", "Klucz")
+spawn("block", 0, 2, 15, 8, 5, 1, "#8b5a2b", "Brama")
+spawn("finish", 0, 0, 22, 6, 1, 6)
+
+when talk "Ola" {
+  dialog("Ola", "Klucz leży przy drzewie. Otwórz nim bramę!")
+}
+when touch "Klucz" {
+  giveItem("klucz")
+}
+when touch "Brama" {
+  if hasItem("klucz") > 0 {
+    hide("Brama")
+    sound("door")
+  } else {
+    say("Brama jest zamknięta")
+  }
+}
+```
+
 ## Zasady dla AI piszącego kod
+- Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
 - Używaj wyłącznie funkcji z tej listy. Każdy blok `when`, `if`, `while`, `repeat`, `for`, `func` musi mieć klamry `{ }`.
@@ -11332,10 +11372,10 @@ when kill {
   'use strict';
   class NexusError extends Error{constructor(message,line){super(message);this.line=line||0;}}
   const KEYWORDS=new Set(['var','func','return','if','else','while','repeat','for','in','break','continue','when','and','or','not','true','false','null']);
-  const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die','shoot','hit','kill','timeup']);
+  const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die','shoot','hit','kill','timeup','talk']);
   const ARG_EVENTS=new Set(['every','touch','key']);
   // These take an optional name: `when kill { }` reacts to every enemy, `when kill "Boss" { }` to one.
-  const OPTIONAL_ARG=new Set(['hit','kill']);
+  const OPTIONAL_ARG=new Set(['hit','kill','talk']);
   const MAX_SOURCE=20000,MAX_LIST=10000,MAX_TEXT=10000,MAX_DEPTH=150,MAX_THREADS=64,SLICE=3000,FRAME_BUDGET=30000;
 
   function lex(src){
@@ -11355,7 +11395,7 @@ when kill {
       if(two==='||'){push('or','or');i+=2;continue;}
       if(['==','!=','<=','>=','+=','-=','*=','/='].includes(two)){push('op',two);i+=2;continue;}
       if(c==='!'){push('not','not');i++;continue;}
-      if('+-*/%<>=(){}[],.;'.includes(c)){push('op',c);i++;continue;}
+      if('+-*/%<>=(){}[],.;:'.includes(c)){push('op',c);i++;continue;}
       throw new NexusError('Nieznany znak „'+c+'”',line);
     }
     push('eof');return out;
@@ -11394,14 +11434,14 @@ when kill {
         case 'continue':p++;return{k:'continue',line};
         case 'when':{
           p++;if(!top)throw new NexusError('Zdarzenia (when) definiuj poza innymi blokami',line);
-          const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die, shoot, hit, kill, timeup',line);
+          const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die, shoot, hit, kill, timeup, talk',line);
           const arg=ARG_EVENTS.has(n.value)||(OPTIONAL_ARG.has(n.value)&&!isOp('{')&&peek().type!=='nl')?expr():null;return{k:'when',event:n.value,arg,body:block(),line};
         }
         case 'else':throw new NexusError('„else” bez pasującego „if”',line);
         default:{
           const target=expr();
           if(peek().type==='op'&&['=','+=','-=','*=','/='].includes(peek().value)){
-            const op=next().value;if(target.k!=='name'&&target.k!=='index')throw new NexusError('Tu nie można przypisać wartości',line);
+            const op=next().value;if(target.k!=='name'&&target.k!=='index'&&target.k!=='member')throw new NexusError('Tu nie można przypisać wartości',line);
             return{k:'assign',target,op,value:expr(),line};
           }
           if(target.k!=='call')throw new NexusError('Ta linia nic nie robi – brakuje wywołania funkcji lub przypisania',line);
@@ -11436,6 +11476,13 @@ when kill {
         case 'id':return{k:'name',name:k.value,line:k.line};
         case 'op':
           if(k.value==='('){skipLines();const e=expr();skipLines();expect(')');return e;}
+          if(k.value==='{'){
+            // Dictionary: { hp: 100, "imię": "Ala" }
+            const entries=[];skipLines();
+            if(!isOp('}')){do{skipLines();if(isOp('}'))break;const kt=next();if(kt.type!=='id'&&kt.type!=='str'&&!KEYWORDS.has(kt.type))throw new NexusError('Klucz słownika to nazwa lub tekst (jest: '+desc(kt)+')',kt.line);
+              expect(':','po kluczu słownika');skipLines();entries.push([String(kt.value??kt.type),expr()]);skipLines();}while(eat(','));}
+            expect('}','na końcu słownika');return{k:'dict',entries,line:k.line};
+          }
           if(k.value==='['){const items=[];skipLines();if(!isOp(']')){do{skipLines();if(isOp(']'))break;items.push(expr());skipLines();}while(eat(','));}expect(']','na końcu listy');return{k:'list',items,line:k.line};}
       }
       throw new NexusError('Nieoczekiwane: '+desc(k),k.line);
@@ -11451,9 +11498,13 @@ when kill {
     find(name){let s=this;while(s){if(s.vars.has(name))return s;s=s.parent;}return null;}
   }
   class Wait{constructor(seconds){this.seconds=seconds;}}
+  // A builtin that waits for the player (ask) returns an Await; the thread sleeps frame by frame until it is done.
+  class Await{constructor(){this.done=false;this.value=null;}}
+  // Dictionaries keep string keys in a Map, so keys like "constructor" are ordinary data.
+  class Dict{constructor(){this.map=new Map();}}
   class Return{constructor(value){this.value=value;}}
   const BREAK={b:1},CONTINUE={c:1},SLICED={s:1},PLAYER=Object.freeze({__player:true});
-  const typeName=v=>v===null||v===undefined?'null':Array.isArray(v)?'lista':v===PLAYER?'player':typeof v==='number'?'liczba':typeof v==='string'?'tekst':typeof v==='boolean'?'prawda/fałsz':'wartość';
+  const typeName=v=>v===null||v===undefined?'null':Array.isArray(v)?'lista':v instanceof Dict?'słownik':v===PLAYER?'player':typeof v==='number'?'liczba':typeof v==='string'?'tekst':typeof v==='boolean'?'prawda/fałsz':'wartość';
   const truthy=v=>!(v===false||v===null||v===undefined||v===0||v==='');
   function show(v){
     if(v===null||v===undefined)return 'null';
@@ -11461,13 +11512,14 @@ when kill {
     if(typeof v==='boolean')return v?'true':'false';
     if(Array.isArray(v))return '['+v.slice(0,50).map(show).join(', ')+(v.length>50?', …':'')+']';
     if(v===PLAYER)return 'player';
+    if(v instanceof Dict)return '{'+[...v.map].slice(0,30).map(([k,x])=>k+': '+show(x)).join(', ')+(v.map.size>30?', …':'')+'}';
     return String(v);
   }
-  const PART_TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health'];
+  const PART_TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health','npc'];
   const PLAYER_FIELDS=['x','y','z','hp','coins','ammo','weapon','kills'];
   const WEAPON_KINDS=['pistol','rifle','shotgun','sniper','sword','none'];
   const ENEMY_MODES=['chase','guard','patrol','shooter'];
-  const BUILTIN_NAMES=new Set(['giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
+  const BUILTIN_NAMES=new Set(['upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
 
   class Runtime{
     constructor(source,api,options={}){
@@ -11566,8 +11618,14 @@ when kill {
             let target=owner;if(!target){target=scope;while(target.parent&&!target.fn)target=target.parent;}
             target.vars.set(name,v);return;
           }
+          if(s.target.k==='member'){
+            const obj=yield* this.eval(s.target.obj,scope);if(!(obj instanceof Dict))throw new NexusError('Kropkę z przypisaniem można stosować tylko do słowników',s.line);
+            if(!obj.map.has(s.target.name)&&obj.map.size>=MAX_LIST)throw new NexusError('Słownik jest za duży',s.line);
+            obj.map.set(s.target.name,s.op==='='?v:this.arith(s.op[0],obj.map.get(s.target.name)??null,v,s.line));return;
+          }
           const list=yield* this.eval(s.target.obj,scope),index=yield* this.eval(s.target.index,scope);
-          if(!Array.isArray(list))throw new NexusError('Indeks [ ] działa tylko na listach',s.line);
+          if(list instanceof Dict){const key=show(index);if(!list.map.has(key)&&list.map.size>=MAX_LIST)throw new NexusError('Słownik jest za duży',s.line);list.map.set(key,s.op==='='?v:this.arith(s.op[0],list.map.get(key)??null,v,s.line));return;}
+          if(!Array.isArray(list))throw new NexusError('Indeks [ ] działa tylko na listach i słownikach',s.line);
           const i=this.index(list,index,s.line,true);
           list[i]=s.op==='='?v:this.arith(s.op[0],list[i],v,s.line);return;
         }
@@ -11592,7 +11650,8 @@ when kill {
         case 'for':{
           let list=yield* this.eval(s.list,scope);
           if(typeof list==='string')list=[...list];
-          if(!Array.isArray(list))throw new NexusError('for … in wymaga listy lub range(…)',s.line);
+          if(list instanceof Dict)list=[...list.map.keys()];
+          if(!Array.isArray(list))throw new NexusError('for … in wymaga listy, słownika lub range(…)',s.line);
           for(const item of list.slice()){
             const inner=new Scope(scope);inner.vars.set(s.name,item);
             try{yield* this.execBlock(s.body,inner);}catch(e){if(e===BREAK)break;if(e===CONTINUE)continue;throw e;}
@@ -11626,6 +11685,7 @@ when kill {
       switch(e.k){
         case 'lit':return e.v;
         case 'list':{const out=[];for(const it of e.items)out.push(yield* this.eval(it,scope));return out;}
+        case 'dict':{const d=new Dict();for(const [key,node] of e.entries)d.map.set(key,yield* this.eval(node,scope));return d;}
         case 'name':{const owner=scope.find(e.name);if(!owner){if(this.funcs.has(e.name)||BUILTIN_NAMES.has(e.name))throw new NexusError('„'+e.name+'” to funkcja – dodaj nawiasy ( )',e.line);throw new NexusError('Nieznana zmienna „'+e.name+'”',e.line);}return owner.vars.get(e.name);}
         case 'or':{const l=yield* this.eval(e.l,scope);return truthy(l)?true:truthy(yield* this.eval(e.r,scope));}
         case 'and':{const l=yield* this.eval(e.l,scope);return truthy(l)?truthy(yield* this.eval(e.r,scope)):false;}
@@ -11645,13 +11705,15 @@ when kill {
         case 'index':{
           const obj=yield* this.eval(e.obj,scope),i=yield* this.eval(e.index,scope);
           if(typeof obj==='string')return obj[this.index(obj,i,e.line)];
-          if(!Array.isArray(obj))throw new NexusError('Indeks [ ] działa tylko na listach i tekstach',e.line);
+          if(obj instanceof Dict)return obj.map.get(show(i))??null;
+          if(!Array.isArray(obj))throw new NexusError('Indeks [ ] działa tylko na listach, tekstach i słownikach',e.line);
           return obj[this.index(obj,i,e.line)];
         }
         case 'member':{
           const obj=yield* this.eval(e.obj,scope);
           if(obj===PLAYER){if(!PLAYER_FIELDS.includes(e.name))throw new NexusError('player ma pola: '+PLAYER_FIELDS.join(', '),e.line);return this.api.playerGet(e.name);}
-          throw new NexusError('Kropka działa tylko z player (np. player.x)',e.line);
+          if(obj instanceof Dict)return obj.map.get(e.name)??null;
+          throw new NexusError('Kropka działa z player (np. player.x) i ze słownikami (np. d.hp)',e.line);
         }
         case 'call':{
           if(e.callee.k!=='name')throw new NexusError('Można wywoływać tylko funkcje po nazwie',e.line);
@@ -11672,6 +11734,7 @@ when kill {
           this.line=e.line;
           const result=fn(args,e.line);
           if(result instanceof Wait){if(result.seconds>0)yield result;return null;}
+          if(result instanceof Await){while(!result.done)yield new Wait(0);return result.value;}
           return result===undefined?null:result;
         }
       }
@@ -11742,7 +11805,36 @@ when kill {
         sin:a=>Math.sin(num(a[0],'sin',0)*Math.PI/180),cos:a=>Math.cos(num(a[0],'cos',0)*Math.PI/180),
         text:a=>show(a[0]),
         number:a=>{const v=typeof a[0]==='number'?a[0]:parseFloat(show(a[0]).replace(',','.'));return isFinite(v)?v:0;},
-        len:a=>{if(typeof a[0]==='string'||Array.isArray(a[0]))return a[0].length;throw new NexusError('len: wymaga listy lub tekstu',rt.line);},
+        len:a=>{if(typeof a[0]==='string'||Array.isArray(a[0]))return a[0].length;if(a[0] instanceof Dict)return a[0].map.size;throw new NexusError('len: wymaga listy, tekstu lub słownika',rt.line);},
+        // Text
+        upper:a=>str(a[0],'upper',0).toUpperCase(),lower:a=>str(a[0],'lower',0).toLowerCase(),trim:a=>str(a[0],'trim',0).trim(),
+        split:a=>{const t=str(a[0],'split',0),sep=str(a[1],'split',1,' ');const out=sep===''?[...t]:t.split(sep);if(out.length>MAX_LIST)throw new NexusError('split: za dużo części',rt.line);return out;},
+        join:a=>{const r=list(a[0],'join').map(show).join(str(a[1],'join',1,', '));if(r.length>MAX_TEXT)throw new NexusError('join: tekst za długi',rt.line);return r;},
+        replace:a=>{const r=str(a[0],'replace',0).split(str(a[1],'replace',1)).join(str(a[2],'replace',2));if(r.length>MAX_TEXT)throw new NexusError('replace: tekst za długi',rt.line);return r;},
+        slice:a=>{const v=a[0];if(typeof v!=='string'&&!Array.isArray(v))throw new NexusError('slice: wymaga tekstu lub listy',rt.line);return v.slice(num(a[1],'slice',1,0),a[2]==null?undefined:num(a[2],'slice',2));},
+        // Lists
+        pick:a=>{const l=list(a[0],'pick');return l.length?l[Math.floor(Math.random()*l.length)]:null;},
+        shuffle:a=>{const l=list(a[0],'shuffle');for(let i=l.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[l[i],l[j]]=[l[j],l[i]];}return l;},
+        sort:a=>{const l=list(a[0],'sort');if(l.every(x=>typeof x==='number'))l.sort((x,y)=>x-y);else l.sort((x,y)=>show(x).localeCompare(show(y),'pl'));if(a[1]===true)l.reverse();return l;},
+        indexOf:a=>typeof a[0]==='string'?a[0].indexOf(show(a[1])):list(a[0],'indexOf').indexOf(a[1]),
+        insert:a=>{const l=list(a[0],'insert');if(l.length>=MAX_LIST)throw new NexusError('insert: lista jest pełna',rt.line);l.splice(Math.max(0,Math.min(l.length,Math.round(num(a[1],'insert',1)))),0,a[2]??null);return l.length;},
+        removeAt:a=>{const l=list(a[0],'removeAt');const i=Math.round(num(a[1],'removeAt',1));if(i<0||i>=l.length)throw new NexusError('removeAt: indeks poza listą',rt.line);return l.splice(i,1)[0];},
+        // Dictionaries
+        keys:a=>{if(!(a[0] instanceof Dict))throw new NexusError('keys: wymaga słownika',rt.line);return [...a[0].map.keys()];},
+        hasKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('hasKey: wymaga słownika',rt.line);return a[0].map.has(show(a[1]));},
+        removeKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('removeKey: wymaga słownika',rt.line);return a[0].map.delete(show(a[1]));},
+        randomColor:()=>'#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'),
+        // NPCs, questions and inventory (NexusScript 1.2)
+        dialog:a=>{api.dialog(part(a[0],'dialog'),show(a[1]??''),Math.max(1,Math.min(20,num(a[2],'dialog',2,4))));},
+        ask:a=>{const q=show(a[0]??'');const opts=a.slice(1).map(show).filter(Boolean).slice(0,4);if(opts.length<2)throw new NexusError('ask: podaj pytanie i co najmniej 2 odpowiedzi',rt.line);const w=new Await();api.ask(q,opts,v=>{w.value=v;w.done=true;});return w;},
+        giveItem:a=>{api.item(str(a[0],'giveItem',0).slice(0,24),Math.max(1,Math.round(num(a[1],'giveItem',1,1))));},
+        takeItem:a=>api.item(str(a[0],'takeItem',0).slice(0,24),-Math.max(1,Math.round(num(a[1],'takeItem',1,1)))),
+        hasItem:a=>api.itemCount(str(a[0],'hasItem',0)),
+        items:()=>api.itemList(),
+        lighting:a=>{const m=str(a[0],'lighting',0);if(!['day','sunset','night','dark'].includes(m))throw new NexusError('lighting: wybierz "day", "sunset", "night" lub "dark"',rt.line);api.lighting(m);},
+        fog:a=>{api.fog(Math.max(10,Math.min(1000,num(a[0],'fog',0))));},
+        shake:a=>{api.shake(Math.max(0,Math.min(3,num(a[0],'shake',0,1))));},
+        rotate:a=>{api.rotate(part(a[0],'rotate'),num(a[1],'rotate',1));},
         push:a=>{const l=list(a[0],'push');if(l.length>=MAX_LIST)throw new NexusError('push: lista ma już 10 000 elementów',rt.line);l.push(a[1]??null);return l.length;},
         pop:a=>{const l=list(a[0],'pop');return l.length?l.pop():null;},
         contains:a=>typeof a[0]==='string'?a[0].includes(show(a[1])):list(a[0],'contains').includes(a[1]),
@@ -11755,7 +11847,7 @@ when kill {
     const s=String(text||'');const m=s.match(/```[a-zA-Z]*[ \t]*\r?\n([\s\S]*?)```/);
     return (m?m[1]:s).replace(/\r\n/g,'\n').trim()+'\n';
   }
-  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,version:'1.1'};
+  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,EVENTS,KEYWORDS,Dict,version:'1.2'};
 })();
 </script>
 <style id="nexus-engine-style">
@@ -11789,6 +11881,13 @@ when kill {
 .nx-cross::before{left:10px;top:0;width:2px;height:22px}.nx-cross::after{top:10px;left:0;height:2px;width:22px}
 .nx-cross.hit::before,.nx-cross.hit::after{background:#ff4a3a}
 .nx-flash{position:absolute;inset:0;background:#ff2a1a;opacity:0;pointer-events:none;transition:opacity .25s}
+.nx-talk{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);padding:8px 14px;border-radius:10px;background:#0d1117d9;color:#fff;font:700 14px Inter,system-ui,sans-serif;pointer-events:none}
+.nx-ask{position:absolute;inset:0;display:grid;place-items:center;background:#0006}
+.nx-ask section{background:#141a22;border:1px solid #ffffff22;border-radius:14px;padding:18px;width:min(420px,calc(100% - 32px));color:#fff;text-align:center}
+.nx-ask h3{margin:0 0 14px;font-size:19px;white-space:pre-line}
+.nx-ask .opts{display:grid;gap:8px}
+.nx-ask button{min-height:44px;border-radius:10px;border:1px solid #ffffff33;background:#1f2937;color:#fff;font:700 15px Inter,system-ui,sans-serif;cursor:pointer}
+.nx-ask button:hover{background:#ff8a4c;color:#1b0f08}
 body.nx-playing{overflow:hidden}
 @media (max-width:600px){.nx-say{font-size:20px}.nx-hp{width:110px}}
 @media (max-width:900px){.nx-title{display:none}}
@@ -11797,8 +11896,8 @@ body.nx-playing{overflow:hidden}
 // NexusGame: plays a Studio 3D project (parts + NexusScript) in its own renderer overlay.
 (() => {
   'use strict';
-  const TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health'];
-  const DEFAULT_COLOR={block:'#4eae79',glass:'#9fd8ff',lava:'#ff5a2a',coin:'#f5c542',spawn:'#4a9eff',finish:'#ffffff',checkpoint:'#b47cff',spring:'#ff9d3c',enemy:'#e0383b',ammo:'#6b7d3a',health:'#f4f4f4'};
+  const TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health','npc'];
+  const DEFAULT_COLOR={block:'#4eae79',glass:'#9fd8ff',lava:'#ff5a2a',coin:'#f5c542',spawn:'#4a9eff',finish:'#ffffff',checkpoint:'#b47cff',spring:'#ff9d3c',enemy:'#e0383b',ammo:'#6b7d3a',health:'#f4f4f4',npc:'#3b82f6'};
   // Player weapons: damage per hit, seconds between shots, range, spread and pellets per shot.
   const WEAPONS={pistol:{name:'Pistolet',dmg:25,rate:.3,range:70,spread:.012,pellets:1,auto:false,ammo:60},rifle:{name:'Karabin',dmg:16,rate:.1,range:90,spread:.03,pellets:1,auto:true,ammo:150},
     shotgun:{name:'Strzelba',dmg:12,rate:.8,range:28,spread:.1,pellets:7,auto:false,ammo:40},sniper:{name:'Snajperka',dmg:100,rate:1.1,range:160,spread:0,pellets:1,auto:false,ammo:20},
@@ -11827,8 +11926,11 @@ body.nx-playing{overflow:hidden}
     g.add(body);
     if(part.type==='checkpoint'){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,3,8),new THREE.MeshLambertMaterial({color:0xdddddd}));pole.position.set(-w/2+.3,h/2+1.5,0);const flag=new THREE.Mesh(new THREE.BoxGeometry(1.1,.7,.05),new THREE.MeshLambertMaterial({color:part.color}));flag.position.set(-w/2+.9,h/2+2.6,0);g.add(pole,flag);}
     if(part.type==='spring'){for(let i=0;i<3;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(Math.min(w,d)*.3,.07,6,16),new THREE.MeshLambertMaterial({color:0xffe9b0}));ring.rotation.x=Math.PI/2;ring.position.y=h/2+.12+i*.18;g.add(ring);}}
-    // Tall enemies (2.5+) look like blocky characters; the box stays as an invisible hit area.
-    if(part.type==='enemy'&&h>=2.5&&typeof createCharacterRig3D==='function'){try{
+    // NPCs and tall enemies (2.5+) look like blocky characters; the box stays as an invisible hit area.
+    if(part.type==='npc'&&typeof createCharacterRig3D==='function'){try{
+      const rig=createCharacterRig3D({head:'#f5cd30',torso:part.color,leftArm:part.color,rightArm:part.color,leftLeg:'#334155',rightLeg:'#334155',hat:'none',back:'none',face:'smile',tshirt:'none',pants:'none'});
+      rig.group.scale.setScalar(Math.max(1.5,h)/6.2);rig.group.position.y=-h/2;g.add(rig.group);body.visible=false;g.userData.rig=rig;}catch{}}
+    else if(part.type==='enemy'&&h>=2.5&&typeof createCharacterRig3D==='function'){try{
       const rig=createCharacterRig3D({head:'#f5cd30',torso:part.color,leftArm:part.color,rightArm:part.color,leftLeg:'#2b2f36',rightLeg:'#2b2f36',hat:'none',back:'none',face:'angry',tshirt:'none',pants:'none'});
       rig.group.scale.setScalar(h/6.2);rig.group.position.y=-h/2;rig.group.rotation.y=Math.PI;g.add(rig.group);body.visible=false;g.userData.rig=rig;}catch{}}
     else if(part.type==='enemy'){const eye=new THREE.MeshBasicMaterial({color:0x111111});for(const s of[-1,1]){const e=new THREE.Mesh(new THREE.BoxGeometry(w*.18,h*.18,.05),eye);e.position.set(s*w*.22,h*.15,d/2+.03);g.add(e);}const brow=new THREE.Mesh(new THREE.BoxGeometry(w*.7,h*.08,.05),eye);brow.position.set(0,h*.33,d/2+.03);g.add(brow);}
@@ -11855,6 +11957,7 @@ body.nx-playing{overflow:hidden}
     const api={spawn:(type,x,y,z,w,h,d,color,name)=>{if(parts.length>=MAX_PARTS)return null;const n=name||'part'+(parts.length+1);parts.push({type,pos:[x,y,z],size:[w,h,d],color:color||DEFAULT_COLOR[type],name:n});return n;},
       exists:n=>parts.some(p=>p.name===n),getPos:n=>(parts.find(p=>p.name===n)||{pos:[0,0,0]}).pos,
       move(){},color(n,c){const p=parts.find(q=>q.name===n);if(p)p.color=c;},resize(){},spin(){},visible(){},remove(n){const i=parts.findIndex(p=>p.name===n);if(i>=0)parts.splice(i,1);},
+      dialog(){},ask(){},item:()=>true,itemCount:()=>0,itemList:()=>[],lighting(){},fog(){},shake(){},rotate(){},
       weapon(){},ammo(){},enemy(){},enemyGet:()=>100,timer(){},getTimer:()=>0,count:t=>parts.filter(p=>p.type===t).length,nearest:t=>(parts.find(p=>p.type===t)||{}).name||null,distance:()=>0,label(){},explode(){},firstPerson(){},
       sky(){},teleport(){},damage(){},heal(){},checkpoint(){},setStat(){},win(){},lose(){},say(){},hint(){},setScore(){},getScore:()=>0,print(){},sound(){},playerGet:()=>0};
     try{const rt=new NexusScript.Runtime(project.script||'',api,{onError:e=>errors.push(e)});rt.start();for(let i=0;i<4;i++)rt.update(0);}
@@ -11875,8 +11978,9 @@ body.nx-playing{overflow:hidden}
     top.append(title,stats);
     const hint=el('div','nx-hint'),say=el('div','nx-say'),consoleBox=el('div','nx-console');hint.hidden=true;consoleBox.hidden=true;
     const ammoPill=el('div','nx-pill'),timerPill=el('div','nx-pill'),killsPill=el('div','nx-pill');stats.append(ammoPill,timerPill,killsPill);
-    const cross=el('div','nx-cross'),flash=el('div','nx-flash');cross.hidden=true;
-    root.append(top,hint,say,consoleBox,cross,flash);
+    const cross=el('div','nx-cross'),flash=el('div','nx-flash'),talkTip=el('div','nx-talk'),bagPill=el('div','nx-pill');cross.hidden=true;talkTip.hidden=true;stats.append(bagPill);
+    let askBox=null;
+    root.append(top,hint,say,consoleBox,cross,flash,talkTip);
     const touch=!!window.isMobileDevice||matchMedia('(pointer:coarse)').matches;
     let joy=null,knob=null,fireB=null;const joyVec={x:0,y:0};
     if(touch){
@@ -11893,7 +11997,9 @@ body.nx-playing{overflow:hidden}
     }
     document.body.append(root);document.body.classList.add('nx-playing');
     const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(70,1,.1,600);
-    scene.add(new THREE.HemisphereLight(0xffffff,0x667788,.85));const sun=new THREE.DirectionalLight(0xfff2dd,.7);sun.position.set(-30,60,20);scene.add(sun);
+    const hemi=new THREE.HemisphereLight(0xffffff,0x667788,.85);scene.add(hemi);const sun=new THREE.DirectionalLight(0xfff2dd,.7);sun.position.set(-30,60,20);scene.add(sun);
+    // A lamp that follows the player, used at night.
+    const lamp=new THREE.PointLight(0xfff1c9,0,30);scene.add(lamp);
     // Player
     let rig=null;
     try{if(typeof createCharacterRig3D==='function'){rig=createCharacterRig3D(typeof avatarData==='object'?avatarData:{});rig.group.scale.setScalar(.56);}}catch{rig=null;}
@@ -11925,7 +12031,7 @@ body.nx-playing{overflow:hidden}
     function removePart(part){scene.remove(part.mesh);disposeTree(part.mesh);parts.splice(parts.indexOf(part),1);byName.delete(part.name);touching.delete(part);}
     function spawnPoint(){const s=parts.find(p=>p.type==='spawn');return s?[s.pos[0],s.pos[1]+s.size[1]/2+.05,s.pos[2]]:[0,2,0];}
     function message(text,secs){say.textContent=text;say.style.opacity='1';sayTimer=secs;}
-    function sound(name){const f={coin:[880,.08],jump:[420,.06],win:[660,.3],hit:[140,.15],beep:[520,.08]}[name];if(f)try{window.bloxTone?.(f[0],f[1],'triangle',.05);}catch{}}
+    function sound(name){const f={coin:[880,.08],jump:[420,.06],win:[660,.3],hit:[140,.15],beep:[520,.08],explosion:[70,.35],laser:[1200,.07],powerup:[990,.18],door:[200,.2],click:[700,.03],error:[110,.2]}[name];if(f)try{window.bloxTone?.(f[0],f[1],'triangle',.05);}catch{}}
     function showErrors(){if(!opts.showErrors||!errors.length){consoleBox.hidden=true;return;}consoleBox.hidden=false;consoleBox.replaceChildren(...errors.slice(-4).map(e=>{const d=el('div');const b=el('b',null,e.line?'Linia '+e.line+': ':'');d.append(b,document.createTextNode(e.message));return d;}));}
     const api={
       spawn:(type,x,y,z,w,h,d,color,name)=>addPart({type,pos:[x,y,z],size:[w,h,d],color,name}),
@@ -11961,8 +12067,28 @@ body.nx-playing{overflow:hidden}
       distance(n){const p=byName.get(n);return p?Math.round(Math.hypot(p.pos[0]-state.pos[0],p.pos[1]-state.pos[1],p.pos[2]-state.pos[2])*100)/100:0;},
       label(n,t){const p=byName.get(n);if(p){setLabel(p,t);p.labelText=t;}},
       explode(x,y,z,r,dmg){explosion([x,y,z],r,dmg);},
-      firstPerson(on){state.firstPerson=!!on;playerObj.visible=!on;equip();}
+      firstPerson(on){state.firstPerson=!!on;playerObj.visible=!on;equip();},
+      dialog(n,text,secs){const p=byName.get(n);if(!p)return;setLabel(p,text);p.labelText=text;p.dialogUntil=(runtime?.time||0)+secs;sound('click');},
+      ask(q,opts,done){
+        askBox?.remove();state.asking=true;input.keys.clear();input.jump=false;input.fire=false;
+        askBox=el('div','nx-ask');const box=el('section');box.append(el('h3',null,q));const list=el('div','opts');
+        const choose=v=>{askBox?.remove();askBox=null;state.asking=false;sound('click');done(v);};
+        opts.forEach((o,i)=>{const b=el('button',null,(i+1)+'. '+o);b.onclick=()=>choose(o);list.append(b);});
+        askBox.choose=i=>{if(opts[i]!=null)choose(opts[i]);};box.append(list);askBox.append(box);root.append(askBox);
+      },
+      item(name,delta){const n=state.items.get(name)||0;if(n+delta<0)return false;if(n+delta===0)state.items.delete(name);else state.items.set(name,n+delta);if(delta>0)sound('powerup');return true;},
+      itemCount:name=>state.items.get(name)||0,
+      itemList:()=>[...state.items.keys()],
+      lighting(m){applyLighting(m);},
+      fog(far){scene.fog.near=far*.3;scene.fog.far=far;},
+      shake(v){state.shake=Math.max(state.shake,v);},
+      rotate(n,deg){const p=byName.get(n);if(p){p.rot=deg;p.mesh.rotation.y=deg*Math.PI/180;}}
     };
+    function applyLighting(m){
+      const L={day:['#8fd3ff',.85,.7,0],sunset:['#ff9a6b',.6,.55,0],night:['#0b1530',.22,.08,1.6],dark:['#05060a',.07,0,2.4]}[m]||null;if(!L)return;
+      const sky=m==='day'?(project.settings?.sky||L[0]):L[0];scene.background=new THREE.Color(sky);scene.fog.color=new THREE.Color(sky);
+      hemi.intensity=L[1];sun.intensity=L[2];sun.color.setHex(m==='sunset'?0xffb070:0xfff2dd);lamp.intensity=L[3];state.lighting=m;
+    }
     function rebuildMesh(p){const text=p.label?p.labelText:'';scene.remove(p.mesh);disposeTree(p.mesh);p.label=p.bar=p.barFill=null;p.mesh=buildMesh(p);p.mesh.visible=p.visible;scene.add(p.mesh);if(text){setLabel(p,text);p.labelText=text;}}
     function setPos(p,pos){p.delta=[p.delta[0]+pos[0]-p.pos[0],p.delta[1]+pos[1]-p.pos[1],p.delta[2]+pos[2]-p.pos[2]];p.pos=pos;p.mesh.position.set(...pos);}
     function reset(){
@@ -11970,7 +12096,8 @@ body.nx-playing{overflow:hidden}
       parts=[];byName=new Map();serial=0;minY=0;touching=new Set();errors=[];result?.remove();result=null;hint.hidden=true;say.style.opacity='0';
       const sky=project.settings?.sky||'#8fd3ff';scene.background=new THREE.Color(sky);scene.fog=new THREE.Fog(sky,120,420);
       for(const p of normalizeParts(project.parts))addPart(p);
-      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false};
+      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false,items:new Map(),asking:false,shake:0,lighting:'day',nearNpc:null};
+      askBox?.remove();askBox=null;hemi.intensity=.85;sun.intensity=.7;sun.color.setHex(0xfff2dd);lamp.intensity=0;
       for(const fx of effects.splice(0))scene.remove(fx.obj),disposeTree(fx.obj);playerObj.visible=true;equip();
       try{runtime=new NexusScript.Runtime(project.script||'',api,{onError:e=>{errors.push(e);showErrors();try{opts.onError?.(e);}catch{}}});runtime.start();runtime.update(0);}
       catch(e){runtime=null;errors.push({message:e.message,line:e.line||0});showErrors();try{opts.onError?.({message:e.message,line:e.line||0});}catch{}}
@@ -12006,7 +12133,7 @@ body.nx-playing{overflow:hidden}
     }
     function explosion(at,r,dmg){
       const ball=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:0xffa53a,transparent:true,opacity:.85}));ball.position.set(...at);scene.add(ball);effects.push({obj:ball,until:(runtime?.time||0)+.45,grow:r});
-      sound('hit');try{window.BloxFx?.shake?.(.4);}catch{}
+      sound('explosion');state.shake=Math.max(state.shake,1);
       for(const p of parts.slice()){if(p.type!=='enemy'||!p.visible)continue;const d=Math.hypot(p.pos[0]-at[0],p.pos[1]-at[1],p.pos[2]-at[2]);if(d<r)damageEnemy(p,dmg*(1-d/r*.6));}
       const pd=Math.hypot(state.pos[0]-at[0],state.pos[1]+1.5-at[1],state.pos[2]-at[2]);if(pd<r)hurt(dmg*(1-pd/r)*.5);
     }
@@ -12054,7 +12181,11 @@ body.nx-playing{overflow:hidden}
       const dir=new THREE.Vector3(to[0]-from[0],to[1]-from[1],to[2]-from[2]),len=dir.length();dir.normalize();ray.set(new THREE.Vector3(...from),dir);ray.far=len;
       const solid=parts.filter(p=>p.visible&&SOLID.has(p.type)&&p.type!=='glass').map(p=>p.mesh);return !ray.intersectObjects(solid,true).length;
     }
-    function keyEvent(k){if(!state.over&&runtime)runtime.fire('key',k);}
+    function keyEvent(k){
+      if(state.asking&&askBox&&/^[1-4]$/.test(k)){askBox.choose(Number(k)-1);return;}
+      if(state.over||!runtime)return;runtime.fire('key',k);
+      if(k==='E'&&state.nearNpc&&parts.includes(state.nearNpc)){runtime.fire('talk',state.nearNpc.name);}
+    }
     const onKey=e=>{
       if(stopped)return;const t=e.target;if(t&&/INPUT|TEXTAREA|SELECT/.test(t.tagName))return;
       const down=e.type==='keydown',code=e.code;
@@ -12087,9 +12218,15 @@ body.nx-playing{overflow:hidden}
       for(const p of parts){if(p.anim){p.anim.t=Math.min(p.anim.dur,p.anim.t+dt);const k=p.anim.t/p.anim.dur,s=k*k*(3-2*k);setPos(p,p.anim.from.map((v,i)=>v+(p.anim.to[i]-v)*s));if(p.anim.t>=p.anim.dur)p.anim=null;}if(p.spin)p.mesh.rotation.y+=p.spin*Math.PI/180*dt;}
       if(state.over)return;
       if(state.deadUntil){if(runtime&&runtime.time>=state.deadUntil)respawn();return;}
+      // NPCs: speech bubbles expire, the nearest one within reach can be talked to.
+      const tnow=runtime?.time||0;let near=null,nd=4.5;
+      for(const q of parts){if(q.dialogUntil&&tnow>=q.dialogUntil){q.dialogUntil=0;setLabel(q,'');q.labelText='';}
+        if(q.type==='npc'&&q.visible){const d=Math.hypot(q.pos[0]-state.pos[0],q.pos[2]-state.pos[2]);if(d<10)q.mesh.rotation.y=Math.atan2(state.pos[0]-q.pos[0],state.pos[2]-q.pos[2]);if(d<nd&&Math.abs(q.pos[1]-state.pos[1])<5){nd=d;near=q;}}}
+      state.nearNpc=near;talkTip.hidden=!near||state.asking;if(near)talkTip.textContent=(touch?'AKCJA':'E')+': porozmawiaj'+(near.name&&!/^part\d+$/.test(near.name)?' – '+near.name:'');
+      if(state.asking){state.vel[0]=state.vel[2]=0;}
       if(state.ground&&parts.includes(state.ground)){const d=state.ground.delta;state.pos=[state.pos[0]+d[0],state.pos[1]+d[1],state.pos[2]+d[2]];}
-      let mx=(input.keys.has('KeyD')||input.keys.has('ArrowRight')?1:0)-(input.keys.has('KeyA')||input.keys.has('ArrowLeft')?1:0)+joyVec.x;
-      let mz=(input.keys.has('KeyS')||input.keys.has('ArrowDown')?1:0)-(input.keys.has('KeyW')||input.keys.has('ArrowUp')?1:0)+joyVec.y;
+      let mx=state.asking?0:(input.keys.has('KeyD')||input.keys.has('ArrowRight')?1:0)-(input.keys.has('KeyA')||input.keys.has('ArrowLeft')?1:0)+joyVec.x;
+      let mz=state.asking?0:(input.keys.has('KeyS')||input.keys.has('ArrowDown')?1:0)-(input.keys.has('KeyW')||input.keys.has('ArrowUp')?1:0)+joyVec.y;
       const len=Math.hypot(mx,mz);if(len>1){mx/=len;mz/=len;}
       const sin=Math.sin(yaw),cos=Math.cos(yaw),vx=(mx*cos+mz*sin)*state.speed,vz=(-mx*sin+mz*cos)*state.speed;
       // The avatar model faces -Z, so it turns half a circle to face the direction of travel.
@@ -12172,6 +12309,8 @@ body.nx-playing{overflow:hidden}
         camera.position.set(tx+Math.sin(yaw)*Math.cos(pitch)*d+rx,ty+Math.sin(pitch)*d,tz+Math.cos(yaw)*Math.cos(pitch)*d+rz);
         camera.lookAt(tx+rx-Math.sin(yaw)*c*30,ty-Math.sin(aim)*30,tz+rz-Math.cos(yaw)*c*30);playerObj.rotation.y=yaw;
       }else{const tx=p[0],ty=p[1]+PH*.75,tz=p[2];camera.position.set(tx+Math.sin(yaw)*Math.cos(pitch)*dist,ty+Math.sin(pitch)*dist,tz+Math.cos(yaw)*Math.cos(pitch)*dist);camera.lookAt(tx,ty,tz);}
+      if(state.shake>0){camera.position.x+=(Math.random()-.5)*state.shake*.6;camera.position.y+=(Math.random()-.5)*state.shake*.6;state.shake=Math.max(0,state.shake-.05);}
+      lamp.position.set(p[0],p[1]+4,p[2]);
       const now=runtime?.time||0;
       for(let i=effects.length-1;i>=0;i--){const fx=effects[i];if(fx.grow)fx.obj.scale.setScalar(Math.min(fx.grow,fx.obj.scale.x+fx.grow*.15));if(fx.obj.material)fx.obj.material.opacity*=.9;if(now>=fx.until){scene.remove(fx.obj);disposeTree(fx.obj);effects.splice(i,1);}}
       for(const q of parts)if(q.bar){q.mesh.getWorldQuaternion(tmpQ).invert();q.bar.quaternion.copy(tmpQ).multiply(camera.quaternion);}
@@ -12179,6 +12318,7 @@ body.nx-playing{overflow:hidden}
       ammoPill.hidden=!state.weapon;if(state.weapon)ammoPill.textContent=WEAPONS[state.weapon].name+(WEAPONS[state.weapon].melee||state.ammo<0?'':' · '+state.ammo);
       timerPill.hidden=!state.timerOn;if(state.timerOn){const t=Math.ceil(state.timer);timerPill.textContent='Czas '+Math.floor(t/60)+':'+String(t%60).padStart(2,'0');}
       killsPill.hidden=!state.kills;killsPill.textContent='Pokonani: '+state.kills;
+      bagPill.hidden=!state.items.size;if(state.items.size)bagPill.textContent='Plecak: '+[...state.items].map(([k,v])=>v>1?k+' ×'+v:k).join(', ');
       renderer.render(scene,camera);
     }
     function loop(t){
@@ -12211,6 +12351,8 @@ body.nx-playing{overflow:hidden}
   function count(t,re,def,lo,hi){const m=t.match(new RegExp('(\\d+)\\s*(?:'+re.source+')'))||t.match(new RegExp('(?:'+re.source+')\\D{0,12}(\\d+)'));const n=m?parseInt(m[1],10):def;return Math.max(lo,Math.min(hi,n));}
   function generate(description){
     const t=String(description||'').toLowerCase();
+    if(/quiz|pytani|zagadk|teleturniej|test wiedzy/.test(t))return quiz(t,description);
+    if(/przygod|quest|misj|npc|rozmow|klucz|skarb|wiosk|zamek|rpg/.test(t)&&!/strzel|zombi/.test(t))return adventure(t,description);
     if(/strzel|shooter|fps|bitw|wojn|zombi|pistolet|karabin|snajper|miecz|walk[aię]|bro[nń]|żołnier|zolnier|potyczk/.test(t))return shooter(t,description);
     const want={
       maze:has(t,/labirynt|maze/),tower:has(t,/wież|wiez|tower|w górę|w gore/),arena:has(t,/arena|przetrw|survival|fal[ai]/),
@@ -12306,6 +12448,55 @@ body.nx-playing{overflow:hidden}
     add('when win {\n  say("Brawo!'+(want.coins?' Monety: " + monety':'"')+', 4)\n}');
     return L.join('\n')+'\n';
   }
+  // Adventure: a village with NPCs, a key hidden behind a task, a locked gate and a treasure (NexusScript 1.2).
+  function adventure(t,description){
+    const night=/noc|ciemn|las/.test(t),L=[],add=s=>L.push(s);
+    add('// Przygoda wygenerowana przez wbudowanego asystenta BloxWeb');
+    add('// Opis: '+String(description||'').replace(/\s+/g,' ').slice(0,120));
+    add('spawn("block", 0, -1, 0, 70, 1, 70, "#5f9e4f")');
+    add('spawn("spawn", 0, 0, -25, 6, 1, 6)');
+    add('// Domki w wiosce');
+    add('for x in [-18, 18] {\n  spawn("block", x, 2, -8, 8, 5, 8, "#c9a46a")\n  spawn("block", x, 5, -8, 9, 1, 9, "#9b3d2b")\n}');
+    add('spawn("npc", -6, 1, -14, 1.5, 3, 1.5, "#3b82f6", "Sołtys")');
+    add('spawn("npc", 12, 1, 4, 1.5, 3, 1.5, "#a855f7", "Kowal")');
+    add('// Mur z bramą i skarbem za nią');
+    add('spawn("block", -20, 2, 20, 30, 5, 1, "#6b6f78")\nspawn("block", 20, 2, 20, 30, 5, 1, "#6b6f78")');
+    add('spawn("block", 0, 2, 20, 10, 5, 1, "#8b5a2b", "Brama")');
+    add('spawn("finish", 0, 0, 28, 6, 1, 6)');
+    add('label("Brama", "Zamknięta brama")');
+    add('// Grzyby do zebrania dla kowala');
+    add('repeat 5 {\n  spawn("coin", random(-30, 30), 1.5, random(-20, 15), 1, 1, 1, "#e11d48")\n}');
+    add('');
+    add('var zadanie = "brak"');
+    add('when start {\n'+(night?'  lighting("night")\n':'')+'  say("Porozmawiaj z mieszkańcami (E / AKCJA)", 3)\n  hint("Cel: porozmawiaj z Sołtysem")\n}');
+    add('when talk "Sołtys" {\n  if zadanie == "brak" {\n    dialog("Sołtys", "Witaj! Kowal ma klucz do bramy. Pomóż mu!")\n    zadanie = "kowal"\n    hint("Cel: idź do Kowala")\n  } else {\n    dialog("Sołtys", "Za bramą czeka skarb!")\n  }\n}');
+    add('when talk "Kowal" {\n  if hasItem("klucz") > 0 {\n    dialog("Kowal", "Klucz już masz. Otwórz bramę!")\n  } else if player.coins >= 5 {\n    dialog("Kowal", "Dzięki za grzyby! Oto klucz.")\n    giveItem("klucz")\n    hint("Cel: otwórz bramę")\n  } else {\n    dialog("Kowal", "Przynieś mi 5 grzybów, to dam ci klucz.")\n    hint("Cel: zbierz grzyby (" + player.coins + "/5)")\n  }\n}');
+    add('when collect {\n  if hasItem("klucz") == 0 {\n    hint("Cel: zbierz grzyby (" + player.coins + "/5)")\n  }\n}');
+    add('when touch "Brama" {\n  if hasItem("klucz") > 0 {\n    takeItem("klucz")\n    hide("Brama")\n    label("Brama", "")\n    sound("door")\n    say("Brama otwarta!")\n  } else {\n    say("Potrzebujesz klucza")\n  }\n}');
+    add('when win {\n  say("Znalazłeś skarb wioski!", 4)\n}');
+    return L.join('\n')+'\n';
+  }
+  // Quiz: questions with clickable answers, points and a result (NexusScript 1.2).
+  function quiz(t,description){
+    const math=/matem|liczb|dodaw|mnoż|mnoz/.test(t),L=[],add=s=>L.push(s);
+    add('// Quiz wygenerowany przez wbudowanego asystenta BloxWeb');
+    add('// Opis: '+String(description||'').replace(/\s+/g,' ').slice(0,120));
+    add('spawn("block", 0, -1, 0, 30, 1, 30, "#334155")');
+    add('spawn("spawn", 0, 0, -8, 6, 1, 6)');
+    add('spawn("npc", 0, 1, 2, 1.5, 3, 1.5, "#f59e0b", "Prowadzący")');
+    add('');
+    if(math){
+      add('var dobre = 0\nvar runda = 0');
+      add('func zadanie() {\n  var a = random(2, 9)\n  var b = random(2, 9)\n  var wynik = a * b\n  var odp = ask("Ile to " + a + " × " + b + "?", text(wynik), text(wynik + random(1, 5)), text(wynik - random(1, 3)))\n  if odp == text(wynik) {\n    dobre += 1\n    sound("powerup")\n    dialog("Prowadzący", "Świetnie!")\n  } else {\n    sound("error")\n    dialog("Prowadzący", "Prawidłowo: " + wynik)\n  }\n}');
+    }else{
+      add('var pytania = [\n  {q: "Stolica Polski to?", a: "Warszawa", z1: "Kraków", z2: "Gdańsk"},\n  {q: "Ile nóg ma pająk?", a: "8", z1: "6", z2: "10"},\n  {q: "Jaka planeta jest najbliżej Słońca?", a: "Merkury", z1: "Mars", z2: "Wenus"},\n  {q: "Ile minut ma godzina?", a: "60", z1: "100", z2: "30"},\n  {q: "Z czego robi się lód?", a: "Z wody", z1: "Z piasku", z2: "Z mleka"}\n]');
+      add('var dobre = 0\nvar runda = 0');
+      add('func zadanie() {\n  var p = pytania[runda - 1]\n  var opcje = shuffle([p.a, p.z1, p.z2])\n  var odp = ask(p.q, opcje[0], opcje[1], opcje[2])\n  if odp == p.a {\n    dobre += 1\n    sound("powerup")\n    dialog("Prowadzący", "Dobrze!")\n  } else {\n    sound("error")\n    dialog("Prowadzący", "Prawidłowo: " + p.a)\n  }\n}');
+    }
+    add('when talk "Prowadzący" {\n  if runda == 0 {\n    repeat 5 {\n      runda += 1\n      setScore(dobre)\n      zadanie()\n      setScore(dobre)\n      wait(1)\n    }\n    if dobre >= 3 {\n      win("Wynik: " + dobre + "/5. Brawo!")\n    } else {\n      lose("Wynik: " + dobre + "/5. Spróbuj jeszcze raz!")\n    }\n  }\n}');
+    add('when start {\n  say("Podejdź do Prowadzącego i naciśnij E / AKCJA", 4)\n  label("Prowadzący", "Quiz")\n}');
+    return L.join('\n')+'\n';
+  }
   // Shooter games: arena with cover, a weapon, waves of enemies and pickups (NexusScript 1.1).
   function shooter(t,description){
     const zombie=/zombi/.test(t),sniper=/snajper/.test(t),sword=/miecz/.test(t),fps=/fps|pierwszej osob|z oczu|oczami/.test(t);
@@ -12356,6 +12547,18 @@ body.nx-playing{overflow:hidden}
 .nx-input,.nx-select,.nx-area{background:#0b0f14;border:1px solid #2f3a47;border-radius:8px;color:#eef2f6;padding:8px 10px;font:inherit;min-width:0}
 .nx-area{width:100%;min-height:150px;font:13px/1.5 ui-monospace,Consolas,monospace;resize:vertical;box-sizing:border-box}
 .nx-code{min-height:340px;tab-size:2;white-space:pre;overflow:auto}
+.nx-code-wrap{position:relative;display:flex;border:1px solid #2f3a47;border-radius:8px;background:#0b0f14;overflow:hidden;height:min(460px,60vh);margin-top:8px}
+.nx-gutter{width:42px;flex:none;padding:10px 6px 10px 0;box-sizing:border-box;text-align:right;color:#4b5563;font:13px/1.5 ui-monospace,Consolas,monospace;overflow:hidden;user-select:none;background:#0d131a;white-space:pre}
+.nx-gutter b{display:block;font-weight:400}.nx-gutter b.err{color:#fff;background:#b91c1c;border-radius:3px}
+.nx-code-box{position:relative;flex:1;min-width:0}
+.nx-hl,.nx-code-box textarea{position:absolute;inset:0;margin:0;padding:10px;box-sizing:border-box;font:13px/1.5 ui-monospace,Consolas,monospace;white-space:pre;tab-size:2;border:0;letter-spacing:0}
+.nx-hl{color:#e5e7eb;pointer-events:none;overflow:hidden}
+.nx-code-box textarea{background:transparent;color:transparent;caret-color:#fff;resize:none;outline:none;overflow:auto;width:100%;height:100%}
+.nx-code-box textarea::selection{background:#3b82f666}
+.nx-hl .k{color:#c084fc}.nx-hl .ev{color:#f59e0b;font-weight:700}.nx-hl .f{color:#60a5fa}.nx-hl .s{color:#86efac}.nx-hl .n{color:#fca5a5}.nx-hl .c{color:#6b7280;font-style:italic}.nx-hl .pl{color:#f472b6}
+.nx-snips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.nx-snips button{min-height:32px;padding:4px 10px;border-radius:999px;border:1px solid #2f3a47;background:#111827;color:#cbd5e1;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
+.nx-snips button:hover{border-color:#ff8a4c;color:#fff}
 .nx-work{display:grid;grid-template-columns:150px minmax(0,1fr) 240px;gap:12px;margin-top:12px}
 .nx-tools{display:flex;flex-direction:column;gap:6px}
 .nx-tool{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid #2f3a47;background:#0f141b;color:#e8edf2;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;text-align:left}
@@ -12393,8 +12596,8 @@ body.nx-playing{overflow:hidden}
   const section=$('view-studio');if(!section)return;
   const REFERENCE=($('nexusReference')?.textContent||'').trim();
   const storeKey='blox_nexus_v1_'+(typeof myPlayerId!=='undefined'?myPlayerId:'local');
-  const TOOLS=[['select','Wybierz','#ffffff'],['block','Blok','#4eae79'],['glass','Szkło','#9fd8ff'],['lava','Lawa','#ff5a2a'],['coin','Moneta','#f5c542'],['spawn','Start','#4a9eff'],['finish','Meta','#dddddd'],['checkpoint','Checkpoint','#b47cff'],['spring','Trampolina','#ff9d3c'],['enemy','Wróg','#e0383b'],['ammo','Amunicja','#6b7d3a'],['health','Apteczka','#f4f4f4'],['erase','Gumka','#555555']];
-  const SIZE={block:[4,1,4],glass:[4,1,4],lava:[4,1,4],coin:[1,1,1],spawn:[6,1,6],finish:[6,1,6],checkpoint:[4,1,4],spring:[3,1,3],enemy:[2,2,2],ammo:[1.2,1,1.2],health:[1.2,1,1.2]};
+  const TOOLS=[['select','Wybierz','#ffffff'],['block','Blok','#4eae79'],['glass','Szkło','#9fd8ff'],['lava','Lawa','#ff5a2a'],['coin','Moneta','#f5c542'],['spawn','Start','#4a9eff'],['finish','Meta','#dddddd'],['checkpoint','Checkpoint','#b47cff'],['spring','Trampolina','#ff9d3c'],['enemy','Wróg','#e0383b'],['ammo','Amunicja','#6b7d3a'],['health','Apteczka','#f4f4f4'],['npc','NPC','#3b82f6'],['erase','Gumka','#555555']];
+  const SIZE={block:[4,1,4],glass:[4,1,4],lava:[4,1,4],coin:[1,1,1],spawn:[6,1,6],finish:[6,1,6],checkpoint:[4,1,4],spring:[3,1,3],enemy:[2,2,2],ammo:[1.2,1,1.2],health:[1.2,1,1.2],npc:[1.5,3,1.5]};
   const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   const clone=v=>JSON.parse(JSON.stringify(v));
   let projects=[],current=null,tool='block',selected=null,undo=[],redo=[],saveTimer=0,showScriptParts=true,playing=null;
@@ -12661,7 +12864,15 @@ body.nx-playing{overflow:hidden}
       const msg=el('div','nx-msg');msg.id='nxCheck';
       const row=el('div','nx-row');const toggle=btn(showScriptParts?'Ukryj klocki z kodu':'Pokaż klocki z kodu',()=>{showScriptParts=!showScriptParts;toggle.textContent=showScriptParts?'Ukryj klocki z kodu':'Pokaż klocki z kodu';refreshScriptParts();});
       row.append(btn('Sprawdź kod',()=>check(true)),toggle,btn('▶ Testuj',()=>test(),'v11-primary'));
-      pane.append(row,msg,area);check(false);
+      // Highlighted code: a coloured <pre> under a transparent textarea, line numbers on the left.
+      area.className='';const wrap=el('div','nx-code-wrap'),gutter=el('div','nx-gutter'),boxEl=el('div','nx-code-box'),pre=el('pre','nx-hl');pre.setAttribute('aria-hidden','true');
+      boxEl.append(pre,area);wrap.append(gutter,boxEl);
+      const paint=()=>{pre.innerHTML=highlight(area.value)+'\n';const n=area.value.split('\n').length;gutter.replaceChildren(...Array.from({length:n},(_,i)=>{const b=el('b',null,String(i+1));if(i+1===errorLine)b.className='err';return b;}));sync();};
+      const sync=()=>{pre.scrollTop=area.scrollTop;pre.scrollLeft=area.scrollLeft;gutter.scrollTop=area.scrollTop;};
+      area.addEventListener('scroll',sync);area.addEventListener('input',paint);repaintCode=paint;
+      const snips=el('div','nx-snips');
+      for(const [label,code] of SNIPPETS){const b=btn('+ '+label,()=>{const at=area.selectionEnd;const before=area.value.slice(0,at),pre2=before&&!before.endsWith('\n')?'\n':'';area.setRangeText(pre2+code+'\n',at,area.selectionEnd,'end');area.focus();area.dispatchEvent(new Event('input'));});b.title='Wstaw: '+label;snips.append(b);}
+      pane.append(row,msg,snips,wrap);paint();check(false);
     }
     if(id==='ai')renderAiTab(pane);
     if(id==='settings'){
@@ -12673,13 +12884,44 @@ body.nx-playing{overflow:hidden}
     }
     if(id==='help'){const pre=el('div','nx-ref');pre.textContent=REFERENCE;const row=el('div','nx-row');row.append(btn('Kopiuj prompt dla AI',()=>copyPrompt()));pane.append(row,pre);}
   }
+  let errorLine=0,repaintCode=()=>{};
   function check(verbose){
     const m=$('nxCheck');if(!m||!current)return true;
+    const fail=(line,text)=>{errorLine=line||0;m.textContent='Linia '+(line||'?')+': '+text;m.classList.add('error');repaintCode();return false;};
     try{NexusScript.parse(current.script||'');const prev=NexusGame.previewParts(current);
-      if(prev.errors.length){m.textContent='Linia '+prev.errors[0].line+': '+prev.errors[0].message;m.classList.add('error');return false;}
+      if(prev.errors.length)return fail(prev.errors[0].line,prev.errors[0].message);
+      errorLine=0;repaintCode();
       m.textContent=verbose||prev.parts.length?'Kod jest poprawny.'+(prev.parts.length?' Kod buduje '+prev.parts.length+' klocków (pokazane półprzezroczyście).':''):'';m.classList.remove('error');return true;}
-    catch(e){m.textContent='Linia '+(e.line||'?')+': '+e.message;m.classList.add('error');return false;}
+    catch(e){return fail(e.line,e.message);}
   }
+  // Syntax colouring for the editor (keywords, events, functions, text, numbers, comments).
+  function highlight(code){
+    const esc=t=>t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const re=/(\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$))|("(?:[^"\\\n]|\\.)*"?|'(?:[^'\\\n]|\\.)*'?)|(\b\d+(?:\.\d+)?\b)|([\p{L}_][\p{L}\p{N}_]*)/gu;
+    let out='',last=0,prevWhen=false;
+    for(const m of code.matchAll(re)){
+      out+=esc(code.slice(last,m.index));last=m.index+m[0].length;const t=esc(m[0]);
+      if(m[1])out+='<span class="c">'+t+'</span>';
+      else if(m[2])out+='<span class="s">'+t+'</span>';
+      else if(m[3])out+='<span class="n">'+t+'</span>';
+      else{const w=m[4];const cls=prevWhen&&NexusScript.EVENTS.has(w)?'ev':NexusScript.KEYWORDS.has(w)?'k':NexusScript.BUILTIN_NAMES.has(w)?'f':w==='player'?'pl':'';out+=cls?'<span class="'+cls+'">'+t+'</span>':t;prevWhen=w==='when';continue;}
+      prevWhen=false;
+    }
+    return out+esc(code.slice(last));
+  }
+  const SNIPPETS=[
+    ['start','when start {\n  say("Witaj!")\n}'],
+    ['co sekundę','when every 1 {\n  // kod co sekundę\n}'],
+    ['dotknięcie','when touch "Nazwa" {\n  say("Dotknięto!")\n}'],
+    ['broń','when start {\n  giveWeapon("rifle")\n}'],
+    ['wróg strzelec','var w = spawn("enemy", 0, 1, 20, 2, 3, 2)\nenemyMode(w, "shooter")\nsetHealth(w, 80)'],
+    ['po pokonaniu','when kill {\n  addScore(10)\n  if count("enemy") == 0 {\n    win("Wszyscy pokonani!")\n  }\n}'],
+    ['minutnik','when start {\n  setTimer(60)\n}\nwhen timeup {\n  lose("Koniec czasu!")\n}'],
+    ['NPC i rozmowa','spawn("npc", 4, 1.5, 6, 1.5, 3, 1.5, "#3b82f6", "Ola")\nwhen talk "Ola" {\n  dialog("Ola", "Cześć! Znajdź klucz.")\n}'],
+    ['pytanie','when key "Q" {\n  var odp = ask("Ile to 2 + 2?", "3", "4", "5")\n  if odp == "4" {\n    say("Dobrze!")\n  } else {\n    say("Spróbuj jeszcze raz")\n  }\n}'],
+    ['klucz i drzwi','spawn("coin", 8, 1.5, 4, 1, 1, 1, "#ffd700", "Klucz")\nspawn("block", 0, 2, 14, 6, 4, 1, "#8b5a2b", "Drzwi")\nwhen touch "Klucz" {\n  giveItem("klucz")\n}\nwhen touch "Drzwi" {\n  if hasItem("klucz") > 0 {\n    hide("Drzwi")\n    sound("door")\n  } else {\n    say("Drzwi są zamknięte")\n  }\n}'],
+    ['noc','when start {\n  lighting("night")\n}'],
+    ['słownik','var gracz = {imie: "Ala", punkty: 0}\ngracz.punkty += 5\nsay(gracz.imie + ": " + gracz.punkty)']];
   function refreshScriptParts(){if(!current)return;editor.setGhosts(showScriptParts?NexusGame.previewParts(current).parts:[]);}
 
   // ---------- AI ----------

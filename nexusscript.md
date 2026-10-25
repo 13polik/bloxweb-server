@@ -1,4 +1,4 @@
-# NexusScript 1.1 – język gier 3D w BloxWeb Studio
+# NexusScript 1.2 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -21,11 +21,12 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - `"enemy"` – wróg z życiem (100). Domyślnie goni gracza w promieniu 18 jednostek i zadaje 25 obrażeń przy dotyku. Można go pokonać bronią.
 - `"ammo"` – paczka amunicji (+30 naboi po dotknięciu).
 - `"health"` – apteczka (+35 zdrowia po dotknięciu).
+- `"npc"` – postać do rozmowy (np. `spawn("npc", 4, 1, 6, 1.5, 3, 1.5, "#3b82f6", "Ola")`). Gracz rozmawia klawiszem E lub przyciskiem AKCJA.
 
 ## Składnia
 - Komentarze: `// do końca linii` oraz `/* blok */`.
 - Instrukcje oddziela się nową linią lub średnikiem.
-- Typy wartości: liczby (`3`, `2.5`), teksty (`"Cześć"` lub `'Cześć'`), `true`, `false`, `null`, listy `[1, 2, 3]`.
+- Typy wartości: liczby (`3`, `2.5`), teksty (`"Cześć"` lub `'Cześć'`), `true`, `false`, `null`, listy `[1, 2, 3]`, słowniki `{imie: "Ala", hp: 100}` (odczyt `d.hp` lub `d["hp"]`, zapis `d.hp = 5`, `for k in d` po kluczach).
 - Zmienne: `var punkty = 0`, potem `punkty = punkty + 1` albo `punkty += 1` (także `-=`, `*=`, `/=`).
 - Operatory: `+ - * / %`, porównania `== != < > <= >=`, logiczne `and or not`. Tekst + liczba skleja tekst.
 - Listy: `var l = [1, 2]`, `l[0]`, `l[1] = 5`, `push(l, 3)`, `len(l)`.
@@ -47,6 +48,7 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when hit { ... }` lub `when hit "Nazwa" { ... }` – gdy strzał gracza trafi klocek lub wroga (zmienna `target` to nazwa trafionego).
 - `when kill { ... }` lub `when kill "Nazwa" { ... }` – gdy wróg zostanie pokonany (zmienna `target` to jego nazwa).
 - `when timeup { ... }` – gdy minutnik z `setTimer` dojdzie do zera.
+- `when talk "Imię" { ... }` – gdy gracz zagada do NPC (E / AKCJA w pobliżu).
 
 ## Broń i walka
 - `giveWeapon("pistol" | "rifle" | "shotgun" | "sniper" | "sword" | "none")` – daje graczowi broń (pistolet, karabin, strzelbę, snajperkę, miecz) albo ją zabiera.
@@ -65,6 +67,16 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
   - `"shooter"` trzyma dystans i strzela do gracza, gdy go widzi.
 - `setHealth(nazwa, życie)`, `getHealth(nazwa)`, `setEnemySpeed(nazwa, prędkość)` (domyślnie 4), `setEnemyDamage(nazwa, obrażenia)` (domyślnie 25).
 - Nad trafionym wrogiem pojawia się pasek życia. Pokonany wróg znika i uruchamia `when kill`.
+
+## Rozmowy, pytania i ekwipunek
+- `dialog(nazwa, "tekst", sekundy)` – dymek nad NPC lub klockiem.
+- `var odp = ask("Pytanie?", "A", "B", "C")` – okno z 2–4 przyciskami; zdarzenie czeka, aż gracz wybierze, i zwraca tekst odpowiedzi.
+- `giveItem("klucz")`, `takeItem("klucz")` (zwraca `false`, gdy brak), `hasItem("klucz")` (ile sztuk), `items()` – plecak widoczny na ekranie.
+
+## Świat i efekty
+- `lighting("day" | "sunset" | "night" | "dark")` – pora dnia (w nocy gracz ma latarkę), `fog(odległość)` – mgła.
+- `shake(siła)` – trzęsienie kamery, `rotate(nazwa, stopnie)` – obrót klocka (sam wygląd).
+- Dźwięki: `"coin"`, `"jump"`, `"win"`, `"hit"`, `"beep"`, `"explosion"`, `"laser"`, `"powerup"`, `"door"`, `"click"`, `"error"`.
 
 ## Czas, liczenie i napisy
 - `setTimer(sekundy)` – minutnik na ekranie; `getTimer()` – ile zostało; po zerze działa `when timeup`.
@@ -100,7 +112,9 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `time()` – sekundy od startu gry.
 - `random(a, b)` – losowa liczba całkowita od a do b (z obu końcami). `random()` – ułamek 0–1.
 - `round(x)`, `floor(x)`, `ceil(x)`, `abs(x)`, `min(a, b)`, `max(a, b)`, `sqrt(x)`, `sin(stopnie)`, `cos(stopnie)`.
-- `text(x)`, `number("12")`, `len(lista_lub_tekst)`, `push(lista, x)`, `pop(lista)`, `contains(lista_lub_tekst, x)`, `range(od, do, krok)`.
+- `text(x)`, `number("12")`, `len(x)`, `push(lista, x)`, `pop(lista)`, `contains(lista_lub_tekst, x)`, `range(od, do, krok)`.
+- Teksty: `upper`, `lower`, `trim`, `split(t, " ")`, `join(lista, ", ")`, `replace(t, "a", "b")`, `slice(t, od, do)`.
+- Listy: `pick(l)` (losowy element), `shuffle(l)`, `sort(l)`, `indexOf(l, x)`, `insert(l, i, x)`, `removeAt(l, i)`. Słowniki: `keys(d)`, `hasKey(d, k)`, `removeKey(d, k)`. `randomColor()`.
 
 ## Przykład: obby z ruchomą platformą i monetami
 ```nexus
@@ -182,7 +196,33 @@ when kill {
 }
 ```
 
+## Przykład: przygoda z NPC i kluczem
+```nexus
+spawn("block", 0, -1, 0, 60, 1, 60, "#5f9e4f")
+spawn("spawn", 0, 0, -20, 6, 1, 6)
+spawn("npc", -4, 1, -10, 1.5, 3, 1.5, "#3b82f6", "Ola")
+spawn("coin", 15, 1.5, 0, 1, 1, 1, "#ffd700", "Klucz")
+spawn("block", 0, 2, 15, 8, 5, 1, "#8b5a2b", "Brama")
+spawn("finish", 0, 0, 22, 6, 1, 6)
+
+when talk "Ola" {
+  dialog("Ola", "Klucz leży przy drzewie. Otwórz nim bramę!")
+}
+when touch "Klucz" {
+  giveItem("klucz")
+}
+when touch "Brama" {
+  if hasItem("klucz") > 0 {
+    hide("Brama")
+    sound("door")
+  } else {
+    say("Brama jest zamknięta")
+  }
+}
+```
+
 ## Zasady dla AI piszącego kod
+- Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
 - Używaj wyłącznie funkcji z tej listy. Każdy blok `when`, `if`, `while`, `repeat`, `for`, `func` musi mieć klamry `{ }`.

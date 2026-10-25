@@ -263,7 +263,7 @@ def relations(uid):
 
 
 # ---------- Player-made games (Studio 3D + NexusScript) ----------
-PART_TYPES = {"block", "lava", "coin", "spawn", "finish", "checkpoint", "spring", "enemy", "glass", "ammo", "health"}
+PART_TYPES = {"block", "lava", "coin", "spawn", "finish", "checkpoint", "spring", "enemy", "glass", "ammo", "health", "npc"}
 HEX = re.compile(r"#[0-9a-fA-F]{6}")
 # Short stems of common Polish/English swear words; titles, descriptions,
 # part names and script text are all checked because other children see them.
