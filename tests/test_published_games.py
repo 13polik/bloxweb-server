@@ -108,3 +108,12 @@ def test_updates_bump_the_revision_and_keep_the_code(client):
     # A withdrawn game can be published again under the same code.
     call(client, "games_unpublish", token=ala["token"], id=first["id"])
     assert call(client, "games_publish", token=ala["token"], id=first["id"], title="Wraca", game=GAME)["revision"] == 3
+
+
+def test_nexusscript_11_pickups_are_kept(client):
+    ala = guest(client, "Ala", "BLOX-111111")
+    game = dict(GAME, parts=GAME["parts"] + [dict(t="ammo", p=[2, 0, 2], s=[1.2, 1, 1.2], c="#6b7d3a"), dict(t="health", p=[-2, 0, 2], s=[1.2, 1, 1.2], c="#f4f4f4")],
+                script='when start {\n  giveWeapon("rifle")\n}\nwhen kill {\n  addScore(10)\n}\n')
+    game_id = call(client, "games_publish", token=ala["token"], title="Strzelanka", game=game)["id"]
+    stored = call(client, "games_get", token=ala["token"], id=game_id)["game"]
+    assert [p["t"] for p in stored["parts"]][-2:] == ["ammo", "health"]
