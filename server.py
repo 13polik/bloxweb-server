@@ -52,6 +52,11 @@ sockets = {}
 cheat_strikes = defaultdict(deque)
 coin_buckets = {}
 COIN_BUCKET, COIN_REFILL = 5000, 30
+# Staff roles live only in the database; the matching badges are shown from the
+# role, never from a browser save. owner (CEO) > admin.
+ROLES = {"owner", "admin"}
+ROLE_BADGES = {"b_ceo", "b_admin"}
+anticheat_log = deque(maxlen=100)
 # This single process is the only writer, so profiles, sessions and social
 # relations can be cached and invalidated on every write. A /sync then needs
 # no database round trip at all, which keeps the room simulation smooth.
@@ -138,16 +143,19 @@ def auth(request, body):
     uid = token_user(token)
     if not uid or not profile(uid):
         fail("Sesja wygasła. Połącz konto ponownie.", 401)
+    if profile(uid)["banned"]:
+        fail("To konto zostało zablokowane przez administrację BloxWeb.", 403)
     return profile(uid)
 
 
 def profile(uid):
     if uid not in user_cache:
-        u = db.execute("SELECT id,name,avatar,login,progress FROM users WHERE id=?", (uid,)).fetchone()
+        u = db.execute("SELECT id,name,avatar,login,progress,role,banned FROM users WHERE id=?", (uid,)).fetchone()
         if not u:
             return None
         user_cache[uid] = dict(id=u["id"], name=u["name"], avatar=json.loads(u["avatar"]), login=u["login"],
-                               progress=json.loads(u["progress"]) if u["progress"] else None)
+                               progress=json.loads(u["progress"]) if u["progress"] else None,
+                               role=u["role"] if u["role"] in ROLES else None, banned=bool(u["banned"]))
     return user_cache[uid]
 
 
@@ -163,7 +171,7 @@ def progress_data(value):
     counters = {k: int(number(v, 0, 0, 1e9)) for k, v in quests.items()
                 if k != "claimed" and isinstance(k, str) and re.fullmatch(r"[a-z0-9_]{1,40}", k)}
     return dict(coins=int(number(value.get("coins"), 0, 0, 1e12)), owned=item_ids(value.get("owned"), 500),
-                badges=item_ids(value.get("badges"), 100),
+                badges=[b for b in item_ids(value.get("badges"), 100) if b not in ROLE_BADGES],
                 quests=dict(list(counters.items())[:50], claimed=item_ids(quests.get("claimed"), 100)))
 
 
@@ -237,7 +245,7 @@ def user_view(uid):
     p = presence.get(uid, {})
     online = now() - p.get("seen", 0) < 15
     room = rooms.get(p.get("room", "")) if online else None
-    return dict(id=u["id"], name=u["name"], avatar=u["avatar"],
+    return dict(id=u["id"], name=u["name"], avatar=u["avatar"], role=u["role"],
                 status="ingame" if room else "online" if online else "offline",
                 gameId=room["game"] if room else None, roomCode=room["code"] if room else None)
 
@@ -312,7 +320,7 @@ def game_data(value):
 def game_card(row):
     author = profile(row["author"]) or {}
     return dict(id=row["id"], title=row["title"], description=row["description"], author=author.get("name", "Gracz"),
-                authorId=row["author"], plays=row["plays"], created=row["created"], updated=row["updated"],
+                authorId=row["author"], authorRole=author.get("role"), cover=row["cover"] if "cover" in row.keys() else None, plays=row["plays"], created=row["created"], updated=row["updated"],
                 hidden=row["hidden"], revision=row["revision"])
 
 
@@ -324,6 +332,45 @@ def ai_request(prompt, code):
         "Content-Type": "application/json", "X-Blox-Key": AI_KEY})
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.loads(response.read().decode())
+
+
+COVER = re.compile(r"data:image/(jpeg|webp|png);base64,[A-Za-z0-9+/=]{100,60000}")
+PROJECT_META = ("description", "publishedId", "publishedRevision", "publishedPrint", "aiDescription")
+
+
+def cover_data(value):
+    return value if isinstance(value, str) and COVER.fullmatch(value) else None
+
+
+def project_data(value):
+    """A private Studio 3D project saved in the cloud: the game data plus editor metadata."""
+    if not isinstance(value, dict):
+        fail("Nieprawidłowy projekt.")
+    project_id = clean(value.get("id"), 40)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{4,40}", project_id):
+        fail("Nieprawidłowy identyfikator projektu.")
+    data = game_data(dict(value, format="bloxweb-nexus"))
+    data.update(id=project_id, name=clean(value.get("name"), 40) or "Moja gra 3D",
+                updated=number(value.get("updated"), time.time()*1000, 0, 1e14))
+    for key in PROJECT_META:
+        if isinstance(value.get(key), (str, int, float)) and not isinstance(value.get(key), bool):
+            data[key] = value[key] if not isinstance(value[key], str) else value[key][:600]
+    return data
+
+
+def staff(user, level="admin"):
+    if user["role"] != "owner" and (level == "owner" or user["role"] != "admin"):
+        fail("Brak uprawnień administratora.", 403)
+
+
+def admin_user_view(uid):
+    u = profile(uid)
+    if not u:
+        return None
+    p = presence.get(uid, {})
+    return dict(user_view(uid), login=u["login"], banned=u["banned"], room=p.get("room"),
+                coins=(u["progress"] or {}).get("coins", 0),
+                games=db.execute("SELECT COUNT(*) FROM published_games WHERE author=?", (uid,)).fetchone()[0])
 
 
 def forget_relations(*uids):
@@ -390,6 +437,7 @@ def leave(uid):
 def strike(uid, kind, detail=""):
     """Record a suspicious action. Many in a minute remove the player from the room."""
     log.warning("anticheat %s %s %s", uid, kind, detail)
+    anticheat_log.append(dict(time=time.time(), user=uid, kind=kind, detail=str(detail)[:80]))
     q = cheat_strikes[uid]
     q.append(now())
     while q and q[0] < now()-60:
@@ -401,6 +449,7 @@ def strike(uid, kind, detail=""):
 
 def kick(uid, reason):
     log.warning("anticheat kick %s: %s", uid, reason)
+    anticheat_log.append(dict(time=time.time(), user=uid, kind="kick", detail=reason[:80]))
     leave(uid)
     presence.setdefault(uid, dict(seen=now(), room=None))["notice"] = reason
     conn = sockets.get(uid)
@@ -538,7 +587,8 @@ def act(room, p, action):
         if text:
             p["chatAt"] = now()
             room["serial"] += 1
-            room["chat"].append(dict(id=room["serial"], sender=p["id"], name=user_view(p["id"])["name"], text=text))
+            sender = user_view(p["id"])
+            room["chat"].append(dict(id=room["serial"], sender=p["id"], name=sender["name"], role=sender["role"], text=text))
             room["chat"] = room["chat"][-60:]
         return
     if kind == "restart":
@@ -941,7 +991,7 @@ async def room_socket(ws: WebSocket):
 @app.get("/health")
 async def health():
     db.execute("SELECT 1").fetchone()
-    return dict(ok=True, version=18, ai=bool(AI_URL and AI_KEY), sockets=len(sockets), rooms=len(rooms),
+    return dict(ok=True, version=19, ai=bool(AI_URL and AI_KEY), sockets=len(sockets), rooms=len(rooms),
                 storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
 
 
@@ -954,7 +1004,7 @@ async def homepage():
 async def api(operation: str, request: Request):
     raw = await request.body()
     # A published Studio game (parts + NexusScript) may be larger than other requests.
-    if len(raw) > (160000 if operation == "games_publish" else 40000):
+    if len(raw) > (220000 if operation in ("games_publish", "projects_save") else 40000):
         fail("Żądanie jest zbyt duże.", 413)
     try:
         body = json.loads(raw or "{}")
@@ -1136,14 +1186,14 @@ async def api(operation: str, request: Request):
                 fail("Możesz aktualizować tylko własne gry.", 403)
             if existing["hidden"] == 1:
                 fail("Ta gra została ukryta po zgłoszeniach i czeka na sprawdzenie.", 403)
-            db.execute("UPDATE published_games SET title=?,description=?,data=?,updated=?,hidden=0,revision=revision+1 WHERE id=?",
-                       (title, description, json.dumps(data), stamp, game_id))
+            db.execute("UPDATE published_games SET title=?,description=?,data=?,updated=?,hidden=0,revision=revision+1,cover=COALESCE(?,cover) WHERE id=?",
+                       (title, description, json.dumps(data), stamp, cover_data(body.get("cover")), game_id))
         else:
             if db.execute("SELECT COUNT(*) FROM published_games WHERE author=? AND hidden<>2", (uid,)).fetchone()[0] >= 20:
                 fail("Masz już 20 opublikowanych gier. Wycofaj jedną, aby dodać nową.")
             game_id = "G-"+secrets.token_hex(3).upper()
-            db.execute("INSERT INTO published_games(id,author,title,description,data,created,updated,plays,reports,hidden,revision) VALUES(?,?,?,?,?,?,?,0,0,0,1)",
-                       (game_id, uid, title, description, json.dumps(data), stamp, stamp))
+            db.execute("INSERT INTO published_games(id,author,title,description,data,created,updated,plays,reports,hidden,revision,cover) VALUES(?,?,?,?,?,?,?,0,0,0,1,?)",
+                       (game_id, uid, title, description, json.dumps(data), stamp, stamp, cover_data(body.get("cover"))))
         db.commit()
         times.append(now())
         revision = db.execute("SELECT revision FROM published_games WHERE id=?", (game_id,)).fetchone()["revision"]
@@ -1151,14 +1201,15 @@ async def api(operation: str, request: Request):
     if operation == "games_list":
         order = "plays DESC, updated DESC" if body.get("sort") == "popular" else "updated DESC"
         query = clean(body.get("query"), 40).casefold()
-        rows = db.execute(f"SELECT id,author,title,description,plays,created,updated,hidden,revision FROM published_games WHERE hidden=0 ORDER BY {order} LIMIT 200").fetchall()
+        rows = db.execute(f"SELECT id,author,title,description,plays,created,updated,hidden,revision,cover FROM published_games WHERE hidden=0 ORDER BY {order} LIMIT 200").fetchall()
         games = [game_card(r) for r in rows if not query or query in r["title"].casefold()][:60]
-        mine = [game_card(r) for r in db.execute("SELECT id,author,title,description,plays,created,updated,hidden,revision FROM published_games WHERE author=? AND hidden<>2 ORDER BY updated DESC", (uid,)).fetchall()]
+        mine = [game_card(r) for r in db.execute("SELECT id,author,title,description,plays,created,updated,hidden,revision,cover FROM published_games WHERE author=? AND hidden<>2 ORDER BY updated DESC", (uid,)).fetchall()]
         return dict(games=games, mine=mine)
     if operation == "games_get":
         game_id = clean(body.get("id"), 12).upper()
         row = db.execute("SELECT * FROM published_games WHERE id=?", (game_id,)).fetchone()
-        if not row or (row["hidden"] and row["author"] != uid):
+        # Staff can open hidden games to review reports.
+        if not row or (row["hidden"] and row["author"] != uid and user["role"] not in ROLES):
             fail("Nie znaleziono tej gry albo została ukryta.", 404)
         if (uid, game_id) not in game_plays_seen:
             game_plays_seen.add((uid, game_id))
@@ -1216,6 +1267,98 @@ async def api(operation: str, request: Request):
         if not text:
             fail("AI nie zwróciło kodu. Spróbuj opisać grę inaczej.", 502)
         return dict(text=text)
+    if operation == "projects_list":
+        rows = db.execute("SELECT id,name,updated FROM studio_projects WHERE user_id=? ORDER BY updated DESC", (uid,)).fetchall()
+        return dict(projects=[dict(id=r["id"], name=r["name"], updated=r["updated"]) for r in rows])
+    if operation == "projects_get":
+        row = db.execute("SELECT data FROM studio_projects WHERE user_id=? AND id=?", (uid, clean(body.get("id"), 40))).fetchone()
+        if not row:
+            fail("Nie znaleziono projektu w chmurze.", 404)
+        return dict(project=json.loads(row["data"]))
+    if operation == "projects_save":
+        data = project_data(body.get("project"))
+        exists = db.execute("SELECT 1 FROM studio_projects WHERE user_id=? AND id=?", (uid, data["id"])).fetchone()
+        if exists:
+            db.execute("UPDATE studio_projects SET name=?,data=?,updated=? WHERE user_id=? AND id=?",
+                       (data["name"], json.dumps(data), data["updated"], uid, data["id"]))
+        else:
+            if db.execute("SELECT COUNT(*) FROM studio_projects WHERE user_id=?", (uid,)).fetchone()[0] >= 20:
+                fail("W chmurze mieści się 20 projektów. Usuń jeden, aby zapisać nowy.")
+            db.execute("INSERT INTO studio_projects(user_id,id,name,data,updated) VALUES(?,?,?,?,?)",
+                       (uid, data["id"], data["name"], json.dumps(data), data["updated"]))
+        db.commit()
+        return dict(ok=True, id=data["id"], updated=data["updated"])
+    if operation == "projects_delete":
+        # A player removes their own private project; published games are separate.
+        db.execute("DELETE FROM studio_projects WHERE user_id=? AND id=?", (uid, clean(body.get("id"), 40)))
+        db.commit()
+        return dict(ok=True)
+    if operation == "admin_overview":
+        staff(user)
+        count = lambda q: db.execute(q).fetchone()[0]
+        return dict(role=user["role"], users=count("SELECT COUNT(*) FROM users"), banned=count("SELECT COUNT(*) FROM users WHERE banned=1"),
+                    games=count("SELECT COUNT(*) FROM published_games WHERE hidden=0"), hiddenGames=count("SELECT COUNT(*) FROM published_games WHERE hidden=1"),
+                    online=sum(1 for p in presence.values() if now()-p.get("seen", 0) < 15), rooms=len(rooms), sockets=len(sockets),
+                    staff=[admin_user_view(r["id"]) for r in db.execute("SELECT id FROM users WHERE role IS NOT NULL").fetchall()],
+                    anticheat=list(anticheat_log)[-40:][::-1])
+    if operation == "admin_games":
+        staff(user)
+        rows = db.execute("SELECT id,author,title,description,plays,created,updated,hidden,revision,reports FROM published_games WHERE hidden=1 OR reports>0 ORDER BY hidden DESC, reports DESC, updated DESC LIMIT 100").fetchall()
+        games = []
+        for r in rows:
+            card = game_card(r) | dict(reports=r["reports"])
+            card["reasons"] = [dict(reporter=x["reporter"], reason=x["reason"]) for x in db.execute("SELECT reporter,reason FROM game_reports WHERE game_id=? ORDER BY created DESC LIMIT 10", (r["id"],)).fetchall()]
+            games.append(card)
+        return dict(games=games)
+    if operation == "admin_game":
+        staff(user)
+        game_id, action = clean(body.get("id"), 12).upper(), body.get("action")
+        if not db.execute("SELECT 1 FROM published_games WHERE id=?", (game_id,)).fetchone():
+            fail("Nie znaleziono gry.", 404)
+        if action == "show":
+            db.execute("UPDATE published_games SET hidden=0, reports=0 WHERE id=?", (game_id,))
+        elif action == "hide":
+            db.execute("UPDATE published_games SET hidden=1 WHERE id=?", (game_id,))
+        else:
+            fail("Nieznana operacja.")
+        db.commit()
+        log.warning("staff %s %s game %s", uid, action, game_id)
+        return dict(ok=True)
+    if operation == "admin_user":
+        staff(user)
+        query = clean(body.get("query"), 54)
+        if query.isdigit():
+            query = "BLOX-"+query
+        rows = db.execute("SELECT id FROM users WHERE id=? COLLATE NOCASE OR fold(name)=? OR login=? LIMIT 10", (query, query.casefold(), query.casefold())).fetchall()
+        return dict(users=[admin_user_view(r["id"]) for r in rows])
+    if operation in ("admin_kick", "admin_ban", "admin_role"):
+        staff(user, "admin" if operation == "admin_kick" else "owner")
+        target = clean(body.get("target"), 54).upper()
+        other = profile(target)
+        if not other:
+            fail("Nie znaleziono gracza.", 404)
+        if other["role"] == "owner":
+            fail("Konta właściciela nie można zmieniać.", 403)
+        if operation == "admin_kick":
+            if other["role"] and user["role"] != "owner":
+                fail("Administratora może wyrzucić tylko właściciel.", 403)
+            kick(target, "Administrator usunął cię z pokoju.")
+        elif operation == "admin_ban":
+            banned = body.get("banned") is True
+            db.execute("UPDATE users SET banned=? WHERE id=?", (1 if banned else 0, target))
+            db.commit()
+            other["banned"] = banned
+            if banned:
+                kick(target, "To konto zostało zablokowane.")
+                for digest in [k for k, v in token_cache.items() if v == target]:
+                    token_cache.pop(digest, None)
+        else:
+            role = "admin" if body.get("role") == "admin" else None
+            db.execute("UPDATE users SET role=? WHERE id=?", (role, target))
+            db.commit()
+            other["role"] = role
+        log.warning("staff %s %s %s %s", uid, operation, target, body.get("banned", body.get("role", "")))
+        return dict(user=admin_user_view(target))
     if operation == "room":
         action = body.get("action")
         if action == "leave":

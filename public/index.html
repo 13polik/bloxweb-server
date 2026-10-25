@@ -7509,7 +7509,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     const hash=JSON.stringify(value);
     if(hash===socialHash)return;
     socialHash=hash;social=value;
-    realFriends=value.friends.map(f=>({...f,avatar:normalizeAvatar(f.avatar)}));
+    realFriends=value.friends.map(f=>({...f,name:(window.bloxRoleTag?.(f.role)||'')+f.name,avatar:normalizeAvatar(f.avatar)}));
     incomingRequests=value.incoming;
     // Network list is not an import that grants trust to local saved IDs.
     renderFriendsAll();renderMessagesTab();
@@ -7898,7 +7898,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if(playerGroup&&Math.hypot(playerGroup.position.x-self.x,playerGroup.position.z-self.z)>7)playerGroup.position.set(self.x,self.y,self.z);
     const otherIds=new Set(value.players.filter(p=>p.id!==onlineId()).map(p=>p.id));
     for(const id of Object.keys(remotePlayers3D))if(!otherIds.has(id))removeRemotePlayer3D(id);
-    for(const p of value.players)if(p.id!==onlineId())updateRemotePlayer3D({...p,avatar:normalizeAvatar(p.avatar),isMoving:p.moving,isDancing:p.dancing,score:p.kills+' elim.'});
+    for(const p of value.players)if(p.id!==onlineId())updateRemotePlayer3D({...p,name:(window.bloxRoleTag?.(p.role)||'')+p.name,avatar:normalizeAvatar(p.avatar),isMoving:p.moving,isDancing:p.dancing,score:p.kills+' elim.'});
     if(value.game==='castle_defense'){
       const cd=castleDefense;
       Object.assign(cd,{hp:value.hp,gold:value.gold,wave:value.wave,maxWaves:20,pending:value.pending,betweenWaves:value.betweenWaves,waveCountdown:value.countdown,won:value.phase==='won',lost:value.phase==='lost'});
@@ -7928,7 +7928,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     for(const fx of value.fx)if(fx.id>lastFx){game.tracer(new THREE.Vector3(...fx.origin),new THREE.Vector3(...fx.end),fx.kind==='bot'?0xffa078:0x90efb2);
       if(fx.kind==='bot'){const bot=entityMaps.enemies.get(fx.enemy);if(bot)bot.flashUntil=gameTimeMs/1000+.07;}
       if(fx.player===onlineId()){game.tone(160,.05,'sawtooth',.025);if(fx.hit)addKillFeed('Trafienie potwierdzone przez serwer.','#a5efbc');}lastFx=fx.id;}
-    for(const m of value.chat)if(m.id>lastChat){appendChatMessage(m.name,m.text,'#d0eed8',false);lastChat=m.id;}
+    for(const m of value.chat)if(m.id>lastChat){appendChatMessage((window.bloxRoleTag?.(m.role)||'')+m.name,m.text,m.role?'#ffd38a':'#d0eed8',false);lastChat=m.id;}
     updateIngameHUD();game.updateHud();
     if(lastRoomRevision!==value.revision){lastRoomRevision=value.revision;setStatus('Online',true);}
     if(value.phase!=='playing')showOnlineResult();
@@ -7963,7 +7963,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if(wsReady){socketSend(true);return;}
     if(!syncing){clearTimeout(pollTimer);pollTimer=setTimeout(poll,5);}
   }
-  window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,frame:interpolate,api,connect,
+  window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,frame:interpolate,api,connect,get me(){return me;},
     get state(){return {connected,id:onlineId(),room:room?{code:room.code,game:room.game,players:room.players,phase:room.phase,wave:room.wave,hp:room.hp,gold:room.gold,kills:room.kills,enemies:room.enemies,turrets:room.turrets,revision:room.revision,owner:room.owner}:null,social,latency,pending:actions.length};}};
   const soloCD=updateCastleDefense,soloCS=updateCS2,soloShot=shootCS2,soloReload=reloadCS2,soloSwitch=switchCS2Weapon,soloBuy=buyCS2Item;
   const previousRemoteUpdate=updateRemotePlayer3D,previousRemoteRemove=removeRemotePlayer3D;
@@ -8120,7 +8120,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   function validate(value){
     if(!value||value.format!=='bloxweb-studio'||value.version!==1||!['obby','coins'].includes(value.kind)||!THEMES[value.theme]||
       !Array.isArray(value.tiles)||value.tiles.length!==W*H||!value.tiles.every(v=>Number.isInteger(v)&&VALID.has(v))||
-      typeof value.name!=='string'||!value.name.trim()||value.name.length>48)throw Error('Nieprawidłowy projekt. Użyj kodu gry wyeksportowanego ze Studio Beta.');
+      typeof value.name!=='string'||!value.name.trim()||value.name.length>48)throw Error('Nieprawidłowy projekt. Użyj kodu gry wyeksportowanego ze Studio.');
     return {format:'bloxweb-studio',version:1,id:typeof value.id==='string'?value.id.slice(0,80):uid(),
       name:value.name.trim(),kind:value.kind,theme:value.theme,settings:physics(value.settings),tiles:[...value.tiles],updated:Number.isFinite(value.updated)?value.updated:Date.now()};
   }
@@ -8128,10 +8128,10 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   const section=node('section','view-section studio-shell');section.id='view-studio';
   section.innerHTML=`
     <header class="studio-head"><div><div class="v11-eyebrow">BloxWeb / narzędzia twórcy</div>
-      <h1>Twoja wyobraźnia.<br>Twoja gra. <span class="studio-beta">BETA</span></h1>
+      <h1>Twoja wyobraźnia.<br>Twoja gra.</h1>
       <p>Zbuduj mały świat, ustaw zasady i od razu wskocz do gry. Bez pisania kodu.</p></div>
       <div class="studio-actions" id="studioHeaderActions"></div></header>
-    <div class="studio-note">Beta lokalna: projekty zapisują się w tej przeglądarce. W podglądzie bez trwałego zapisu użyj eksportu. Własne mapy są na razie jednoosobowe, bez publicznego publikowania.</div>
+    <div class="studio-note">Mapy 2D zapisują się w tej przeglądarce. W podglądzie bez trwałego zapisu użyj eksportu. Własne mapy są na razie jednoosobowe, bez publicznego publikowania.</div>
     <div id="studioTemplates" class="studio-templates"></div>
     <div class="studio-status" id="studioStatus" role="status" aria-live="polite"></div>
     <div id="studioWorkbench" class="studio-workbench" hidden>
@@ -8149,14 +8149,14 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     <section class="studio-library"><h2>Moje gry <span id="studioCount" class="v11-mini-count"></span></h2>
       <div id="studioProjects" class="studio-projects"></div></section>`;
   document.querySelector('.content').append(section);
-  const nav=button('Twórz gry · Beta',()=>switchTab('studio'));
-  nav.id='nav-studio';nav.className='nav-btn';nav.setAttribute('aria-label','Twórz gry · Beta');
+  const nav=button('Twórz gry',()=>switchTab('studio'));
+  nav.id='nav-studio';nav.className='nav-btn';nav.setAttribute('aria-label','Twórz gry');
   $('nav-settings').before(nav);
   const oldSwitch=switchTab;
   switchTab=function(name){oldSwitch(name);document.querySelectorAll('.sidebar .nav-btn').forEach(b=>b.classList.toggle('active',b.id==='nav-'+name));if(name==='studio'){drawEditor();renderLibrary();}};
   const home=node('section','studio-home-entry');
-  const homeText=node('div');homeText.append(node('h3','','Z gracza w twórcę'),node('p','','Studio Beta: układaj mapy, zbieraj pomysły i testuj własne gry.'));
-  const openStudio=button('Otwórz Studio · Beta',()=>{switchTab('studio');if(!current&&!projects.length)create('obby');},true);openStudio.id='studioHomeOpen';
+  const homeText=node('div');homeText.append(node('h3','','Z gracza w twórcę'),node('p','','Studio: buduj gry 3D, programuj je w NexusScript i publikuj dla innych gry.'));
+  const openStudio=button('Otwórz Studio',()=>{switchTab('studio');if(!current&&!projects.length)create('obby');},true);openStudio.id='studioHomeOpen';
   home.append(homeText,openStudio);$('v11Lobby').after(home);
   document.querySelectorAll('.ver-badge').forEach(e=>e.textContent='v11.1');
 
@@ -8183,7 +8183,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     $('studioWorkbench').hidden=false;$('studioTemplates').hidden=true;
     $('studioName').value=current.name;$('studioKind').value=current.kind;$('studioTheme').value=current.theme;current.settings=physics(current.settings);for(const name of ['Speed','Jump','Gravity'])$('studio'+name).value=current.settings[name.toLowerCase()];updateUndo();drawEditor();renderLibrary();}
   function create(kind){
-    if(projects.length>=20){feedback('Limit beta to 20 projektów. Zrób eksport i usuń niepotrzebny projekt.',true);return;}
+    if(projects.length>=20){feedback('Limit to 20 projektów. Zrób eksport i usuń niepotrzebny projekt.',true);return;}
     persist();const p=template(kind);projects.push(p);select(p);persist('Utworzono grę. Możesz już edytować mapę i nacisnąć „Testuj grę”.');
   }
   for(const [kind,title,desc] of [['obby','Obby / tor przeszkód','Platformy, skoki i lawa. Dotrzyj do mety własną drogą.'],['coins','Wyprawa po monety','Schowaj monety w świecie. Zbierz wszystkie, aby odblokować metę.']]){
@@ -8192,7 +8192,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   }
   $('studioHeaderActions').append(button('Nowa gra',()=>{$('studioTemplates').hidden=false;$('studioTemplates').scrollIntoView({block:'nearest'});}),button('Importuj kod',()=>codeDialog('import')));
   const fileInput=node('input');fileInput.type='file';fileInput.accept='.json,application/json';fileInput.hidden=true;fileInput.id='studioFileInput';section.append(fileInput);
-  fileInput.onchange=async()=>{const file=fileInput.files[0];if(!file)return;try{if(file.size>60000)throw Error('Plik może mieć maksymalnie 60 KB.');if(projects.length>=20)throw Error('Limit beta to 20 projektów.');const p=validate(JSON.parse(await file.text()));p.id=uid();persist();projects.push(p);select(p);persist('Zaimportowano projekt z pliku.');}catch(e){feedback(e instanceof SyntaxError?'Plik nie zawiera prawidłowego kodu JSON.':e.message,true);}finally{fileInput.value='';}};
+  fileInput.onchange=async()=>{const file=fileInput.files[0];if(!file)return;try{if(file.size>60000)throw Error('Plik może mieć maksymalnie 60 KB.');if(projects.length>=20)throw Error('Limit to 20 projektów.');const p=validate(JSON.parse(await file.text()));p.id=uid();persist();projects.push(p);select(p);persist('Zaimportowano projekt z pliku.');}catch(e){feedback(e instanceof SyntaxError?'Plik nie zawiera prawidłowego kodu JSON.':e.message,true);}finally{fileInput.value='';}};
   $('studioHeaderActions').append(button('Wczytaj plik',()=>fileInput.click()));
   $('studioPaintMode').onchange=e=>paintMode=e.target.value;
   $('studioBrushSize').onchange=e=>brushSize=Number(e.target.value);
@@ -8217,7 +8217,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
       const card=node('article','studio-project-card'+(project.id===current?.id?' active':''));
       const thumb=node('canvas');thumb.width=240;thumb.height=140;thumb.setAttribute('aria-label','Podgląd mapy '+project.name);drawMap(thumb,project,false);
       card.append(thumb,node('strong','',project.name),node('small','',project.kind==='obby'?'Obby · projekt lokalny':'Monety · projekt lokalny'));
-      const actions=node('div','studio-actions');actions.append(button('Edytuj',()=>{select(project);$('studioWorkbench').scrollIntoView({block:'start'});}),button('Duplikuj',()=>{if(projects.length>=20){feedback('Limit beta to 20 projektów.',true);return;}persist();const p=clone(projects.find(p=>p.id===project.id)||project);p.id=uid();p.name=(p.name+' · kopia').slice(0,48);projects.push(p);select(p);persist('Utworzono kopię projektu.');}),
+      const actions=node('div','studio-actions');actions.append(button('Edytuj',()=>{select(project);$('studioWorkbench').scrollIntoView({block:'start'});}),button('Duplikuj',()=>{if(projects.length>=20){feedback('Limit to 20 projektów.',true);return;}persist();const p=clone(projects.find(p=>p.id===project.id)||project);p.id=uid();p.name=(p.name+' · kopia').slice(0,48);projects.push(p);select(p);persist('Utworzono kopię projektu.');}),
         button('Usuń',()=>deleteDialog(project)));card.append(actions);list.append(card);
     }
   }
@@ -8236,13 +8236,13 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
   function codeDialog(kind){
     if(kind==='export'&&!current)return;persist();
     const box=makeModal(kind==='export'?'Kod Twojej gry':'Importuj grę');
-    box.append(node('p','',kind==='export'?'Skopiuj cały kod do notatki lub wyślij go znajomemu. Druga osoba może wkleić go w „Importuj kod”. Kod zawiera tylko mapę i ustawienia, bez danych konta.':'Wklej kod wyeksportowany ze Studio Beta. Import utworzy osobny projekt, nie nadpisze istniejących gier.'));
+    box.append(node('p','',kind==='export'?'Skopiuj cały kod do notatki lub wyślij go znajomemu. Druga osoba może wkleić go w „Importuj kod”. Kod zawiera tylko mapę i ustawienia, bez danych konta.':'Wklej kod wyeksportowany ze Studio. Import utworzy osobny projekt, nie nadpisze istniejących gier.'));
     const area=node('textarea');area.id='studioCode';area.setAttribute('aria-label',kind==='export'?'Kod gry':'Wklej kod gry');area.maxLength=60000;area.spellcheck=false;
     if(kind==='export'){area.value=JSON.stringify(current);area.readOnly=true;}
     const status=node('p','studio-status');status.setAttribute('role','status');
     const row=node('div','studio-actions');row.append(button('Zamknij',closeModal),button(kind==='export'?'Kopiuj kod':'Importuj grę',async()=>{
       if(kind==='export'){try{await navigator.clipboard.writeText(area.value);status.textContent='Skopiowano kod gry.';}catch{area.focus();area.select();status.textContent='Kod zaznaczony. Użyj opcji Kopiuj lub Ctrl/Cmd+C.';}return;}
-      try{if(projects.length>=20)throw Error('Limit beta to 20 projektów.');if(area.value.length>60000)throw Error('Kod jest zbyt długi.');
+      try{if(projects.length>=20)throw Error('Limit to 20 projektów.');if(area.value.length>60000)throw Error('Kod jest zbyt długi.');
         const p=validate(JSON.parse(area.value));p.id=uid();projects.push(p);select(p);persist('Zaimportowano nowy projekt.');closeModal();
       }catch(error){status.textContent=error instanceof SyntaxError?'To nie jest poprawny kod JSON.':error.message;status.classList.add('error');}
     },true));box.append(area,status,row);area.focus();if(kind==='export')area.select();
@@ -8313,7 +8313,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     if(!current)return;
     try{if(!$('studioName').value.trim())throw Error('Nadaj grze nazwę.');playable(current);}catch(e){feedback(e.message,true);return;}
     if(typeof currentPlayingGame!=='undefined'&&currentPlayingGame){feedback('Najpierw wyjdź z uruchomionej gry.',true);return;}
-    if(ready!==true&&window.BloxLoading)return window.BloxLoading.run(()=>startTest(true),current.name||'Studio Beta');
+    if(ready!==true&&window.BloxLoading)return window.BloxLoading.run(()=>startTest(true),current.name||'Studio');
     persist('Projekt zapisany. Trwa test gry.');returnFocus=document.activeElement;
     run={project:clone(current),state:'playing'};runner.hidden=false;document.body.classList.add('studio-testing');restartRun();$('studioGame').focus({preventScroll:true});
     cancelAnimationFrame(frame);lastTime=performance.now();accumulator=0;frame=requestAnimationFrame(loop);
@@ -12125,23 +12125,49 @@ body.nx-playing{overflow:hidden}
   function persist(msg){
     clearTimeout(saveTimer);saveTimer=0;
     if(current){current.updated=Date.now();const i=projects.findIndex(p=>p.id===current.id);if(i>=0)projects[i]=clone(current);else projects.unshift(clone(current));}
-    try{accountStore.setItem(storeKey,JSON.stringify(projects));if(msg)status(msg);}catch{status('Nie udało się zapisać. Skopiuj kod gry w zakładce Skrypt.',true);}
+    try{accountStore.setItem(storeKey,JSON.stringify(projects));if(msg)status(msg);}catch{status('Nie udało się zapisać w przeglądarce. Projekt zapisze się w chmurze po połączeniu.',true);}
+    if(current)queueCloud(current.id);
     renderLibrary();
   }
   function changed(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist('Zapisano automatycznie.'),600);updatePublishButton();}
-  function snapshot(){if(!current)return;undo.push(clone(current.parts));if(undo.length>40)undo.shift();redo=[];}
+  // ---------- Cloud save (Supabase table studio_projects) ----------
+  const cloudPending=new Set();let cloudTimer=0,cloudReady=false,cloudPulling=false;
+  function queueCloud(id){if(!id)return;cloudPending.add(id);clearTimeout(cloudTimer);cloudTimer=setTimeout(flushCloud,2500);}
+  async function flushCloud(){
+    const o=online();if(!o?.state.connected||!cloudReady){if(cloudPending.size){clearTimeout(cloudTimer);cloudTimer=setTimeout(flushCloud,5000);}return;}
+    for(const id of [...cloudPending]){const p=projects.find(x=>x.id===id);cloudPending.delete(id);if(!p)continue;
+      try{await o.api('projects_save',{project:p},true,20000);if(current?.id===id)status('Zapisano w chmurze ☁');}
+      catch(e){if(/20 projektów/.test(e.message))status(e.message,true);else{cloudPending.add(id);clearTimeout(cloudTimer);cloudTimer=setTimeout(flushCloud,8000);}break;}}
+  }
+  async function pullCloud(){
+    const o=online();if(cloudPulling||!o?.state.connected)return;cloudPulling=true;
+    try{
+      const remote=(await o.api('projects_list',{},true,20000)).projects;const seen=new Set();let changedAny=false;
+      for(const r of remote){seen.add(r.id);const local=projects.find(p=>p.id===r.id);
+        if(local&&(local.updated||0)>=r.updated-1)continue;
+        if(!local&&projects.length>=20)continue;
+        if(current?.id===r.id&&local)continue;
+        const got=(await o.api('projects_get',{id:r.id},true,20000)).project;const p={...template(),...got,format:'bloxweb-nexus'};
+        const i=projects.findIndex(x=>x.id===r.id);if(i>=0)projects[i]=p;else projects.push(p);changedAny=true;}
+      for(const p of projects)if(!seen.has(p.id)||(remote.find(r=>r.id===p.id)?.updated||0)<(p.updated||0)-1)cloudPending.add(p.id);
+      cloudReady=true;if(changedAny){try{accountStore.setItem(storeKey,JSON.stringify(projects));}catch{}renderLibrary();}
+      if(cloudPending.size)flushCloud();
+    }catch{}finally{cloudPulling=false;}
+  }
+  setInterval(()=>{const o=online();if(o?.state.connected&&(!cloudReady||Date.now()-(pullCloud.at||0)>120000)){pullCloud.at=Date.now();pullCloud();}},4000);
+  function snapshot(){if(!current)return;undo.push(clone(current.parts));if(undo.length>60)undo.shift();redo=[];}
   function status(text,error){const m=$('nxStatus');if(m){m.textContent=text;m.classList.toggle('error',!!error);}}
 
   // ---------- Layout ----------
   const lib=el('section','nx-section');lib.id='nxLibrary';
-  lib.innerHTML='<h2>Gry 3D · NexusScript</h2><p class="lead">Buduj światy 3D z klocków, programuj je w NexusScript i publikuj dla innych graczy.</p>';
+  lib.innerHTML='<h2>Moje gry 3D</h2><p class="lead">Buduj światy 3D z klocków, programuj je w NexusScript i publikuj dla innych graczy. Projekty zapisują się na koncie (w chmurze), więc masz je na każdym urządzeniu.</p>';
   const libRow=el('div','nx-row');libRow.append(btn('+ Nowa gra 3D',()=>createProject(),'v11-primary'),btn('Wklej grę (kod JSON)',()=>importDialog()));
   const libGrid=el('div','nx-grid');libGrid.id='nxProjects';lib.append(libRow,libGrid);
   const work=el('section','nx-section');work.id='nxWorkbench';work.hidden=true;
   work.innerHTML=`<div class="nx-row"><input id="nxName" class="nx-input" maxlength="40" aria-label="Nazwa gry" style="flex:1;min-width:160px;font-weight:700">
     <span id="nxActions" class="nx-row"></span></div><div id="nxStatus" class="nx-msg" role="status" aria-live="polite"></div>
     <div class="nx-work"><div class="nx-tools" id="nxTools" role="toolbar" aria-label="Narzędzia"></div>
-    <div class="nx-view" id="nxView"><div class="nx-help" id="nxHelp">Kliknij, aby postawić klocek. Przeciągnij, aby obrócić widok.</div><div class="nx-zoom"><button type="button" id="nxZoomIn" aria-label="Przybliż">+</button><button type="button" id="nxZoomOut" aria-label="Oddal">−</button><button type="button" id="nxCenter" aria-label="Wyśrodkuj widok">◎</button></div></div>
+    <div class="nx-view" id="nxView"><div class="nx-help" id="nxHelp">Kliknij, aby postawić klocek. Przeciągnij: obrót, prawy przycisk lub dwa palce: przesuwanie.</div><div class="nx-zoom"><button type="button" id="nxZoomIn" aria-label="Przybliż">+</button><button type="button" id="nxZoomOut" aria-label="Oddal">−</button><button type="button" id="nxCenter" aria-label="Wyśrodkuj widok">◎</button></div></div>
     <div class="nx-props" id="nxProps"></div></div>
     <div class="nx-tabs" role="tablist" id="nxTabs"></div><div class="nx-pane" id="nxPane"></div>`;
   const catalog=el('section','nx-section');catalog.id='nxCatalog';
@@ -12171,11 +12197,21 @@ body.nx-playing{overflow:hidden}
     for(const p of projects){
       const card=el('article','nx-card');card.append(el('strong',null,p.name),el('small',null,(p.parts?.length||0)+' klocków · '+(p.script||'').split('\n').length+' linii kodu'));
       if(p.publishedId)card.append(el('span','nx-tag'+(unpublishedChanges(p)?' warn':''),'Opublikowana '+p.publishedId+(p.publishedRevision?' · wersja '+p.publishedRevision:'')+(unpublishedChanges(p)?' · są nowe zmiany':'')));
-      const row=el('div','nx-row');if(unpublishedChanges(p))row.append(btn('Aktualizuj',()=>{openProject(p);publishDialog();},'v11-primary'));row.append(btn('Edytuj',()=>{openProject(p);work.scrollIntoView({block:'start'});}),btn('Graj',()=>{openProject(p);test();}),btn('Usuń',()=>confirmDialog('Usunąć projekt?','„'+p.name+'” zniknie z tej przeglądarki. Opublikowana wersja zostaje w katalogu.','Usuń',()=>{projects=projects.filter(x=>x.id!==p.id);if(current?.id===p.id){current=null;work.hidden=true;editor.stop();}persist('Usunięto projekt.');})));
+      const row=el('div','nx-row');if(unpublishedChanges(p))row.append(btn('Aktualizuj',()=>{openProject(p);publishDialog();},'v11-primary'));row.append(btn('Edytuj',()=>{openProject(p);work.scrollIntoView({block:'start'});}),btn('Graj',()=>{openProject(p);test();}),btn('Usuń',()=>confirmDialog('Usunąć projekt?','„'+p.name+'” zniknie z tej przeglądarki i z chmury. Opublikowana wersja zostaje w katalogu.','Usuń',()=>{projects=projects.filter(x=>x.id!==p.id);cloudPending.delete(p.id);online()?.state.connected&&online().api('projects_delete',{id:p.id}).catch(()=>{});if(current?.id===p.id){current=null;work.hidden=true;editor.stop();}persist('Usunięto projekt.');})));
       card.append(row);libGrid.append(card);
     }
   }
-  function createProject(){if(projects.length>=20){alertDialog('Limit projektów','Możesz mieć 20 gier 3D. Usuń jedną, aby dodać nową.');return;}persist();const p=template();projects.unshift(p);openProject(p);persist('Utworzono grę 3D. Postaw klocki albo napisz kod w zakładce Skrypt.');}
+  const STARTERS=[['empty','Pusty świat','Start i meta – resztę budujesz sam.'],['obby z lawą 10 platform monety checkpointy','Obby z lawą','Skoki po platformach nad lawą, monety i checkpointy.'],
+    ['labirynt z monetami','Labirynt','Losowy labirynt z monetami i wyjściem.'],['wieża 18 platform trampoliny monety','Wieża','Spirala platform wokół kolumny, trampoliny.'],
+    ['arena przetrwaj 60 sekund z monetami','Arena przetrwania','Unikaj wrogów przez 60 sekund.'],['parkour ruchome platformy na czas','Parkour na czas','Ruchome platformy i limit czasu.']];
+  function createProject(){
+    if(projects.length>=20){alertDialog('Limit projektów','Możesz mieć 20 gier 3D. Usuń jedną, aby dodać nową.');return;}
+    const d=dialog('Nowa gra 3D');d.box.append(el('p','v11-muted','Wybierz punkt startowy. Wszystko możesz potem zmienić w edytorze i w kodzie.'));
+    const grid=el('div','nx-grid');grid.style.marginTop='0';
+    for(const [key,title,desc] of STARTERS){const b=el('button','nx-card');b.type='button';b.style.textAlign='left';b.style.cursor='pointer';b.append(el('strong',null,title),el('p',null,desc));
+      b.onclick=()=>{d.close();persist();const p=template();if(key!=='empty'){p.name=title;p.parts=[];p.script=NexusAssistant.generate(key);}projects.unshift(p);openProject(p);persist('Utworzono grę „'+p.name+'”. Kliknij „Testuj”, aby zagrać.');};grid.append(b);}
+    const row=el('div','nx-row');row.append(btn('Anuluj',d.close));d.box.append(grid,row);
+  }
   function openProject(p){
     if(current&&current.id!==p.id)persist();
     current=clone(projects.find(x=>x.id===p.id)||p);selected=null;undo=[];redo=[];work.hidden=false;$('nxName').value=current.name;
@@ -12184,7 +12220,7 @@ body.nx-playing{overflow:hidden}
   }
   $('nxName').oninput=()=>{if(!current)return;current.name=$('nxName').value.trim()||'Moja gra 3D';changed();};
   const actions=$('nxActions');
-  actions.append(btn('▶ Testuj',()=>test(),'v11-primary'),btn('Zapisz',()=>persist('Zapisano projekt.')),btn('Cofnij',()=>doUndo()),Object.assign(btn('Publikuj',()=>publishDialog()),{id:'nxPublishBtn'}),btn('Kod gry',()=>exportDialog()),btn('Zamknij',()=>{persist();current=null;work.hidden=true;editor.stop();}));
+  actions.append(btn('▶ Testuj',()=>test(),'v11-primary'),btn('Zapisz',()=>persist('Zapisano projekt.')),btn('Cofnij',()=>doUndo()),btn('Ponów',()=>doRedo()),Object.assign(btn('Publikuj',()=>publishDialog()),{id:'nxPublishBtn'}),btn('Kod gry',()=>exportDialog()),btn('Zamknij',()=>{persist();current=null;work.hidden=true;editor.stop();}));
 
   // ---------- 3D editor ----------
   const editor=(()=>{
@@ -12239,19 +12275,37 @@ body.nx-playing{overflow:hidden}
     }
     function bind(){
       const c=renderer.domElement;
-      c.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;pointer={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};try{c.setPointerCapture(e.pointerId);}catch{}c.focus({preventScroll:true});});
+      // One finger / left drag orbits, right or Shift+drag pans, two fingers pan and pinch-zoom.
+      const touches=new Map();let pinch=null;
+      const panBy=(dx,dy)=>{const k=dist*.0016,right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw)),fwd=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));target.addScaledVector(right,-dx*k).addScaledVector(fwd,dy*k);};
+      c.addEventListener('contextmenu',e=>e.preventDefault());
+      c.addEventListener('pointerdown',e=>{
+        touches.set(e.pointerId,{x:e.clientX,y:e.clientY});try{c.setPointerCapture(e.pointerId);}catch{}c.focus({preventScroll:true});
+        if(touches.size===2){const [a,b]=[...touches.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2};pointer=null;return;}
+        pointer={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,pan:e.button===2||e.shiftKey};
+      });
       c.addEventListener('pointermove',e=>{
-        if(pointer&&pointer.id===e.pointerId){const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;if(Math.abs(dx)+Math.abs(dy)>4)pointer.moved=true;if(pointer.moved){yaw-=dx*.007;pitch=Math.max(.08,Math.min(1.45,pitch+dy*.005));pointer.x=e.clientX;pointer.y=e.clientY;}return;}
+        if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+        if(pinch&&touches.size===2){const [a,b]=[...touches.values()],d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+          if(pinch.d>10&&d>10)dist=Math.max(8,Math.min(160,dist*pinch.d/d));panBy(mx-pinch.x,my-pinch.y);pinch={d,x:mx,y:my};return;}
+        if(pointer&&pointer.id===e.pointerId){const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;if(Math.abs(dx)+Math.abs(dy)>4)pointer.moved=true;
+          if(pointer.moved){if(pointer.pan)panBy(dx,dy);else{yaw-=dx*.007;pitch=Math.max(.08,Math.min(1.45,pitch+dy*.005));}pointer.x=e.clientX;pointer.y=e.clientY;}return;}
         if(e.pointerType==='mouse'&&current&&!['select','erase'].includes(tool)){const hit=pick(e);if(hit){const pos=placement(hit),s=SIZE[tool];cursor.visible=true;cursor.position.set(...pos);cursor.scale.set(...s);}else cursor.visible=false;}
       });
-      const up=e=>{if(!pointer||pointer.id!==e.pointerId)return;const wasClick=!pointer.moved;pointer=null;if(wasClick&&e.type==='pointerup')click(e);};
-      c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);c.addEventListener('lostpointercapture',e=>{if(pointer&&pointer.id===e.pointerId&&pointer.moved)pointer=null;});
+      const up=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=null;if(!pointer||pointer.id!==e.pointerId)return;const wasClick=!pointer.moved&&!pointer.pan;pointer=null;if(wasClick&&e.type==='pointerup')click(e);};
+      c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);c.addEventListener('lostpointercapture',e=>{touches.delete(e.pointerId);if(pointer&&pointer.id===e.pointerId&&pointer.moved)pointer=null;});
       c.addEventListener('pointerleave',()=>{cursor.visible=false;});
       c.addEventListener('wheel',e=>{e.preventDefault();dist=Math.max(8,Math.min(160,dist*(e.deltaY>0?1.1:.9)));},{passive:false});
       c.addEventListener('keydown',e=>{
         if(!current)return;
-        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();doUndo();return;}
-        if(selected==null)return;const map={ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[2,-1],ArrowDown:[2,1],PageUp:[1,1],PageDown:[1,-1]};
+        const k=e.key.toLowerCase(),mod=e.ctrlKey||e.metaKey;
+        if(mod&&(k==='y'||(k==='z'&&e.shiftKey))){e.preventDefault();doRedo();return;}
+        if(mod&&k==='z'){e.preventDefault();doUndo();return;}
+        if(mod&&k==='v'&&clipboard){e.preventDefault();pastePart();return;}
+        if(!mod&&k==='f'&&selected!=null){e.preventDefault();editor.focus(current.parts[selected].p);return;}
+        if(selected==null)return;
+        if(mod&&k==='c'){e.preventDefault();clipboard=clone(current.parts[selected]);status('Skopiowano klocek (Ctrl+V wkleja).');return;}
+        if(mod&&k==='d'){e.preventDefault();clipboard=clone(current.parts[selected]);pastePart();return;}const map={ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[2,-1],ArrowDown:[2,1],PageUp:[1,1],PageDown:[1,-1]};
         if(map[e.key]){e.preventDefault();nudge(...map[e.key]);}
         if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}
       });
@@ -12268,14 +12322,18 @@ body.nx-playing{overflow:hidden}
       const pos=placement(hit),size=[...SIZE[tool]],color=$('nxNewColor')?.value||NexusGame.DEFAULT_COLOR[tool];
       current.parts.push({t:tool,p:pos,s:size,c:tool==='finish'?'#ffffff':color});selected=current.parts.length-1;afterEdit();
     }
-    return {start,stop,resize,rebuild,setGhosts,focus:p=>{target.set(p[0],p[1],p[2]);}};
+    return {start,stop,resize,rebuild,setGhosts,focus:p=>{target.set(p[0],p[1],p[2]);dist=Math.min(dist,30);}};
   })();
   function afterEdit(){editor.rebuild();renderProps();changed();}
+  let clipboard=null;
   function doUndo(){if(!current||!undo.length)return;redo.push(clone(current.parts));current.parts=undo.pop();selected=null;afterEdit();status('Cofnięto.');}
+  function doRedo(){if(!current||!redo.length)return;undo.push(clone(current.parts));current.parts=redo.pop();selected=null;afterEdit();status('Przywrócono.');}
+  function pastePart(){if(!current||!clipboard)return;if(current.parts.length>=NexusGame.MAX_PARTS){status('Limit 600 klocków.',true);return;}
+    const saved=redo;snapshot();redo=saved;const c=clone(clipboard);c.p[0]+=c.s[0];delete c.n;current.parts.push(c);clipboard=clone(c);selected=current.parts.length-1;afterEdit();status('Wklejono klocek.');}
   function nudge(axis,d){if(selected==null)return;snapshot();current.parts[selected].p[axis]+=d;afterEdit();}
   function deleteSelected(){if(selected==null)return;snapshot();current.parts.splice(selected,1);selected=null;afterEdit();}
   // Tools
-  for(const [id,label,color] of TOOLS){const b=el('button','nx-tool');b.type='button';b.dataset.tool=id;const sw=el('i');sw.style.background=color;b.append(sw,document.createTextNode(label));b.setAttribute('aria-pressed',String(id===tool));b.onclick=()=>{tool=id;document.querySelectorAll('#nxTools .nx-tool').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.tool===tool)));$('nxHelp').textContent=id==='select'?'Kliknij klocek, aby go zaznaczyć i edytować. Strzałki przesuwają zaznaczony.':id==='erase'?'Kliknij klocek, aby go usunąć.':'Kliknij, aby postawić: '+label+'. Przeciągnij, aby obrócić widok.';renderProps();};$('nxTools').append(b);}
+  for(const [id,label,color] of TOOLS){const b=el('button','nx-tool');b.type='button';b.dataset.tool=id;const sw=el('i');sw.style.background=color;b.append(sw,document.createTextNode(label));b.setAttribute('aria-pressed',String(id===tool));b.onclick=()=>{tool=id;document.querySelectorAll('#nxTools .nx-tool').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.tool===tool)));$('nxHelp').textContent=id==='select'?'Kliknij klocek, aby go zaznaczyć. Strzałki/PgUp/PgDn przesuwają, Ctrl+C/V/D kopiują, F centruje.':id==='erase'?'Kliknij klocek, aby go usunąć.':'Kliknij, aby postawić: '+label+'. Przeciągnij, aby obrócić widok.';renderProps();};$('nxTools').append(b);}
   function renderProps(){
     const box=$('nxProps');box.replaceChildren();if(!current)return;
     if(selected==null||!current.parts[selected]){
@@ -12373,6 +12431,21 @@ body.nx-playing{overflow:hidden}
   function dialog(title){const back=el('div','nx-dialog-back'),box=el('section','nx-dialog');box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.append(el('h2',null,title));back.append(box);document.body.append(back);back.addEventListener('click',e=>{if(e.target===back)back.remove();});return {back,box,close:()=>back.remove()};}
   function alertDialog(title,text){const d=dialog(title);d.box.append(el('p',null,text));const r=el('div','nx-row');r.append(btn('OK',d.close,'v11-primary'));d.box.append(r);}
   function confirmDialog(title,text,ok,fn){const d=dialog(title);d.box.append(el('p',null,text));const r=el('div','nx-row');r.append(btn('Anuluj',d.close),btn(ok,()=>{d.close();fn();},'v11-primary'));d.box.append(r);}
+  // A 480×270 picture of the game for the catalogue, rendered from the parts and the script.
+  function makeCover(){
+    let r=null;
+    try{
+      const parts=[...NexusGame.normalizeParts(current.parts),...NexusGame.previewParts(current).parts].slice(0,600);if(!parts.length)return null;
+      r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setPixelRatio(1);r.setSize(480,270,false);
+      const sc=new THREE.Scene();sc.background=new THREE.Color(current.settings.sky||'#8fd3ff');sc.add(new THREE.HemisphereLight(0xffffff,0x667788,.9));const sun=new THREE.DirectionalLight(0xffffff,.65);sun.position.set(-30,60,20);sc.add(sun);
+      const box=new THREE.Box3();for(const part of parts){const m=NexusGame.buildMesh(part);sc.add(m);box.expandByObject(m);}
+      const c=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3()).length()||10;
+      const cam=new THREE.PerspectiveCamera(50,480/270,.1,2000);cam.position.set(c.x+size*.55,c.y+size*.45,c.z-size*.6);cam.lookAt(c);r.render(sc,cam);
+      let url=r.domElement.toDataURL('image/jpeg',.72);if(url.length>60000)url=r.domElement.toDataURL('image/jpeg',.45);
+      sc.traverse(o=>{o.geometry?.dispose?.();o.material?.map?.dispose?.();o.material?.dispose?.();});
+      return url.length<=60000?url:null;
+    }catch{return null;}finally{r?.dispose();}
+  }
   function publishDialog(){
     if(!current)return;persist();
     try{NexusScript.parse(current.script||'');}catch(e){alertDialog('Najpierw popraw kod','Linia '+(e.line||'?')+': '+e.message);return;}
@@ -12386,7 +12459,7 @@ body.nx-playing{overflow:hidden}
     const r=el('div','nx-row');const go=btn(current.publishedId?'Aktualizuj':'Publikuj',async()=>{
       go.disabled=true;m.textContent='Publikuję…';m.classList.remove('error');
       const wasPublished=!!current.publishedId;
-      try{const res=await api('games_publish',{id:current.publishedId||'',title:t.value.trim(),description:ds.value.trim(),game:project()});
+      try{const res=await api('games_publish',{id:current.publishedId||'',title:t.value.trim(),description:ds.value.trim(),game:project(),cover:makeCover()});
         current.publishedId=res.id;current.publishedRevision=res.revision;current.description=ds.value.trim();current.publishedPrint=fingerprint(current);persist(wasPublished?'Zaktualizowano grę '+res.id+' (wersja '+res.revision+').':'Opublikowano grę '+res.id+'.');updatePublishButton();
         m.textContent=wasPublished?'Zaktualizowano! Gracze dostaną wersję '+res.revision+' przy następnym uruchomieniu gry '+res.id+'.':'Gotowe! Kod gry: '+res.id+'. Gra jest w katalogu i na ekranie głównym.';loadCatalog();window.NexusHome?.refresh();go.hidden=true;}
       catch(e){m.textContent=e.message;m.classList.add('error');go.disabled=false;}
@@ -12419,7 +12492,8 @@ body.nx-playing{overflow:hidden}
     }catch(e){msg.textContent=e.message;msg.classList.add('error');}
   }
   function gameCard(g,own){
-    const card=el('article','nx-card');card.append(el('strong',null,g.title),el('small',null,'autor: '+g.author+' · zagrano '+g.plays+'× · '+g.id+(g.revision>1?' · wersja '+g.revision:'')));
+    const card=el('article','nx-card');if(g.cover){const img=el('img');img.src=g.cover;img.alt='Okładka gry '+g.title;img.loading='lazy';img.style.cssText='width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px';card.append(img);}
+    card.append(el('strong',null,g.title),el('small',null,'autor: '+(window.bloxRoleTag?.(g.authorRole)||'')+g.author+' · zagrano '+g.plays+'× · '+g.id+(g.revision>1?' · wersja '+g.revision:'')));
     if(g.description)card.append(el('p',null,g.description));
     if(own&&g.hidden===1)card.append(el('span','nx-tag warn','Ukryta po zgłoszeniach – czeka na sprawdzenie'));
     const row=el('div','nx-row');row.append(btn('▶ Graj',()=>playPublished(g.id),'v11-primary'));
@@ -12452,7 +12526,7 @@ body.nx-playing{overflow:hidden}
     }catch(e){msg.textContent=e.message;msg.classList.add('error');}
   }
   renderLibrary();
-  window.NexusStudio={open:openProject,create:createProject,loadCatalog,playPublished,promptText,reportDialog,editPublished,api,dialog,get current(){return current;},get projects(){return projects;}};
+  window.NexusStudio={pullCloud,flushCloud,open:openProject,create:createProject,loadCatalog,playPublished,promptText,reportDialog,editPublished,api,dialog,get current(){return current;},get projects(){return projects;}};
 })();
 </script>
 <style id="nexus-home-style">
@@ -12478,6 +12552,7 @@ body.nx-playing{overflow:hidden}
   // A generated cover: sky gradient with a few floating blocks, coloured by the game code.
   function cover(g){
     const h=hue(g.id),wrap=document.createElement('div');wrap.className='nx-cover';
+    if(g.cover){const img=document.createElement('img');img.src=g.cover;img.alt='';img.loading='lazy';img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover';wrap.append(img);return wrap;}
     const blocks=[];let seed=h+7;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
     for(let i=0;i<6;i++){const x=10+rnd()*70,y=30+rnd()*45,w=12+rnd()*16;blocks.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="5" rx="1.2" fill="hsl(${(h+120+i*25)%360} 65% 55%)"/><rect x="${x.toFixed(1)}" y="${(y+5).toFixed(1)}" width="${w.toFixed(1)}" height="2.5" fill="#0003"/>`);}
     wrap.innerHTML=`<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="nxg${g.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${h} 70% 62%)"/><stop offset="1" stop-color="hsl(${(h+40)%360} 60% 32%)"/></linearGradient></defs><rect width="100" height="100" fill="url(#nxg${g.id})"/>${blocks.join('')}<circle cx="80" cy="18" r="7" fill="#fff6" /></svg>`;
@@ -12486,7 +12561,7 @@ body.nx-playing{overflow:hidden}
   }
   function info(g){
     const {box,close}=NexusStudio.dialog(g.title);
-    const meta=document.createElement('p');meta.className='v11-muted';meta.textContent='Autor: '+g.author+' · zagrano '+g.plays+'× · kod '+g.id+(g.revision>1?' · wersja '+g.revision:'');
+    const meta=document.createElement('p');meta.className='v11-muted';meta.textContent='Autor: '+(window.bloxRoleTag?.(g.authorRole)||'')+g.author+' · zagrano '+g.plays+'× · kod '+g.id+(g.revision>1?' · wersja '+g.revision:'');
     const desc=document.createElement('p');desc.textContent=g.description||'Gra stworzona w BloxWeb Studio 3D (NexusScript).';
     const row=document.createElement('div');row.className='nx-row';
     const b=(t,fn,cls='v11-button')=>{const x=document.createElement('button');x.type='button';x.className=cls;x.textContent=t;x.onclick=fn;return x;};
@@ -12500,7 +12575,7 @@ body.nx-playing{overflow:hidden}
     const thumb=document.createElement('div');thumb.className='game-thumb';thumb.style.position='relative';thumb.append(cover(g));
     const badge=document.createElement('span');badge.className='nx-badge';badge.textContent='Gra gracza';thumb.append(badge);
     const title=document.createElement('div');title.className='game-title';title.textContent=g.title;
-    const stats=document.createElement('div');stats.className='game-stats';const a=document.createElement('span');a.textContent=g.author;const p=document.createElement('span');p.textContent='▶ '+g.plays+(g.revision>1?' · v'+g.revision:'');stats.append(a,p);
+    const stats=document.createElement('div');stats.className='game-stats';const a=document.createElement('span');a.textContent=(window.bloxRoleTag?.(g.authorRole)||'')+g.author;const p=document.createElement('span');p.textContent='▶ '+g.plays+(g.revision>1?' · v'+g.revision:'');stats.append(a,p);
     const play=document.createElement('button');play.type='button';play.className='quick-play-card-btn';play.textContent='Zagraj teraz';
     play.onclick=e=>{e.stopPropagation();NexusStudio.playPublished(g.id);};
     c.onclick=()=>info(g);c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();info(g);}};
@@ -12533,6 +12608,104 @@ body.nx-playing{overflow:hidden}
     if(!loadedAt||(visible&&Date.now()-loadedAt>60000))refresh();
   },3000);
   window.NexusHome={refresh,get count(){return games.length;},get games(){return games.slice();}};
+})();
+</script>
+<style id="blox-staff-style">
+.staff-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font:800 11px Inter,system-ui,sans-serif;letter-spacing:.03em;vertical-align:middle;margin-left:6px}
+.staff-chip svg{width:13px;height:13px}
+.staff-chip.owner{background:linear-gradient(135deg,#ffd76a,#ff9d3c);color:#2a1600}
+.staff-chip.admin{background:#3b82f6;color:#fff}
+.badge-card.staff-badge{border-color:#ffb23c!important;box-shadow:0 0 0 1px #ffb23c55 inset}
+.badge-card.staff-badge.admin{border-color:#3b82f6!important;box-shadow:0 0 0 1px #3b82f655 inset}
+.staff-badge .staff-icon{width:44px;height:44px;margin:0 auto 6px}
+#view-admin .adm-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}
+#view-admin .adm-stat{background:#0f141b;border:1px solid #2b3440;border-radius:10px;padding:10px}
+#view-admin .adm-stat b{display:block;font-size:22px}
+#view-admin .adm-stat small{color:#9aa6b4}
+#view-admin .adm-log{max-height:280px;overflow:auto;font:12px/1.5 ui-monospace,Consolas,monospace;background:#0b0f14;border-radius:8px;padding:10px;color:#c9d2dc}
+#view-admin table{width:100%;border-collapse:collapse;font-size:13px}
+#view-admin td,#view-admin th{padding:6px;border-bottom:1px solid #2b3440;text-align:left;vertical-align:top}
+</style>
+<script id="blox-staff">
+// Staff roles: CEO and admin badges (from the server, never from a save) and the admin panel.
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const ICONS={owner:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z"/></svg>',
+    admin:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z"/></svg>'};
+  const LABEL={owner:'CEO',admin:'ADMIN'};
+  const NAME={owner:'Właściciel (CEO)',admin:'Administrator'};
+  window.bloxRoleTag=role=>role==='owner'?'[CEO] ':role==='admin'?'[ADMIN] ':'';
+  function chip(role){const c=document.createElement('span');c.className='staff-chip '+role;c.innerHTML=ICONS[role];c.append(document.createTextNode(LABEL[role]));c.title=NAME[role];return c;}
+  const myRole=()=>window.bloxOnline?.me?.role||null;
+  const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;};
+  const b=(t,fn,cls='v11-button')=>{const x=el('button',cls,t);x.type='button';x.onclick=fn;return x;};
+  // ---------- badges and name chips ----------
+  function decorate(){
+    const role=myRole();
+    for(const id of ['topUsername','profileNameBig']){const n=$(id);if(!n)continue;n.parentElement.querySelectorAll('.staff-chip[data-own]').forEach(x=>x.remove());if(role){const c=chip(role);c.dataset.own='1';n.after(c);}}
+    for(const id of ['allBadgesGrid','profileBadgesGrid']){
+      const grid=$(id);if(!grid)continue;grid.querySelectorAll('.staff-badge').forEach(x=>x.remove());if(!role)continue;
+      const card=el('div','badge-card unlocked staff-badge '+role);const icon=el('div','staff-icon');icon.innerHTML=ICONS[role];icon.style.color=role==='owner'?'#ffb23c':'#3b82f6';
+      card.append(icon,el('div','badge-name',NAME[role]),el('div','badge-desc',role==='owner'?'Założyciel i właściciel BloxWeb. Najwyższe uprawnienia.':'Członek administracji BloxWeb. Pilnuje porządku w grach graczy.'));
+      card.querySelector('.badge-name').style.fontWeight='800';grid.prepend(card);
+    }
+    const nav=$('nav-admin');if(nav)nav.hidden=!role;
+  }
+  const base=renderQuestsAndBadgesTab;
+  renderQuestsAndBadgesTab=function(){const r=base.apply(this,arguments);decorate();return r;};
+  window.renderQuestsAndBadgesTab=renderQuestsAndBadgesTab;
+  let lastRole;setInterval(()=>{const r=myRole();if(r!==lastRole){lastRole=r;decorate();}},2000);
+  // ---------- admin panel ----------
+  const section=el('section','view-section');section.id='view-admin';
+  section.innerHTML='<div class="section-title"><span>Panel administratora</span></div><div id="admRole"></div><div class="adm-stats" id="admStats"></div>'+
+    '<div class="nx-section"><h2>Zgłoszone i ukryte gry</h2><p class="lead">Gry ukryte po 3 zgłoszeniach czekają tu na decyzję.</p><div id="admGamesMsg" class="nx-msg"></div><div class="nx-grid" id="admGames"></div></div>'+
+    '<div class="nx-section"><h2>Gracze</h2><div class="nx-row"><input id="admQuery" class="nx-input" placeholder="ID (np. 828719), nick lub login" maxlength="54" aria-label="Szukaj gracza"></div><div id="admUsersMsg" class="nx-msg"></div><div id="admUsers"></div></div>'+
+    '<div class="nx-section"><h2>Antycheat – ostatnie zdarzenia</h2><div class="adm-log" id="admLog"></div></div>'+
+    '<div class="nx-section"><h2>Administracja</h2><div id="admStaff"></div></div>';
+  document.querySelector('.content')?.append(section);
+  const nav=b('Panel admina',()=>{switchTab('admin');load();},'nav-btn');nav.id='nav-admin';nav.hidden=true;nav.setAttribute('aria-label','Panel administratora');
+  $('nav-settings')?.before(nav);
+  const api=(op,body)=>window.bloxOnline.api(op,body,true,15000);
+  async function load(){
+    try{
+      const o=await api('admin_overview',{});
+      $('admRole').replaceChildren(el('span','v11-muted','Zalogowano jako '),chip(o.role),el('span','v11-muted',o.role==='owner'?' – pełne uprawnienia: moderacja, blokowanie kont i nadawanie roli administratora.':' – moderacja gier, wyszukiwanie graczy i wyrzucanie z pokoi.'));
+      $('admStats').replaceChildren(...[['Konta',o.users],['Online',o.online],['Pokoje',o.rooms],['Połączenia na żywo',o.sockets],['Gry w katalogu',o.games],['Ukryte gry',o.hiddenGames],['Zablokowane konta',o.banned]].map(([k,v])=>{const d=el('div','adm-stat');d.append(el('b',null,String(v)),el('small',null,k));return d;}));
+      $('admLog').replaceChildren(...(o.anticheat.length?o.anticheat.map(e=>el('div',null,new Date(e.time*1000).toLocaleString('pl-PL')+' · '+e.user+' · '+e.kind+' · '+e.detail)):[el('div',null,'Brak zdarzeń od ostatniego restartu serwera.')]));
+      $('admStaff').replaceChildren(...o.staff.map(userRow));
+    }catch(e){$('admRole').textContent=e.message;}
+    loadGames();
+  }
+  async function loadGames(){
+    const msg=$('admGamesMsg');msg.textContent='';
+    try{const {games}=await api('admin_games',{});
+      $('admGames').replaceChildren(...(games.length?games.map(g=>{
+        const c=el('article','nx-card');c.append(el('strong',null,g.title),el('small',null,'autor: '+(window.bloxRoleTag(g.authorRole))+g.author+' ('+g.authorId+') · '+g.id+' · zgłoszeń: '+g.reports));
+        if(g.hidden===1)c.append(el('span','nx-tag warn','Ukryta'));
+        for(const r of g.reasons)c.append(el('small',null,'• '+(r.reason||'bez powodu')+' – '+r.reporter));
+        const row=el('div','nx-row');row.append(b('▶ Sprawdź',()=>window.NexusStudio?.playPublished(g.id)),b('Przywróć',()=>gameAction(g.id,'show'),'v11-primary'),b('Ukryj',()=>gameAction(g.id,'hide')));c.append(row);return c;
+      }):[el('p','v11-muted','Brak zgłoszonych gier.')]));
+    }catch(e){msg.textContent=e.message;msg.classList.add('error');}
+  }
+  async function gameAction(id,action){try{await api('admin_game',{id,action});loadGames();window.NexusHome?.refresh();}catch(e){$('admGamesMsg').textContent=e.message;}}
+  function userRow(u){
+    const box=el('div','nx-card');box.style.marginTop='8px';
+    const head=el('div');head.append(el('strong',null,u.name),document.createTextNode(' '));if(u.role)head.append(chip(u.role));
+    box.append(head,el('small',null,u.id+(u.login?' · login: '+u.login:' · gość')+' · BloxBux: '+u.coins+' · gier: '+u.games+(u.room?' · w pokoju '+u.room:'')+(u.banned?' · ZABLOKOWANE':'')));
+    const me=myRole(),row=el('div','nx-row'),msg=el('div','nx-msg');
+    const act=async(op,body,ok)=>{try{const r=await api(op,{target:u.id,...body});msg.textContent=ok;msg.classList.remove('error');box.replaceWith(userRow(r.user||u));}catch(e){msg.textContent=e.message;msg.classList.add('error');}};
+    if(u.role!=='owner'){
+      if(u.room&&(me==='owner'||!u.role))row.append(b('Wyrzuć z pokoju',()=>act('admin_kick',{},'Wyrzucono z pokoju.')));
+      if(me==='owner'){
+        row.append(b(u.banned?'Odblokuj konto':'Zablokuj konto',()=>{if(u.banned||confirm('Zablokować konto '+u.name+' ('+u.id+')? Gracz nie będzie mógł się połączyć.'))act('admin_ban',{banned:!u.banned},u.banned?'Odblokowano.':'Zablokowano.');}));
+        row.append(b(u.role==='admin'?'Odbierz admina':'Nadaj admina',()=>act('admin_role',{role:u.role==='admin'?'':'admin'},'Zmieniono rolę.')));
+      }
+    }
+    box.append(row,msg);return box;
+  }
+  let t=0;$('admQuery').oninput=()=>{clearTimeout(t);t=setTimeout(async()=>{const q=$('admQuery').value.trim();if(q.length<2)return;try{const {users}=await api('admin_user',{query:q});$('admUsers').replaceChildren(...(users.length?users.map(userRow):[el('p','v11-muted','Nie znaleziono.')]));$('admUsersMsg').textContent='';}catch(e){$('admUsersMsg').textContent=e.message;}},350);};
+  window.BloxStaff={load,decorate};
 })();
 </script>
 </body>

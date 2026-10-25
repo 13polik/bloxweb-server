@@ -100,7 +100,18 @@ def open_database(data):
         if column not in columns:
             db.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_login ON users(login)")
-    if "revision" not in {row[1] for row in db.execute("PRAGMA table_info(published_games)")}:
+    games = {row[1] for row in db.execute("PRAGMA table_info(published_games)")}
+    if "revision" not in games:
         db.execute("ALTER TABLE published_games ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
+    if "cover" not in games:
+        db.execute("ALTER TABLE published_games ADD COLUMN cover TEXT")
+    users = {row[1] for row in db.execute("PRAGMA table_info(users)")}
+    if "role" not in users:
+        db.execute("ALTER TABLE users ADD COLUMN role TEXT")
+    if "banned" not in users:
+        db.execute("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0")
+    db.execute("""CREATE TABLE IF NOT EXISTS studio_projects(
+     user_id TEXT NOT NULL REFERENCES users(id), id TEXT NOT NULL, name TEXT NOT NULL,
+     data TEXT NOT NULL, updated REAL NOT NULL, PRIMARY KEY(user_id,id))""")
     db.commit()
     return db
