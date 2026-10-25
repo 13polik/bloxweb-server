@@ -9904,5 +9904,62 @@ body.blox-is-loading{overflow:hidden}
   };
 })();
 </script>
+<style id="v15-polish">/* BloxWeb 15: one consistent graphite and tangerine look across the older views. */
+.section-title span,.section-title{letter-spacing:-.2px}
+.btn-green{background:#ff995c!important;color:#22160e!important;border-radius:8px!important}
+.btn-green:hover{background:#ffb07e!important}
+.btn-disabled{background:#23262d!important;color:#c7ccd6!important;border:1px solid #3b404b!important}
+.quest-card{border-radius:10px!important}
+.quest-progress-bg{height:8px!important;background:#2a2e36!important;border-radius:999px!important}
+.quest-progress-fill{background:linear-gradient(90deg,#ff995c,#ffc29a)!important;border-radius:999px}
+.p-stat-box{border-radius:10px!important}
+.p-stat-box strong{color:#ffc29a!important}
+.badge-card{border-radius:10px!important;transition:transform .15s,border-color .15s}
+.badge-card.unlocked{background:linear-gradient(180deg,#22252c 0%,#2c241d 100%)!important;border-color:#8a5b3c!important}
+.badge-card.unlocked::after{color:#ffc29a!important}
+.badge-icon svg{width:38px;height:38px;display:block;margin:0 auto}
+.badge-card:not(.unlocked) .badge-icon svg{opacity:.45}
+.cat-pill.active{color:#ffc29a!important}
+.game-card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease!important}
+.game-card:hover{border-color:#6b4a35!important;box-shadow:0 10px 26px #0006!important}
+.v15-pill-icon{display:none}
+button:focus-visible,.nav-btn:focus-visible,.cat-pill:focus-visible,.game-card:focus-visible{outline:2px solid #ffc399!important;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.game-card,.badge-card{transition:none!important}}
+</style>
+<script>/* BloxWeb 15: portal polish. Strips leftover emoji and English labels from older views
+   and swaps badge emoji for icons that match the rest of the portal. */
+(() => {
+  'use strict';
+  const LEAD=/^(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{FE0F}\u{200D}]\s*)+/u;
+  const RENAME={'Profil Gracza':'Profil gracza','Zdobyte Odznaki Gracza (Badges)':'Zdobyte odznaki','Twój Ekwipunek (Posiadane Przedmioty)':'Twój ekwipunek',
+    'Misje Gracza (Wykonuj zadania w grach 3D i odbieraj BloxBuxy!)':'Misje','Wszystkie Odznaki Platformy (Badges)':'Wszystkie odznaki',
+    'Koparka BloxBux':'Koparka BloxBux','Kody Promocyjne':'Kody promocyjne','Ustawienia Gry i Zarządzanie Kontem':'Ustawienia gry i konta',
+    'Kamera i Grafika 3D':'Kamera i grafika 3D','Kopia Zapasowa Konta (Eksport / Import)':'Kopia zapasowa konta','Zmień swój nick':'Zmień nick','Zapisz opis':'Zapisz opis'};
+  const icon=(body)=>`<svg viewBox="0 0 40 40" fill="none" stroke="#ffb07e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const BADGE_ICONS={
+    '🌟':icon('<path d="M20 5l4.4 9 9.9 1.4-7.2 7 1.7 9.9L20 27.6l-8.8 4.7 1.7-9.9-7.2-7 9.9-1.4z" fill="#ff995c33"/>'),
+    '🏆':icon('<path d="M13 7h14v8a7 7 0 0 1-14 0z" fill="#ff995c33"/><path d="M13 10H8v2a5 5 0 0 0 5 5M27 10h5v2a5 5 0 0 1-5 5M20 22v6M14 33h12M16 28h8v5h-8z"/>'),
+    '🌋':icon('<path d="M5 33l9-16h12l9 16z" fill="#ff995c33"/><path d="M17 17c0-4 3-4 3-8M23 17c0-3 3-4 2-7M14 26l4 3 3-4 4 4"/>'),
+    '🔨':icon('<path d="M22 8l10 10-4 4-10-10z" fill="#ff995c33"/><path d="M20 14L7 27l4 4 13-13"/>'),
+    '💰':icon('<ellipse cx="20" cy="12" rx="11" ry="4" fill="#ff995c33"/><path d="M9 12v6c0 2.2 4.9 4 11 4s11-1.8 11-4v-6M9 18v6c0 2.2 4.9 4 11 4s11-1.8 11-4v-6M9 24v4c0 2.2 4.9 4 11 4s11-1.8 11-4v-4"/>'),
+    '👥':icon('<circle cx="15" cy="14" r="5" fill="#ff995c33"/><circle cx="27" cy="16" r="4"/><path d="M5 32c1-6 5-9 10-9s9 3 10 9M25 24c4 0 8 2 9 7"/>'),
+    '🏰':icon('<path d="M8 33V15h4v4h4v-4h8v4h4v-4h4v18z" fill="#ff995c33"/><path d="M17 33v-6a3 3 0 0 1 6 0v6"/>')
+  };
+  const clean=t=>{const s=t.replace(LEAD,'').trim();return RENAME[s]||s;};
+  function tidy(root){
+    for(const node of root.querySelectorAll('.section-title span,.section-title,#view-profile button,#view-settings button,#view-settings h3,#view-bux h3,#view-quests h3,#view-inventory h3,.cat-pill,.badge-card>div:last-child')){
+      if(node.children.length&&!node.matches('.cat-pill'))continue;
+      const before=node.textContent,after=clean(before);if(after&&after!==before.trim())node.textContent=after;
+    }
+    for(const box of root.querySelectorAll('.badge-icon')){const key=box.textContent.trim();if(BADGE_ICONS[key])box.innerHTML=BADGE_ICONS[key];}
+  }
+  // Game titles feed cards, the in-game header and recent games.
+  for(const g of defaultGames)g.title=clean(g.title);
+  const content=document.querySelector('.content')||document.body;
+  let pending=false;const observer=new MutationObserver(()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;observer.disconnect();tidy(document.body);observer.observe(content,{childList:true,subtree:true});});});
+  tidy(document.body);observer.observe(content,{childList:true,subtree:true});
+  try{renderGames(getFilteredGamesList());renderContinuePlaying();}catch{}
+})();
+</script>
 </body>
 </html>
