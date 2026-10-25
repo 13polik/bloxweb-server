@@ -1,6 +1,7 @@
 -- BloxWeb 17: games made in Studio 3D (parts + NexusScript) published for other players.
 -- Additive only: two new tables; no existing column, row or policy changes.
 -- Run once as the project owner BEFORE deploying the matching server.py.
+-- revision counts published updates (1 = first version).
 -- hidden: 0 = visible, 1 = hidden after 3 reports (waits for review), 2 = withdrawn by its author.
 CREATE TABLE IF NOT EXISTS bloxweb.published_games (
  id TEXT PRIMARY KEY,
@@ -12,7 +13,8 @@ CREATE TABLE IF NOT EXISTS bloxweb.published_games (
  updated DOUBLE PRECISION NOT NULL,
  plays INTEGER NOT NULL DEFAULT 0,
  reports INTEGER NOT NULL DEFAULT 0,
- hidden INTEGER NOT NULL DEFAULT 0);
+ hidden INTEGER NOT NULL DEFAULT 0,
+ revision INTEGER NOT NULL DEFAULT 1);
 CREATE INDEX IF NOT EXISTS published_games_author ON bloxweb.published_games(author);
 CREATE INDEX IF NOT EXISTS published_games_visible ON bloxweb.published_games(hidden, updated DESC);
 CREATE TABLE IF NOT EXISTS bloxweb.game_reports (

@@ -287,7 +287,7 @@ def game_card(row):
     author = profile(row["author"]) or {}
     return dict(id=row["id"], title=row["title"], description=row["description"], author=author.get("name", "Gracz"),
                 authorId=row["author"], plays=row["plays"], created=row["created"], updated=row["updated"],
-                hidden=row["hidden"])
+                hidden=row["hidden"], revision=row["revision"])
 
 
 def ai_request(prompt, code):
@@ -946,23 +946,24 @@ async def api(operation: str, request: Request):
                 fail("Możesz aktualizować tylko własne gry.", 403)
             if existing["hidden"] == 1:
                 fail("Ta gra została ukryta po zgłoszeniach i czeka na sprawdzenie.", 403)
-            db.execute("UPDATE published_games SET title=?,description=?,data=?,updated=?,hidden=0 WHERE id=?",
+            db.execute("UPDATE published_games SET title=?,description=?,data=?,updated=?,hidden=0,revision=revision+1 WHERE id=?",
                        (title, description, json.dumps(data), stamp, game_id))
         else:
             if db.execute("SELECT COUNT(*) FROM published_games WHERE author=? AND hidden<>2", (uid,)).fetchone()[0] >= 20:
                 fail("Masz już 20 opublikowanych gier. Wycofaj jedną, aby dodać nową.")
             game_id = "G-"+secrets.token_hex(3).upper()
-            db.execute("INSERT INTO published_games(id,author,title,description,data,created,updated,plays,reports,hidden) VALUES(?,?,?,?,?,?,?,0,0,0)",
+            db.execute("INSERT INTO published_games(id,author,title,description,data,created,updated,plays,reports,hidden,revision) VALUES(?,?,?,?,?,?,?,0,0,0,1)",
                        (game_id, uid, title, description, json.dumps(data), stamp, stamp))
         db.commit()
         times.append(now())
-        return dict(id=game_id)
+        revision = db.execute("SELECT revision FROM published_games WHERE id=?", (game_id,)).fetchone()["revision"]
+        return dict(id=game_id, revision=revision, updated=stamp)
     if operation == "games_list":
         order = "plays DESC, updated DESC" if body.get("sort") == "popular" else "updated DESC"
         query = clean(body.get("query"), 40).casefold()
-        rows = db.execute(f"SELECT id,author,title,description,plays,created,updated,hidden FROM published_games WHERE hidden=0 ORDER BY {order} LIMIT 200").fetchall()
+        rows = db.execute(f"SELECT id,author,title,description,plays,created,updated,hidden,revision FROM published_games WHERE hidden=0 ORDER BY {order} LIMIT 200").fetchall()
         games = [game_card(r) for r in rows if not query or query in r["title"].casefold()][:60]
-        mine = [game_card(r) for r in db.execute("SELECT id,author,title,description,plays,created,updated,hidden FROM published_games WHERE author=? AND hidden<>2 ORDER BY updated DESC", (uid,)).fetchall()]
+        mine = [game_card(r) for r in db.execute("SELECT id,author,title,description,plays,created,updated,hidden,revision FROM published_games WHERE author=? AND hidden<>2 ORDER BY updated DESC", (uid,)).fetchall()]
         return dict(games=games, mine=mine)
     if operation == "games_get":
         game_id = clean(body.get("id"), 12).upper()

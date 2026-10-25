@@ -88,7 +88,8 @@ def open_database(data):
     CREATE TABLE IF NOT EXISTS published_games(
      id TEXT PRIMARY KEY, author TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL,
      description TEXT NOT NULL, data TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL,
-     plays INTEGER NOT NULL DEFAULT 0, reports INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0);
+     plays INTEGER NOT NULL DEFAULT 0, reports INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0,
+     revision INTEGER NOT NULL DEFAULT 1);
     CREATE INDEX IF NOT EXISTS published_games_author ON published_games(author);
     CREATE TABLE IF NOT EXISTS game_reports(
      game_id TEXT NOT NULL REFERENCES published_games(id), reporter TEXT NOT NULL REFERENCES users(id),
@@ -99,5 +100,7 @@ def open_database(data):
         if column not in columns:
             db.execute(f"ALTER TABLE users ADD COLUMN {column} TEXT")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_login ON users(login)")
+    if "revision" not in {row[1] for row in db.execute("PRAGMA table_info(published_games)")}:
+        db.execute("ALTER TABLE published_games ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
     db.commit()
     return db

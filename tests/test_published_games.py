@@ -93,3 +93,18 @@ def test_page_embeds_the_same_language_reference():
     start = page.index('<script type="text/plain" id="nexusReference">\n') + len('<script type="text/plain" id="nexusReference">\n')
     embedded = page[start:page.index("</script>", start)]
     assert embedded == (root / "nexusscript.md").read_text(encoding="utf-8")
+
+
+def test_updates_bump_the_revision_and_keep_the_code(client):
+    ala, olek = guest(client, "Ala", "BLOX-111111"), guest(client, "Olek", "BLOX-222222")
+    first = call(client, "games_publish", token=ala["token"], title="Wersja", game=GAME)
+    assert first["revision"] == 1
+    changed = dict(GAME, script='when start {\n  say("Nowa wersja!")\n}\n')
+    second = call(client, "games_publish", token=ala["token"], id=first["id"], title="Wersja 2", game=changed)
+    assert second == dict(first, revision=2, updated=second["updated"]) and second["id"] == first["id"]
+    card = call(client, "games_list", token=olek["token"])["games"][0]
+    assert card["revision"] == 2 and card["title"] == "Wersja 2"
+    assert "Nowa wersja" in call(client, "games_get", token=olek["token"], id=first["id"])["game"]["script"]
+    # A withdrawn game can be published again under the same code.
+    call(client, "games_unpublish", token=ala["token"], id=first["id"])
+    assert call(client, "games_publish", token=ala["token"], id=first["id"], title="Wraca", game=GAME)["revision"] == 3

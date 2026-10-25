@@ -10603,7 +10603,7 @@ body.device-mobile #v10Debug{display:none!important}
   // ---------- Home screen ----------
   function tidyHome(){
     for(const b of document.querySelectorAll('#view-home .quick-play-card-btn')){const t=b.textContent.replace(/^[▶►]\s*/,'').trim();if(t!==b.textContent)b.textContent=t;}
-    const all=document.querySelector('.category-pills .cat-pill');if(all&&/^Wszystkie gry/.test(all.textContent)){const t=`Wszystkie gry (${defaultGames.length})`;if(all.textContent!==t)all.textContent=t;}
+    const all=document.querySelector('.category-pills .cat-pill');if(all&&/^Wszystkie gry/.test(all.textContent)){const t=`Wszystkie gry (${defaultGames.length+(window.NexusHome?.count||0)})`;if(all.textContent!==t)all.textContent=t;}
   }
   const home=$('view-home');
   if(home){let queued=false;const watch=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;watch.disconnect();tidyHome();watch.observe(home,{childList:true,subtree:true});});});tidyHome();watch.observe(home,{childList:true,subtree:true});}
@@ -12050,6 +12050,10 @@ body.nx-playing{overflow:hidden}
   try{const raw=JSON.parse(accountStore.getItem(storeKey)||'[]');if(Array.isArray(raw))projects=raw.filter(p=>p&&p.format==='bloxweb-nexus').slice(0,20);}catch{}
 
   function online(){return window.bloxOnline;}
+  // Small fingerprint of a project's published content (name, settings, parts, script).
+  function fingerprint(p){const t=JSON.stringify([p.name,p.settings,p.parts,p.script||'']);let h=5381;for(let i=0;i<t.length;i++)h=(h*33+t.charCodeAt(i))|0;return (h>>>0).toString(36)+t.length;}
+  const unpublishedChanges=p=>!!p.publishedId&&p.publishedPrint!==fingerprint(p);
+  function updatePublishButton(){const b=$('nxPublishBtn');if(b&&current)b.textContent=current.publishedId?(unpublishedChanges(current)?'Aktualizuj grę •':'Aktualizuj grę'):'Publikuj';}
   async function api(op,body){
     const o=online();if(!o?.api)throw Error('Brak połączenia z serwerem BloxWeb.');
     if(!o.state.connected){try{await o.connect?.();}catch{}}
@@ -12067,7 +12071,7 @@ body.nx-playing{overflow:hidden}
     try{accountStore.setItem(storeKey,JSON.stringify(projects));if(msg)status(msg);}catch{status('Nie udało się zapisać. Skopiuj kod gry w zakładce Skrypt.',true);}
     renderLibrary();
   }
-  function changed(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist('Zapisano automatycznie.'),600);}
+  function changed(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist('Zapisano automatycznie.'),600);updatePublishButton();}
   function snapshot(){if(!current)return;undo.push(clone(current.parts));if(undo.length>40)undo.shift();redo=[];}
   function status(text,error){const m=$('nxStatus');if(m){m.textContent=text;m.classList.toggle('error',!!error);}}
 
@@ -12108,8 +12112,9 @@ body.nx-playing{overflow:hidden}
     libGrid.replaceChildren();
     if(!projects.length){libGrid.append(el('p','v11-muted','Nie masz jeszcze gier 3D. Kliknij „Nowa gra 3D”.'));return;}
     for(const p of projects){
-      const card=el('article','nx-card');card.append(el('strong',null,p.name),el('small',null,(p.parts?.length||0)+' klocków · '+(p.script||'').split('\n').length+' linii kodu'+(p.publishedId?' · opublikowana '+p.publishedId:'')));
-      const row=el('div','nx-row');row.append(btn('Edytuj',()=>{openProject(p);work.scrollIntoView({block:'start'});}),btn('Graj',()=>{openProject(p);test();}),btn('Usuń',()=>confirmDialog('Usunąć projekt?','„'+p.name+'” zniknie z tej przeglądarki. Opublikowana wersja zostaje w katalogu.','Usuń',()=>{projects=projects.filter(x=>x.id!==p.id);if(current?.id===p.id){current=null;work.hidden=true;editor.stop();}persist('Usunięto projekt.');})));
+      const card=el('article','nx-card');card.append(el('strong',null,p.name),el('small',null,(p.parts?.length||0)+' klocków · '+(p.script||'').split('\n').length+' linii kodu'));
+      if(p.publishedId)card.append(el('span','nx-tag'+(unpublishedChanges(p)?' warn':''),'Opublikowana '+p.publishedId+(p.publishedRevision?' · wersja '+p.publishedRevision:'')+(unpublishedChanges(p)?' · są nowe zmiany':'')));
+      const row=el('div','nx-row');if(unpublishedChanges(p))row.append(btn('Aktualizuj',()=>{openProject(p);publishDialog();},'v11-primary'));row.append(btn('Edytuj',()=>{openProject(p);work.scrollIntoView({block:'start'});}),btn('Graj',()=>{openProject(p);test();}),btn('Usuń',()=>confirmDialog('Usunąć projekt?','„'+p.name+'” zniknie z tej przeglądarki. Opublikowana wersja zostaje w katalogu.','Usuń',()=>{projects=projects.filter(x=>x.id!==p.id);if(current?.id===p.id){current=null;work.hidden=true;editor.stop();}persist('Usunięto projekt.');})));
       card.append(row);libGrid.append(card);
     }
   }
@@ -12117,11 +12122,12 @@ body.nx-playing{overflow:hidden}
   function openProject(p){
     if(current&&current.id!==p.id)persist();
     current=clone(projects.find(x=>x.id===p.id)||p);selected=null;undo=[];redo=[];work.hidden=false;$('nxName').value=current.name;
-    editor.start();refreshScriptParts();renderProps();showTab(activeTab);status('Otwarto „'+current.name+'”.');
+    editor.start();refreshScriptParts();renderProps();showTab(activeTab);updatePublishButton();
+    status('Otwarto „'+current.name+'”.'+(current.publishedId?' Gra jest opublikowana jako '+current.publishedId+(unpublishedChanges(current)?' – masz zmiany, które możesz opublikować przyciskiem „Aktualizuj grę”.':'.'):''));
   }
   $('nxName').oninput=()=>{if(!current)return;current.name=$('nxName').value.trim()||'Moja gra 3D';changed();};
   const actions=$('nxActions');
-  actions.append(btn('▶ Testuj',()=>test(),'v11-primary'),btn('Zapisz',()=>persist('Zapisano projekt.')),btn('Cofnij',()=>doUndo()),btn('Publikuj',()=>publishDialog()),btn('Kod gry',()=>exportDialog()),btn('Zamknij',()=>{persist();current=null;work.hidden=true;editor.stop();}));
+  actions.append(btn('▶ Testuj',()=>test(),'v11-primary'),btn('Zapisz',()=>persist('Zapisano projekt.')),btn('Cofnij',()=>doUndo()),Object.assign(btn('Publikuj',()=>publishDialog()),{id:'nxPublishBtn'}),btn('Kod gry',()=>exportDialog()),btn('Zamknij',()=>{persist();current=null;work.hidden=true;editor.stop();}));
 
   // ---------- 3D editor ----------
   const editor=(()=>{
@@ -12314,15 +12320,18 @@ body.nx-playing{overflow:hidden}
     if(!current)return;persist();
     try{NexusScript.parse(current.script||'');}catch(e){alertDialog('Najpierw popraw kod','Linia '+(e.line||'?')+': '+e.message);return;}
     const prev=NexusGame.previewParts(current);if(!current.parts.some(p=>p.t==='spawn')&&!prev.parts.some(p=>p.type==='spawn')){alertDialog('Brakuje startu','Dodaj klocek „Start”, aby gracze wiedzieli, gdzie zaczynają.');return;}
-    const d=dialog(current.publishedId?'Aktualizuj opublikowaną grę':'Opublikuj grę');
+    const d=dialog(current.publishedId?'Aktualizuj opublikowaną grę '+current.publishedId:'Opublikuj grę');
     const t=el('input','nx-input');t.maxLength=40;t.value=current.name;t.setAttribute('aria-label','Tytuł');
     const ds=el('textarea','nx-area');ds.style.minHeight='80px';ds.maxLength=300;ds.value=current.description||'';ds.placeholder='Krótki opis gry';ds.setAttribute('aria-label','Opis');
     const m=el('div','nx-msg');
-    d.box.append(el('p','v11-muted','Gra pojawi się w katalogu „Gry graczy” razem z Twoim nickiem. Nie wpisuj danych osobowych. Niestosowne słowa są blokowane, a gry zgłoszone przez 3 osoby są ukrywane.'),t,ds,m);
+    if(current.publishedId)d.box.append(el('p','v11-muted','Gracze zobaczą nową wersję pod tym samym kodem. Liczba zagrań zostaje.'));
+    d.box.append(el('p','v11-muted','Gra pojawi się w katalogu „Gry graczy” i na ekranie głównym razem z Twoim nickiem. Nie wpisuj danych osobowych. Niestosowne słowa są blokowane, a gry zgłoszone przez 3 osoby są ukrywane.'),t,ds,m);
     const r=el('div','nx-row');const go=btn(current.publishedId?'Aktualizuj':'Publikuj',async()=>{
       go.disabled=true;m.textContent='Publikuję…';m.classList.remove('error');
-      try{const res=await api('games_publish',{id:current.publishedId||'',title:t.value.trim(),description:ds.value.trim(),game:project()});current.publishedId=res.id;current.description=ds.value.trim();persist('Opublikowano grę '+res.id+'.');
-        m.textContent='Gotowe! Kod gry: '+res.id+'. Znajomi mogą go wpisać w „Gry graczy”.';loadCatalog();go.hidden=true;}
+      const wasPublished=!!current.publishedId;
+      try{const res=await api('games_publish',{id:current.publishedId||'',title:t.value.trim(),description:ds.value.trim(),game:project()});
+        current.publishedId=res.id;current.publishedRevision=res.revision;current.description=ds.value.trim();current.publishedPrint=fingerprint(current);persist(wasPublished?'Zaktualizowano grę '+res.id+' (wersja '+res.revision+').':'Opublikowano grę '+res.id+'.');updatePublishButton();
+        m.textContent=wasPublished?'Zaktualizowano! Gracze dostaną wersję '+res.revision+' przy następnym uruchomieniu gry '+res.id+'.':'Gotowe! Kod gry: '+res.id+'. Gra jest w katalogu i na ekranie głównym.';loadCatalog();window.NexusHome?.refresh();go.hidden=true;}
       catch(e){m.textContent=e.message;m.classList.add('error');go.disabled=false;}
     },'v11-primary');
     r.append(btn('Zamknij',d.close),go);d.box.append(r);t.focus();
@@ -12353,13 +12362,24 @@ body.nx-playing{overflow:hidden}
     }catch(e){msg.textContent=e.message;msg.classList.add('error');}
   }
   function gameCard(g,own){
-    const card=el('article','nx-card');card.append(el('strong',null,g.title),el('small',null,'autor: '+g.author+' · zagrano '+g.plays+'× · '+g.id));
+    const card=el('article','nx-card');card.append(el('strong',null,g.title),el('small',null,'autor: '+g.author+' · zagrano '+g.plays+'× · '+g.id+(g.revision>1?' · wersja '+g.revision:'')));
     if(g.description)card.append(el('p',null,g.description));
     if(own&&g.hidden===1)card.append(el('span','nx-tag warn','Ukryta po zgłoszeniach – czeka na sprawdzenie'));
     const row=el('div','nx-row');row.append(btn('▶ Graj',()=>playPublished(g.id),'v11-primary'));
+    if(own)row.append(btn('Edytuj / aktualizuj',()=>editPublished(g)));
     if(own)row.append(btn('Wycofaj',()=>confirmDialog('Wycofać grę?','„'+g.title+'” zniknie z katalogu. Projekt zostaje u Ciebie w Studio.','Wycofaj',async()=>{try{await api('games_unpublish',{id:g.id});for(const p of projects)if(p.publishedId===g.id)delete p.publishedId;persist();loadCatalog();}catch(e){alertDialog('Błąd',e.message);}})));
     else row.append(btn('Zgłoś',()=>reportDialog(g)));
     card.append(row);return card;
+  }
+  // Opens the local project behind a published game, or downloads it (e.g. on a new device).
+  async function editPublished(g){
+    const local=projects.find(p=>p.publishedId===g.id);
+    if(local){openProject(local);work.scrollIntoView({block:'start'});return;}
+    if(projects.length>=20){alertDialog('Limit projektów','Masz 20 gier 3D. Usuń jedną, aby pobrać tę grę do edycji.');return;}
+    try{const res=await api('games_get',{id:g.id});const data=res.game;
+      const p={...template(),name:res.card.title,description:res.card.description||'',settings:{...template().settings,...(data.settings||{})},parts:data.parts||[],script:data.script||'',publishedId:g.id,publishedRevision:res.card.revision};
+      p.publishedPrint=fingerprint(p);projects.unshift(p);openProject(p);persist('Pobrano opublikowaną grę '+g.id+' do edycji. Po zmianach kliknij „Aktualizuj grę”.');work.scrollIntoView({block:'start'});}
+    catch(e){alertDialog('Nie udało się pobrać gry',e.message);}
   }
   function reportDialog(g){
     const d=dialog('Zgłoś grę „'+g.title+'”');const s=el('select','nx-select');for(const r of ['Nieodpowiednie treści','Wulgarne słowa','Dane osobowe','Oszustwo lub spam','Inne'])s.append(el('option',null,r));
@@ -12375,7 +12395,87 @@ body.nx-playing{overflow:hidden}
     }catch(e){msg.textContent=e.message;msg.classList.add('error');}
   }
   renderLibrary();
-  window.NexusStudio={open:openProject,create:createProject,loadCatalog,playPublished,promptText,get current(){return current;},get projects(){return projects;}};
+  window.NexusStudio={open:openProject,create:createProject,loadCatalog,playPublished,promptText,reportDialog,editPublished,api,dialog,get current(){return current;},get projects(){return projects;}};
+})();
+</script>
+<style id="nexus-home-style">
+.nx-cover{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:10px;overflow:hidden;color:#fff;font-family:Inter,system-ui,sans-serif}
+.nx-cover svg{position:absolute;inset:0;width:100%;height:100%}
+.nx-cover b{position:relative;font-size:20px;line-height:1.1;text-shadow:0 2px 6px #0009;overflow-wrap:anywhere}
+.nx-cover small{position:relative;font-size:11px;font-weight:700;opacity:.9}
+.game-card .game-thumb:has(.nx-cover){position:relative}
+.nx-badge{position:absolute;top:8px;left:8px;z-index:1;padding:3px 8px;border-radius:999px;background:#0d1117cc;color:#ffb27f;font:700 11px Inter,system-ui,sans-serif}
+.game-card.nx-player-card .game-stats span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Phones show the catalogue as a list with small thumbnails; title and author are already beside them. */
+@media (max-width:600px){.nx-cover b,.nx-cover small{display:none}.nx-badge{top:4px;left:4px;padding:2px 6px;font-size:10px}}
+</style>
+<script id="nexus-home">
+// Player-made games from Studio 3D appear in the home catalogue next to the built-in games.
+(() => {
+  'use strict';
+  if(!window.NexusStudio)return;
+  const $=id=>document.getElementById(id);
+  const CATEGORY='Gry graczy';
+  let games=[],loadedAt=0,loading=false;
+  const hue=id=>{let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return h;};
+  // A generated cover: sky gradient with a few floating blocks, coloured by the game code.
+  function cover(g){
+    const h=hue(g.id),wrap=document.createElement('div');wrap.className='nx-cover';
+    const blocks=[];let seed=h+7;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+    for(let i=0;i<6;i++){const x=10+rnd()*70,y=30+rnd()*45,w=12+rnd()*16;blocks.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="5" rx="1.2" fill="hsl(${(h+120+i*25)%360} 65% 55%)"/><rect x="${x.toFixed(1)}" y="${(y+5).toFixed(1)}" width="${w.toFixed(1)}" height="2.5" fill="#0003"/>`);}
+    wrap.innerHTML=`<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="nxg${g.id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${h} 70% 62%)"/><stop offset="1" stop-color="hsl(${(h+40)%360} 60% 32%)"/></linearGradient></defs><rect width="100" height="100" fill="url(#nxg${g.id})"/>${blocks.join('')}<circle cx="80" cy="18" r="7" fill="#fff6" /></svg>`;
+    const title=document.createElement('b');title.textContent=g.title;const by=document.createElement('small');by.textContent='autor: '+g.author;
+    wrap.append(title,by);return wrap;
+  }
+  function info(g){
+    const {box,close}=NexusStudio.dialog(g.title);
+    const meta=document.createElement('p');meta.className='v11-muted';meta.textContent='Autor: '+g.author+' · zagrano '+g.plays+'× · kod '+g.id+(g.revision>1?' · wersja '+g.revision:'');
+    const desc=document.createElement('p');desc.textContent=g.description||'Gra stworzona w BloxWeb Studio 3D (NexusScript).';
+    const row=document.createElement('div');row.className='nx-row';
+    const b=(t,fn,cls='v11-button')=>{const x=document.createElement('button');x.type='button';x.className=cls;x.textContent=t;x.onclick=fn;return x;};
+    row.append(b('▶ Graj',()=>{close();NexusStudio.playPublished(g.id);},'v11-primary'));
+    if(g.authorId!==window.bloxOnline?.state.id)row.append(b('Zgłoś',()=>{close();NexusStudio.reportDialog(g);}));
+    else row.append(b('Edytuj / aktualizuj',()=>{close();switchTab('studio');NexusStudio.editPublished(g);}));
+    row.append(b('Zamknij',close));box.append(meta,desc,row);
+  }
+  function card(g){
+    const c=document.createElement('div');c.className='game-card nx-player-card';c.dataset.gameId=g.id;c.tabIndex=0;c.setAttribute('role','button');c.setAttribute('aria-label','Gra gracza: '+g.title);
+    const thumb=document.createElement('div');thumb.className='game-thumb';thumb.style.position='relative';thumb.append(cover(g));
+    const badge=document.createElement('span');badge.className='nx-badge';badge.textContent='Gra gracza';thumb.append(badge);
+    const title=document.createElement('div');title.className='game-title';title.textContent=g.title;
+    const stats=document.createElement('div');stats.className='game-stats';const a=document.createElement('span');a.textContent=g.author;const p=document.createElement('span');p.textContent='▶ '+g.plays+(g.revision>1?' · v'+g.revision:'');stats.append(a,p);
+    const play=document.createElement('button');play.type='button';play.className='quick-play-card-btn';play.textContent='Zagraj teraz';
+    play.onclick=e=>{e.stopPropagation();NexusStudio.playPublished(g.id);};
+    c.onclick=()=>info(g);c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();info(g);}};
+    c.append(thumb,title,stats,play);return c;
+  }
+  function append(){
+    const box=$('gamesContainer');if(!box)return;
+    box.querySelectorAll('.nx-player-card,.nx-home-empty').forEach(n=>n.remove());
+    const cat=typeof activeCategoryFilter==='undefined'?'all':activeCategoryFilter;
+    if(cat!=='all'&&cat!==CATEGORY)return;
+    const q=($('searchInput')?.value||'').toLowerCase();
+    const list=games.filter(g=>g.title.toLowerCase().includes(q)||g.author.toLowerCase().includes(q));
+    for(const g of list)box.append(card(g));
+    if(cat===CATEGORY&&!list.length){const e=document.createElement('p');e.className='v11-muted nx-home-empty';e.textContent=window.bloxOnline?.state.connected?'Nie ma jeszcze gier graczy. Stwórz pierwszą w zakładce „Twórz gry”!':'Połącz się z serwerem, aby zobaczyć gry graczy.';box.append(e);}
+  }
+  const base=renderGames;
+  renderGames=function(list){const out=base.apply(this,arguments);append();return out;};
+  window.renderGames=renderGames;
+  // Category pill
+  const pills=document.querySelector('#view-home .category-pills');
+  if(pills&&!$('nxHomePill')){const pill=document.createElement('button');pill.type='button';pill.className='cat-pill';pill.id='nxHomePill';pill.textContent=CATEGORY;pill.onclick=()=>filterByCategory(CATEGORY,pill);pills.append(pill);}
+  async function refresh(){
+    const o=window.bloxOnline;if(loading||!o?.api||!o.state.connected)return;loading=true;
+    try{const res=await o.api('games_list',{sort:'popular'},true,15000);games=(res.games||[]).slice(0,30);loadedAt=Date.now();renderGames(getFilteredGamesList());}
+    catch{}finally{loading=false;}
+  }
+  // Load as soon as the account is connected, then refresh every minute while the home screen is visible.
+  setInterval(()=>{
+    const home=$('view-home'),visible=home&&home.offsetParent!==null&&!document.hidden;
+    if(!loadedAt||(visible&&Date.now()-loadedAt>60000))refresh();
+  },3000);
+  window.NexusHome={refresh,get count(){return games.length;},get games(){return games.slice();}};
 })();
 </script>
 </body>
