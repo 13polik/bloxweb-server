@@ -7372,7 +7372,8 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const synced=accountStore.getItem(syncedKey()),keepProfile=!!token&&(synced===null||synced===localProfileKey());
       const data=await api('session',{token,id:myPlayerId,name:username,avatar:avatarData,keepProfile,scope:isSecondaryTestTab?myPlayerId:'main'},false,WAKE_TIMEOUT);
       token=data.token;accountStore.setItem(tokenKey(),token);me=data.user;account=data.account||null;connected=true;failures=0;
-      if(keepProfile)useServerProfile(me);else markProfileSynced();
+      // A refused nick (reserved, staff-like or taken) comes back as the server's nick plus a notice.
+      if(keepProfile||me.name!==username)useServerProfile(me);else markProfileSynced();if(data.notice)showToast(data.notice);
       receiveProgress(data.progress);
       setStatus('Online',true);applySocial(data.social);renderFriendsAll();renderProfileOnline();renderPublicRooms();
       feedback(settingsFeedback,'Połączenie gotowe. ID online: '+me.id);
@@ -7582,7 +7583,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       if(wantSocial){lastSocial=performance.now();applySocial(data.social);}
       me=data.user;
       // Skip when the player edited their profile while this request was in flight.
-      if(localProfileKey()===sentKey){if(payload.profile)markProfileSynced();else useServerProfile(me);}
+      if(localProfileKey()===sentKey){if(payload.profile&&me.name===username)markProfileSynced();else useServerProfile(me);}
       if(progressKey(localProgress())===progressKey(sentProgress)){if(data.progress){applyProgress(data.progress);writeProgressBase(data.progress);}}
       // Coins changed during the request: the server already has what was
       // sent, so only the newer local changes go up next time.
@@ -13727,7 +13728,7 @@ body.nx-playing{overflow:hidden}
     admin:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z"/></svg>'};
   const LABEL={owner:'CEO',admin:'ADMIN'};
   const NAME={owner:'Właściciel (CEO)',admin:'Administrator'};
-  window.bloxRoleTag=role=>role==='owner'?'[CEO] ':role==='admin'?'[ADMIN] ':'';
+  window.bloxRoleTag=role=>role==='owner'?'[CEO] ':role==='admin'?'[ADMIN] ':role==='official'?'[OFICJALNE] ':'';
   function chip(role){const c=document.createElement('span');c.className='staff-chip '+role;c.innerHTML=ICONS[role];c.append(document.createTextNode(LABEL[role]));c.title=NAME[role];return c;}
   const myRole=()=>window.bloxOnline?.me?.role||null;
   const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;};

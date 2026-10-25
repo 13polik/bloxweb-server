@@ -16,6 +16,7 @@ import random
 import re
 import secrets
 import time
+import unicodedata
 from pathlib import Path
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -57,6 +58,32 @@ COIN_BUCKET, COIN_REFILL = 5000, 30
 # Staff roles live only in the database; the matching badges are shown from the
 # role, never from a browser save. owner (CEO) > admin.
 ROLES = {"owner", "admin"}
+# The official BloxWeb account: reserved so nobody can pose as the platform. It has no
+# password or usable session, so nobody signs in to it; it only holds the name and badge.
+OFFICIAL_ID = "BLOX-OFFICIAL"
+BADGE_ROLES = ROLES | {"official"}
+# Nick rules. A nick is compared by its "key": lower case, no accents, look-alike digits
+# and symbols read as letters (0→o, 1/i/!→l, 3→e …), only letters, repeats collapsed, so
+# "Bl0x_Web", "B L O X W E B" and "bloxxweb" all read as "bloxweb".
+LOOKALIKE = str.maketrans({"0": "o", "1": "l", "i": "l", "!": "l", "|": "l", "3": "e", "4": "a", "@": "a",
+                           "5": "s", "$": "s", "7": "t", "8": "b", "9": "g", "6": "g", "2": "z", "ł": "l"})
+
+
+def name_key(name):
+    s = unicodedata.normalize("NFKD", str(name or "").lower().replace("ł", "l"))
+    s = "".join(c for c in s if not unicodedata.combining(c)).translate(LOOKALIKE)
+    s = re.sub(r"(.)\1+", r"\1", re.sub(r"[^a-z]", "", s))
+    return s or str(name or "").strip().lower()
+
+
+# Names held for one account each (the account itself may use them, nobody else, not even inside a longer nick).
+RESERVED_NAMES = {name_key(n): owner for n, owner in
+                  [("BloxWeb", OFFICIAL_ID), ("13polik", "BLOX-759762"), ("Mikolaj_Ps", "BLOX-828719")]}
+# Words that make a nick look like the administration; only staff may use them.
+STAFF_WORDS = [name_key(w) for w in ["admin", "administrator", "administracja", "moderator", "support", "owner",
+                                     "staff", "official", "oficjalny", "wlasciciel", "helpdesk", "system"]]
+STAFF_EXACT = {name_key(w) for w in ["ceo", "mod", "gm", "root"]}
+name_owner = {}
 ROLE_BADGES = {"b_ceo", "b_admin"}
 anticheat_log = deque(maxlen=100)
 # This single process is the only writer, so profiles, sessions and social
@@ -157,7 +184,7 @@ def profile(uid):
             return None
         user_cache[uid] = dict(id=u["id"], name=u["name"], avatar=json.loads(u["avatar"]), login=u["login"],
                                progress=json.loads(u["progress"]) if u["progress"] else None,
-                               role=u["role"] if u["role"] in ROLES else None, banned=bool(u["banned"]))
+                               role=u["role"] if u["role"] in BADGE_ROLES else None, banned=bool(u["banned"]))
     return user_cache[uid]
 
 
@@ -231,13 +258,74 @@ def save_progress(uid, change):
         current["progress"] = merged
 
 
+def name_problem(uid, name, role=None):
+    """Why this account may not use this nick, or None when it may."""
+    key = name_key(name)
+    for reserved, owner in RESERVED_NAMES.items():
+        if reserved in key and uid != owner:
+            return "Nick „%s” jest zarezerwowany. Wybierz inny." % name
+    if role not in ROLES and uid != OFFICIAL_ID and (key in STAFF_EXACT or any(w in key for w in STAFF_WORDS)):
+        return "Nick „%s” wygląda jak konto administracji BloxWeb. Wybierz inny." % name
+    holder = name_owner.get(key)
+    if holder and holder != uid:
+        return "Nick „%s” jest już zajęty. Wybierz inny." % name
+    return None
+
+
+def free_name(uid, base, role=None):
+    """A nick close to `base` this account may use: the same nick with a number, or Gracz1234."""
+    if not name_problem(uid, base, role):
+        return base
+    # A taken nick gets a number; a reserved or staff-like one is replaced.
+    stem = base if "zajęty" in (name_problem(uid, base, role) or "") else "Gracz"
+    for _ in range(200):
+        candidate = stem[:11] + str(random.randint(1000, 99999))
+        if not name_problem(uid, candidate, role):
+            return candidate
+    return "Gracz" + secrets.token_hex(4)
+
+
+def claim_name(uid, old, new):
+    if old is not None and name_owner.get(name_key(old)) == uid:
+        name_owner.pop(name_key(old), None)
+    name_owner[name_key(new)] = uid
+
+
+def prepare_names():
+    """Create the official account, then give every nick one owner: reserved names go back to their
+    owners, staff look-alikes and repeats get a number (the oldest account keeps the plain nick)."""
+    if not db.execute("SELECT 1 FROM users WHERE id=?", (OFFICIAL_ID,)).fetchone():
+        db.execute("INSERT INTO users(id,token_hash,visitor_hash,name,avatar,created) VALUES(?,?,?,?,?,?)",
+                   (OFFICIAL_ID, "locked:"+secrets.token_hex(32), None, "BloxWeb", json.dumps(avatar({})), time.time()))
+    db.execute("UPDATE users SET role='official' WHERE id=?", (OFFICIAL_ID,))
+    name_owner.clear()
+    rows = db.execute("SELECT id,name,role FROM users ORDER BY created").fetchall()
+    owners = set(RESERVED_NAMES.values())
+    for row in sorted(rows, key=lambda r: r["id"] not in owners):
+        name = row["name"]
+        if name_problem(row["id"], name, row["role"]):
+            name = free_name(row["id"], name, row["role"])
+            db.execute("UPDATE users SET name=? WHERE id=?", (name, row["id"]))
+            user_cache.pop(row["id"], None)
+        claim_name(row["id"], None, name)
+    db.commit()
+
+
 def save_profile(uid, name, look):
+    """Save a nick and look. A nick that is reserved, looks like staff or is taken is refused
+    (the old nick stays) and the reason comes back for the player."""
     current = profile(uid)
-    name, look = clean(name, 16) or current["name"], avatar(look)
+    name, look, notice = clean(name, 16) or current["name"], avatar(look), None
+    if name != current["name"]:
+        notice = name_problem(uid, name, current["role"])
+        if notice:
+            name = current["name"]
     if (name, look) != (current["name"], current["avatar"]):
         db.execute("UPDATE users SET name=?,avatar=? WHERE id=?", (name, json.dumps(look), uid))
         db.commit()
+        claim_name(uid, current["name"], name)
         current.update(name=name, avatar=look)
+    return notice
 
 
 def user_view(uid):
@@ -898,6 +986,7 @@ async def simulation():
 
 @asynccontextmanager
 async def lifespan(app):
+    prepare_names()
     task = asyncio.create_task(simulation())
     yield
     task.cancel()
@@ -1040,7 +1129,7 @@ async def api(operation: str, request: Request):
         visitor_hash = hashlib.sha256(identity.encode()).hexdigest() if identity else None
         if not token and identity:
             token = hmac.new(SERVER_SECRET, identity.encode(), hashlib.sha256).hexdigest()
-        uid = token_user(token)
+        uid, notice = token_user(token), None
         if not uid:
             if body.get("token"):
                 fail("Nieprawidłowy kod konta online.", 401)
@@ -1049,13 +1138,18 @@ async def api(operation: str, request: Request):
             uid = preferred if re.fullmatch(r"BLOX-[A-Z0-9_-]{3,48}", preferred) else "BLOX-"+secrets.token_hex(5).upper()
             if db.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
                 uid = "BLOX-"+secrets.token_hex(5).upper()
-            db.execute("INSERT INTO users(id,token_hash,visitor_hash,name,avatar,created) VALUES(?,?,?,?,?,?)", (uid, hash_token(token), visitor_hash, clean(body.get("name"), 16) or "Gracz", json.dumps(avatar(body.get("avatar"))), time.time()))
+            wanted = clean(body.get("name"), 16) or "Gracz"
+            name = free_name(uid, wanted)
+            if name != wanted and wanted != "Gracz":
+                notice = name_problem(uid, wanted) + " Twój nick to teraz „%s”." % name
+            db.execute("INSERT INTO users(id,token_hash,visitor_hash,name,avatar,created) VALUES(?,?,?,?,?,?)", (uid, hash_token(token), visitor_hash, name, json.dumps(avatar(body.get("avatar"))), time.time()))
             db.commit()
+            claim_name(uid, None, name)
         elif not body.get("keepProfile"):
-            save_profile(uid, body.get("name"), body.get("avatar"))
+            notice = save_profile(uid, body.get("name"), body.get("avatar"))
         presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
         return dict(token=token, user=user_view(uid), social=social(uid), account=account_view(uid),
-                    progress=profile(uid)["progress"])
+                    progress=profile(uid)["progress"], notice=notice)
     if operation == "login":
         login, password = credentials(body)
         # One login may fail 10 times, one address 30 times (a school or home
@@ -1106,7 +1200,9 @@ async def api(operation: str, request: Request):
         if body.get("profile"):
             changes = body["profile"]
             if isinstance(changes, dict):
-                save_profile(uid, changes.get("name"), changes.get("avatar"))
+                refused = save_profile(uid, changes.get("name"), changes.get("avatar"))
+                if refused:
+                    presence[uid]["notice"] = refused
         if body.get("progress"):
             save_progress(uid, body["progress"])
         room = room_input(uid, body)
@@ -1132,6 +1228,8 @@ async def api(operation: str, request: Request):
         target, kind = clean(body.get("target"), 54).upper(), body.get("action")
         if target == uid:
             fail("Nie możesz dodać siebie.")
+        if target == OFFICIAL_ID:
+            fail("Oficjalnego konta BloxWeb nie można dodać do znajomych.")
         if not db.execute("SELECT 1 FROM users WHERE id=?", (target,)).fetchone():
             fail("Nie znaleziono tego ID.", 404)
         if kind == "request":
@@ -1305,10 +1403,10 @@ async def api(operation: str, request: Request):
     if operation == "admin_overview":
         staff(user)
         count = lambda q: db.execute(q).fetchone()[0]
-        return dict(role=user["role"], users=count("SELECT COUNT(*) FROM users"), banned=count("SELECT COUNT(*) FROM users WHERE banned=1"),
+        return dict(role=user["role"], users=count("SELECT COUNT(*) FROM users WHERE id<>'"+OFFICIAL_ID+"'"), banned=count("SELECT COUNT(*) FROM users WHERE banned=1"),
                     games=count("SELECT COUNT(*) FROM published_games WHERE hidden=0"), hiddenGames=count("SELECT COUNT(*) FROM published_games WHERE hidden=1"),
                     online=sum(1 for p in presence.values() if now()-p.get("seen", 0) < 15), rooms=len(rooms), sockets=len(sockets),
-                    staff=[admin_user_view(r["id"]) for r in db.execute("SELECT id FROM users WHERE role IS NOT NULL").fetchall()],
+                    staff=[admin_user_view(r["id"]) for r in db.execute("SELECT id FROM users WHERE role IN ('owner','admin')").fetchall()],
                     anticheat=list(anticheat_log)[-40:][::-1])
     if operation == "admin_games":
         staff(user)
@@ -1348,6 +1446,8 @@ async def api(operation: str, request: Request):
             fail("Nie znaleziono gracza.", 404)
         if other["role"] == "owner":
             fail("Konta właściciela nie można zmieniać.", 403)
+        if target == OFFICIAL_ID:
+            fail("Oficjalnego konta BloxWeb nie można zmieniać.", 403)
         if operation == "admin_kick":
             if other["role"] and user["role"] != "owner":
                 fail("Administratora może wyrzucić tylko właściciel.", 403)
