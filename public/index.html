@@ -8621,21 +8621,38 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
     const dir=to.clone().sub(from),dist=dir.length();const ray=new THREE.Raycaster(from,dir.normalize(),0,dist);
     return !ray.intersectObjects(platforms.map(p=>p.mesh),false).length;
   }
+  // Player gunfire is heard, running targets are harder to hit, bots share what they see.
+  let lastPlayerAmmo=null,lastPlayerWeapon=-1,lastPlayerPos=null,playerSpeed=0;
+  function turnTo(group,angle,dt){const cur=group.rotation.y,diff=((angle-cur)%(Math.PI*2)+Math.PI*3)%(Math.PI*2)-Math.PI;group.rotation.y=cur+diff*Math.min(1,dt*10);}
   function soloBots(dt){
     const nav=cs2.navigation,clock=gameTimeMs/1000,target=playerGroup.position;if(!nav||cs2.won)return;
+    const wpn=cs2.weapons[cs2.currentWeapon],shot=!!wpn&&lastPlayerAmmo!==null&&lastPlayerWeapon===cs2.currentWeapon&&wpn.ammo<lastPlayerAmmo;
+    lastPlayerAmmo=wpn?wpn.ammo:null;lastPlayerWeapon=cs2.currentWeapon;
+    if(lastPlayerPos&&dt>0)playerSpeed+=(Math.min(12,Math.hypot(target.x-lastPlayerPos.x,target.z-lastPlayerPos.z)/dt)-playerSpeed)*Math.min(1,dt*8);
+    lastPlayerPos={x:target.x,z:target.z};
+    const skill=Math.min(.12,((cs2.round||1)-1)*.025);
     for(const e of cs2.enemies){
       const p=e.rig.group.position,dist=Math.hypot(target.x-p.x,target.z-p.z)||1,dx=(target.x-p.x)/dist,dz=(target.z-p.z)/dist;
       const sight=dist<65&&visible(e);e.plan-=dt;e.shootCd-=dt;e.reaction=Math.max(0,e.reaction-dt);
-      if(sight){if(clock-e.seen>.35)e.reaction=.45+e.role*.12;e.seen=clock;e.memory={x:target.x,z:target.z};}
-      let goal=e.memory;e.state='szukanie';
-      if(clock-e.seen>4&&Math.hypot(goal.x-p.x,goal.z-p.z)<5){goal=[{x:-62,z:-56},{x:-30,z:12},{x:16,z:-18},{x:-10,z:50},{x:52,z:4}][(Math.floor(clock/9)+e.id)%5];e.memory=goal;}
+      // Taking a hit gives away the shooter's position.
+      if(e.lastHp!==undefined&&e.hp<e.lastHp){e.memory={x:target.x,z:target.z};e.alert=clock;e.plan=0;e.reaction=Math.min(e.reaction,.25);}
+      e.lastHp=e.hp;
+      if(shot&&!sight&&dist<50){e.memory={x:target.x+(Math.random()-.5)*6,z:target.z+(Math.random()-.5)*6};e.alert=clock;e.plan=0;}
+      if(sight){
+        if(clock-e.seen>.35){e.reaction=.45+e.role*.12-skill;e.engaged=clock;}
+        e.seen=clock;e.memory={x:target.x,z:target.z};
+        for(const o of cs2.enemies){if(o===e||clock-o.seen<1.5||clock-(o.alert||-99)<1)continue;const q=o.rig.group.position;if(Math.hypot(q.x-p.x,q.z-p.z)<36){o.memory={x:target.x,z:target.z};o.alert=clock;}}
+      }
+      let goal=e.memory;e.state=clock-(e.alert||-99)<4&&!sight?'nasluch':'szukanie';
+      if(clock-e.seen>4&&clock-(e.alert||-99)>4&&Math.hypot(goal.x-p.x,goal.z-p.z)<5){goal=[{x:-62,z:-56},{x:-30,z:12},{x:16,z:-18},{x:-10,z:50},{x:52,z:4}][(Math.floor(clock/9)+e.id)%5];e.memory=goal;}
       if(sight&&dist<48){
         const side=e.id%2?-1:1;e.state='walka';
         if(dist<11){goal={x:p.x-dx*7,z:p.z-dz*7};e.state='odwrot';}
         else if(e.role===1&&dist>16){goal={x:target.x-dx*18-dz*side*10,z:target.z-dz*18+dx*side*10};e.state='flanka';}
         else if(dist<29){const sway=side*(Math.floor(clock/2)%2?1:-1);goal={x:p.x-dz*sway*4,z:p.z+dx*sway*4};}
       }
-      if(e.hp<36&&dist<45&&(clock+e.id)%7<3.3){
+      // Wounded or reloading bots fall back behind the nearest cover.
+      if((e.hp<36&&dist<45&&(clock+e.id)%7<3.3)||(e.reload>0&&dist<40)){
         e.coverTimer=(e.coverTimer||0)-dt;
         if(e.coverTimer<=0){let best=null,bd=Infinity;for(const b of nav.boxes){if(Math.max(b.w,b.d)>40)continue;const vx=b.x-target.x,vz=b.z-target.z,n=Math.hypot(vx,vz)||1,c={x:b.x+vx/n*(b.w/2+2),z:b.z+vz/n*(b.d/2+2)},d=Math.hypot(c.x-p.x,c.z-p.z);if(d<bd&&nav.free(c.x,c.z)){best=c;bd=d;}}e.cover=best;e.coverTimer=2.8;}
         if(e.cover){goal=e.cover;e.state='oslona';}
@@ -8643,20 +8660,30 @@ body.device-mobile .studio-brush select,body.device-mobile .studio-brush input{w
       if(!nav.free(goal.x,goal.z)){const a=nav.anchor(goal,false);goal=a===null?{x:p.x,z:p.z}:nav.point(a);}
       if(e.plan<=0){e.path=nav.route(p,goal);e.plan=1+e.role*.15;}
       if(e.path.length&&Math.hypot(p.x-e.path[0].x,p.z-e.path[0].z)<.8)e.path.shift();
-      e.moving=false;
-      if(e.path.length){const t=e.path[0],n=Math.hypot(t.x-p.x,t.z-p.z)||1;let x=p.x+(t.x-p.x)/n*(e.speed+e.role*.45)*(e.speed===0?0:1)*dt,z=p.z+(t.z-p.z)/n*(e.speed+e.role*.45)*(e.speed===0?0:1)*dt;
+      e.moving=false;let heading=null;
+      // Bots stop briefly to fire, like counter-strafing.
+      if(e.path.length&&clock>=(e.settleUntil||0)){const t=e.path[0],n=Math.hypot(t.x-p.x,t.z-p.z)||1;let x=p.x+(t.x-p.x)/n*(e.speed+e.role*.45)*(e.speed===0?0:1)*dt,z=p.z+(t.z-p.z)/n*(e.speed+e.role*.45)*(e.speed===0?0:1)*dt;
         for(const other of cs2.enemies){if(other===e)continue;const op=other.rig.group.position,sx=p.x-op.x,sz=p.z-op.z,gap=Math.hypot(sx,sz);if(gap>.01&&gap<2.3){x+=sx/gap*(2.3-gap)*dt;z+=sz/gap*(2.3-gap)*dt;}}
-        if(nav.clear(p,{x,z})){p.x=x;p.z=z;e.moving=true;}else e.plan=0;
+        if(nav.clear(p,{x,z})){heading=Math.atan2(x-p.x,z-p.z)+Math.PI;p.x=x;p.z=z;e.moving=true;}else e.plan=0;
       }
-      p.y=.5;e.rig.group.rotation.y=Math.atan2(dx,dz)+Math.PI;
+      p.y=.5;
+      // Bots only track the player they know about; otherwise they look where they walk.
+      if(sight||clock-e.seen<1.2||clock-(e.alert||-99)<1)turnTo(e.rig.group,Math.atan2(dx,dz)+Math.PI,dt);else if(heading!==null)turnTo(e.rig.group,heading,dt);
       if(e.reload>0){e.reload-=dt;if(e.reload<=0)e.ammo=8;continue;}
+      if(!sight&&e.ammo<4&&clock-e.seen>2){e.reload=1.8;continue;}
       if(sight&&dist<55&&e.reaction<=0&&e.shootCd<=0&&e.state!=='oslona'&&visible(e)){
         if(e.ammo<=0){e.reload=1.8;continue;}
-        e.ammo--;e.burst++;e.shootCd=e.burst<3?.3:1.3+e.role*.15;if(e.burst>=3)e.burst=0;
+        let chance=.7-dist/85+skill;
+        if(e.moving)chance*=.6;
+        chance*=1-Math.min(.45,playerSpeed/12*.5);
+        if(e.burst>0)chance*=.8;
+        if(clock-(e.engaged||-99)<.8)chance*=.75;
+        chance=Math.max(.08,Math.min(.8,chance));
+        e.ammo--;e.burst++;e.shootCd=e.burst<3?.3:1.3+e.role*.15;if(e.burst>=3)e.burst=0;e.settleUntil=clock+.22;
         const from=new THREE.Vector3(p.x,2.8,p.z),end=target.clone();end.y+=2;
-        const hit=Math.random()<Math.max(.12,.65-dist/95);if(!hit){end.x+=(e.id%2?1:-1)*2;end.y+=1;}
+        const hit=Math.random()<chance;if(!hit){end.x+=(Math.random()-.5)*4;end.z+=(Math.random()-.5)*4;end.y+=Math.random()*1.5;}
         window.BloxGame.tracer(from,end,0xffa46b);e.flashUntil=clock+.07;
-        if(hit&&clock>cs2.spawnShieldUntil){cs2.hp-=cs2.boughtKevlar?5:8;if(cs2.hp<=0){cs2.hp=100;cs2.money=Math.max(0,cs2.money-200);cs2.boughtKevlar=false;cs2.reloading=false;cs2.spawnShieldUntil=clock+2.5;playerGroup.position.set(-70,1.5,-70);addKillFeed('Powrót do bazy · -$200','#ffb08e');}playerHP=cs2.hp;updateIngameHUD();updateWeaponHUD();}
+        if(hit&&clock>cs2.spawnShieldUntil){const head=Math.random()<.06+skill*.3;cs2.hp-=Math.round((cs2.boughtKevlar?5:8)*(head?2.2:1));if(cs2.hp<=0){cs2.hp=100;cs2.money=Math.max(0,cs2.money-200);cs2.boughtKevlar=false;cs2.reloading=false;cs2.spawnShieldUntil=clock+2.5;playerGroup.position.set(-70,1.5,-70);addKillFeed('Powrót do bazy · -$200','#ffb08e');}playerHP=cs2.hp;updateIngameHUD();updateWeaponHUD();}
       }
     }
   }
