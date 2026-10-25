@@ -1,0 +1,16 @@
+name = "bloxweb-ai"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Workers AI binding: the model runs on Cloudflare's servers, no API key in BloxWeb.
+[ai]
+binding = "AI"
+
+[vars]
+# Cheaper model = more free answers per day. Alternatives:
+# "@cf/qwen/qwen2.5-coder-32b-instruct" (better code, fewer answers per day)
+MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
+
+# The shared secret is NOT stored here. Set it once with:
+#   npx wrangler secret put BLOX_KEY
+# and give the same value to Render as BLOX_AI_KEY.

@@ -197,4 +197,4 @@ def test_room_create_join_chat_and_join_friend(client):
 
 
 def test_health_reports_version(client):
-    assert client.get("/health").json()["version"] == 16
+    assert client.get("/health").json()["version"] == 17

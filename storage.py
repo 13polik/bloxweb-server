@@ -85,6 +85,14 @@ def open_database(data):
      token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), created REAL NOT NULL);
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS friends_b ON friends(b);
+    CREATE TABLE IF NOT EXISTS published_games(
+     id TEXT PRIMARY KEY, author TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL,
+     description TEXT NOT NULL, data TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL,
+     plays INTEGER NOT NULL DEFAULT 0, reports INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS published_games_author ON published_games(author);
+    CREATE TABLE IF NOT EXISTS game_reports(
+     game_id TEXT NOT NULL REFERENCES published_games(id), reporter TEXT NOT NULL REFERENCES users(id),
+     reason TEXT NOT NULL, created REAL NOT NULL, PRIMARY KEY(game_id,reporter));
     """)
     columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
     for column in ("login", "password_hash", "progress"):

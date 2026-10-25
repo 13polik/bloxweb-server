@@ -7906,7 +7906,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     actions.push({seq:++sequence,kind,...payload});
     if(!syncing){clearTimeout(pollTimer);pollTimer=setTimeout(poll,5);}
   }
-  window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,frame:interpolate,
+  window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,frame:interpolate,api,connect,
     get state(){return {connected,id:onlineId(),room:room?{code:room.code,game:room.game,players:room.players,phase:room.phase,wave:room.wave,hp:room.hp,gold:room.gold,kills:room.kills,enemies:room.enemies,turrets:room.turrets,revision:room.revision,owner:room.owner}:null,social,latency,pending:actions.length};}};
   const soloCD=updateCastleDefense,soloCS=updateCS2,soloShot=shootCS2,soloReload=reloadCS2,soloSwitch=switchCS2Weapon,soloBuy=buyCS2Item;
   const previousRemoteUpdate=updateRemotePlayer3D,previousRemoteRemove=removeRemotePlayer3D;
@@ -11073,6 +11073,1309 @@ body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);
   addEventListener('keyup',e=>{if(e.code==='Tab'&&inCs()){e.preventDefault();toggleBoard(false);}},true);
   const card=defaultGames.find(g=>g.id==='cs2');
   if(card)card.desc='Rundy jak w CS 1.6: antyterroryści przeciw terrorystom, freeze time, zegar 1:55 i ekonomia za wygrane i przegrane. Wygrywa drużyna, która pierwsza zdobędzie 4 rundy. Nóż, sloty broni 1/2/3, Q, sklep pod B i tabela wyników pod Tab. Online: kooperacja przeciw botom.';
+})();
+</script>
+<script type="text/plain" id="nexusReference">
+# NexusScript 1.0 – język gier 3D w BloxWeb Studio
+
+NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
+
+## Świat i jednostki
+- Oś X: lewo/prawo, oś Y: góra/dół (Y=0 to poziom gruntu), oś Z: przód/tył.
+- Gracz ma ok. 3,4 jednostki wzrostu i skacze na ok. 2,5 jednostki w górę. Skok w dal to ok. 6–7 jednostek.
+- Pozycja klocka to jego środek. `spawn("block", 0, 0, 0, 4, 1, 4)` tworzy płytę 4×1×4, której górna powierzchnia jest na Y=0,5.
+- Pod światem nie ma podłogi: kto spadnie poniżej najniższego klocka o 30 jednostek, traci życie i wraca do ostatniego checkpointu.
+- Limit: 600 klocków w grze.
+
+## Typy klocków
+- `"block"` – zwykły klocek, można po nim chodzić.
+- `"glass"` – półprzezroczysty klocek, można po nim chodzić.
+- `"lava"` – zabija po dotknięciu.
+- `"coin"` – moneta do zebrania (nie blokuje ruchu).
+- `"spawn"` – miejsce startu gracza (płyta). Powinien być dokładnie jeden.
+- `"finish"` – meta: dotknięcie wygrywa grę (jeśli skrypt nie używa `when touch` na mecie inaczej).
+- `"checkpoint"` – płyta zapisu: po śmierci gracz wraca na ostatni dotknięty checkpoint.
+- `"spring"` – trampolina, wybija gracza wysoko.
+- `"enemy"` – wróg: goni gracza w promieniu 18 jednostek i zadaje 25 obrażeń.
+
+## Składnia
+- Komentarze: `// do końca linii` oraz `/* blok */`.
+- Instrukcje oddziela się nową linią lub średnikiem.
+- Typy wartości: liczby (`3`, `2.5`), teksty (`"Cześć"` lub `'Cześć'`), `true`, `false`, `null`, listy `[1, 2, 3]`.
+- Zmienne: `var punkty = 0`, potem `punkty = punkty + 1` albo `punkty += 1` (także `-=`, `*=`, `/=`).
+- Operatory: `+ - * / %`, porównania `== != < > <= >=`, logiczne `and or not`. Tekst + liczba skleja tekst.
+- Listy: `var l = [1, 2]`, `l[0]`, `l[1] = 5`, `push(l, 3)`, `len(l)`.
+- Warunki: `if x > 3 { ... } else if x == 3 { ... } else { ... }`
+- Pętle: `while warunek { ... }`, `repeat 5 { ... }`, `for i in range(0, 10) { ... }`, `for el in lista { ... }`, `break`, `continue`.
+- Funkcje: `func nazwa(a, b) { return a + b }`. Wywołanie: `nazwa(1, 2)`.
+- Klamry `{ }` są obowiązkowe. Nie ma średników na końcu bloków ani słowa `end`.
+
+## Zdarzenia (`when`)
+Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależnie, a `wait()` wstrzymuje tylko je.
+- `when start { ... }` – raz, na początku gry. Tu najlepiej budować świat.
+- `when every 2 { ... }` – co podaną liczbę sekund.
+- `when tick { ... }` – w każdej klatce; zmienna `dt` to czas klatki w sekundach. Używaj oszczędnie.
+- `when touch "Nazwa" { ... }` – gdy gracz dotknie klocka o tej nazwie (raz na każde wejście na klocek).
+- `when collect { ... }` – po zebraniu monety (`player.coins` to liczba zebranych).
+- `when key "E" { ... }` – po naciśnięciu klawisza (litera lub `"space"`). Na telefonie przycisk AKCJA działa jak `"E"`.
+- `when win { ... }` i `when die { ... }` – po wygranej i po utracie życia.
+
+## Funkcje świata
+- `spawn(typ, x, y, z, szer, wys, gleb, kolor, nazwa)` – tworzy klocek i zwraca jego nazwę. Domyślnie: rozmiar 4×1×4, kolor zależny od typu, nazwa automatyczna. Kolor jako `"#rrggbb"`.
+- `move(nazwa, x, y, z, sekundy)` – przesuwa klocek do pozycji (płynnie, jeśli podano sekundy; zdarzenie czeka do końca ruchu). Gracz stojący na klocku jedzie razem z nim.
+- `moveBy(nazwa, dx, dy, dz, sekundy)` – przesuwa o podany wektor.
+- `color(nazwa, "#rrggbb")`, `resize(nazwa, szer, wys, gleb)`, `spin(nazwa, stopnieNaSekunde)` (sam wygląd, kolizja się nie obraca).
+- `hide(nazwa)` / `show(nazwa)` – ukryty klocek nie blokuje i nie reaguje na dotyk. `remove(nazwa)` usuwa klocek.
+- `exists(nazwa)`, `getX(nazwa)`, `getY(nazwa)`, `getZ(nazwa)`.
+- `sky("#rrggbb")` – kolor nieba.
+
+## Gracz
+- Odczyt: `player.x`, `player.y`, `player.z`, `player.hp` (0–100), `player.coins`.
+- `teleport(x, y, z)`, `damage(ile)`, `heal(ile)`, `checkpoint(x, y, z)` (ustawia miejsce odrodzenia).
+- `setSpeed(4–16)`, `setJump(6–22)`, `setGravity(10–45)` – domyślnie 8, 12 i 30.
+- `win("tekst")` – wygrana, `lose("tekst")` – przegrana (koniec gry).
+
+## Interfejs i dźwięk
+- `say("tekst", sekundy)` – duży komunikat na środku ekranu (domyślnie 3 s).
+- `hint("tekst")` – stały napis u góry ekranu (pusty tekst go chowa).
+- `setScore(liczba)` / `addScore(liczba)` / `getScore()` – licznik punktów na ekranie.
+- `print(...)` – wypisuje do konsoli Studio (pomoc przy szukaniu błędów).
+- `sound("coin" | "jump" | "win" | "hit" | "beep")`.
+
+## Narzędzia
+- `wait(sekundy)` – pauza w bieżącym zdarzeniu.
+- `time()` – sekundy od startu gry.
+- `random(a, b)` – losowa liczba całkowita od a do b (z obu końcami). `random()` – ułamek 0–1.
+- `round(x)`, `floor(x)`, `ceil(x)`, `abs(x)`, `min(a, b)`, `max(a, b)`, `sqrt(x)`, `sin(stopnie)`, `cos(stopnie)`.
+- `text(x)`, `number("12")`, `len(lista_lub_tekst)`, `push(lista, x)`, `pop(lista)`, `contains(lista_lub_tekst, x)`, `range(od, do, krok)`.
+
+## Przykład: obby z ruchomą platformą i monetami
+```nexus
+// Plansza startowa i meta
+spawn("spawn", 0, 0, 0, 6, 1, 6)
+var z = 8
+repeat 6 {
+  spawn("block", random(-3, 3), 0, z, 4, 1, 4, "#4eae79")
+  spawn("coin", 0, 2, z)
+  z += 7
+}
+spawn("lava", 0, -1, 30, 30, 1, 60)
+spawn("block", 0, 0, z, 4, 1, 4, "#ffb23c", "Winda")
+spawn("finish", 0, 8, z + 8, 6, 1, 6)
+
+when start {
+  say("Zbierz monety i dotrzyj do mety!")
+  hint("Monety: 0")
+}
+
+when collect {
+  hint("Monety: " + player.coins)
+  sound("coin")
+}
+
+when every 4 {
+  move("Winda", 0, 8, z, 1.5)
+  wait(1)
+  move("Winda", 0, 0, z, 1.5)
+}
+
+when win {
+  say("Brawo! Monety: " + player.coins)
+}
+```
+
+## Zasady dla AI piszącego kod
+- Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
+- Używaj wyłącznie funkcji z tej listy. Każdy blok `when`, `if`, `while`, `repeat`, `for`, `func` musi mieć klamry `{ }`.
+- Zbuduj świat poleceniami `spawn` na początku programu lub w `when start`. Dodaj dokładnie jeden `"spawn"` i zwykle jeden `"finish"`.
+- Odległości między platformami do skoku: najwyżej 6 jednostek w poziomie i 2 w pionie.
+- Teksty dla gracza pisz po polsku. Gry muszą być odpowiednie dla dzieci.
+</script>
+<script id="nexus-core">
+// NexusScript 1.0: tokenizer, parser and a sandboxed, time-sliced interpreter.
+// Programs only reach the game through the whitelisted `api` object; there is no eval and no DOM access.
+(() => {
+  'use strict';
+  class NexusError extends Error{constructor(message,line){super(message);this.line=line||0;}}
+  const KEYWORDS=new Set(['var','func','return','if','else','while','repeat','for','in','break','continue','when','and','or','not','true','false','null']);
+  const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die']);
+  const ARG_EVENTS=new Set(['every','touch','key']);
+  const MAX_SOURCE=20000,MAX_LIST=10000,MAX_TEXT=10000,MAX_DEPTH=150,MAX_THREADS=64,SLICE=3000,FRAME_BUDGET=30000;
+
+  function lex(src){
+    const out=[],n=src.length;let i=0,line=1;
+    const push=(type,value)=>out.push({type,value,line});
+    while(i<n){
+      const c=src[i];
+      if(c==='\n'){push('nl');line++;i++;continue;}
+      if(c===' '||c==='\t'||c==='\r'||c==='﻿'){i++;continue;}
+      if(c==='/'&&src[i+1]==='/'){while(i<n&&src[i]!=='\n')i++;continue;}
+      if(c==='/'&&src[i+1]==='*'){const start=line;i+=2;while(i<n&&!(src[i]==='*'&&src[i+1]==='/')){if(src[i]==='\n')line++;i++;}if(i>=n)throw new NexusError('Niezamknięty komentarz /* … */',start);i+=2;continue;}
+      if(/[0-9]/.test(c)||(c==='.'&&/[0-9]/.test(src[i+1]||''))){let j=i;while(j<n&&/[0-9.]/.test(src[j]))j++;const t=src.slice(i,j);if((t.match(/\./g)||[]).length>1)throw new NexusError('Nieprawidłowa liczba „'+t+'”',line);push('num',parseFloat(t));i=j;continue;}
+      if(c==='"'||c==="'"){let j=i+1,s='';while(j<n&&src[j]!==c){if(src[j]==='\n')throw new NexusError('Niezamknięty tekst – brakuje '+c,line);if(src[j]==='\\'&&j+1<n){const e=src[j+1];s+=e==='n'?'\n':e==='t'?'\t':e;j+=2;continue;}s+=src[j++];}if(j>=n)throw new NexusError('Niezamknięty tekst – brakuje '+c,line);push('str',s);i=j+1;continue;}
+      if(/[\p{L}_]/u.test(c)){let j=i;while(j<n&&/[\p{L}\p{N}_]/u.test(src[j]))j++;const w=src.slice(i,j);push(KEYWORDS.has(w)?w:'id',w);i=j;continue;}
+      const two=src.slice(i,i+2);
+      if(two==='&&'){push('and','and');i+=2;continue;}
+      if(two==='||'){push('or','or');i+=2;continue;}
+      if(['==','!=','<=','>=','+=','-=','*=','/='].includes(two)){push('op',two);i+=2;continue;}
+      if(c==='!'){push('not','not');i++;continue;}
+      if('+-*/%<>=(){}[],.;'.includes(c)){push('op',c);i++;continue;}
+      throw new NexusError('Nieznany znak „'+c+'”',line);
+    }
+    push('eof');return out;
+  }
+
+  function parse(src){
+    src=String(src??'');
+    if(src.length>MAX_SOURCE)throw new NexusError('Kod jest za długi (limit 20 000 znaków)',1);
+    const t=lex(src);let p=0;
+    const peek=(k=0)=>t[Math.min(p+k,t.length-1)];
+    const next=()=>t[p++];
+    const isOp=v=>peek().type==='op'&&peek().value===v;
+    const desc=k=>k.type==='eof'?'koniec kodu':k.type==='nl'?'koniec linii':k.type==='str'?'tekst':k.type==='num'?'liczba '+k.value:'„'+k.value+'”';
+    const eat=v=>{if(isOp(v)){p++;return true;}return false;};
+    const expect=(v,what)=>{if(!eat(v))throw new NexusError('Brakuje „'+v+'”'+(what?' '+what:'')+' (jest: '+desc(peek())+')',peek().line);};
+    const skipLines=()=>{while(peek().type==='nl')p++;};
+    const skipSep=()=>{while(peek().type==='nl'||isOp(';'))p++;};
+    const ident=what=>{const k=next();if(k.type!=='id')throw new NexusError('Oczekiwano nazwy'+(what?' '+what:'')+' (jest: '+desc(k)+')',k.line);return k.value;};
+    const endOf=()=>{const k=peek();if(k.type==='nl'||k.type==='eof'||isOp(';')||isOp('}'))return;throw new NexusError('Oczekiwano końca instrukcji, a jest '+desc(k)+'. Każda instrukcja w osobnej linii.',k.line);};
+    function block(){
+      skipLines();expect('{','na początku bloku');const body=[];skipSep();
+      while(!isOp('}')){if(peek().type==='eof')throw new NexusError('Brakuje „}” zamykającego blok',peek().line);body.push(statement(false));endOf();skipSep();}
+      p++;return body;
+    }
+    function statement(top){
+      const k=peek(),line=k.line;
+      switch(k.type){
+        case 'var':{p++;const name=ident('zmiennej');let value=null;if(eat('='))value=expr();return{k:'var',name,value,line};}
+        case 'func':{p++;if(!top)throw new NexusError('Funkcje (func) definiuj poza innymi blokami',line);const name=ident('funkcji');if(BUILTIN_NAMES.has(name))throw new NexusError('„'+name+'” to wbudowana funkcja – wybierz inną nazwę',line);expect('(');const params=[];skipLines();if(!isOp(')')){do{skipLines();params.push(ident('parametru'));skipLines();}while(eat(','));}expect(')');return{k:'func',name,params,body:block(),line};}
+        case 'return':{p++;const n=peek();const value=(n.type==='nl'||n.type==='eof'||isOp('}')||isOp(';'))?null:expr();return{k:'return',value,line};}
+        case 'if':{p++;const cond=expr();const then=block();let other=null;const save=p;skipLines();if(peek().type==='else'){p++;other=peek().type==='if'?[statement(false)]:block();}else p=save;return{k:'if',cond,then,other,line};}
+        case 'while':{p++;const cond=expr();return{k:'while',cond,body:block(),line};}
+        case 'repeat':{p++;const count=expr();return{k:'repeat',count,body:block(),line};}
+        case 'for':{p++;const name=ident('zmiennej pętli');if(peek().type!=='in')throw new NexusError('Brakuje „in” w pętli for (np. for i in range(0, 5) { … })',line);p++;const list=expr();return{k:'for',name,list,body:block(),line};}
+        case 'break':p++;return{k:'break',line};
+        case 'continue':p++;return{k:'continue',line};
+        case 'when':{
+          p++;if(!top)throw new NexusError('Zdarzenia (when) definiuj poza innymi blokami',line);
+          const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die',line);
+          const arg=ARG_EVENTS.has(n.value)?expr():null;return{k:'when',event:n.value,arg,body:block(),line};
+        }
+        case 'else':throw new NexusError('„else” bez pasującego „if”',line);
+        default:{
+          const target=expr();
+          if(peek().type==='op'&&['=','+=','-=','*=','/='].includes(peek().value)){
+            const op=next().value;if(target.k!=='name'&&target.k!=='index')throw new NexusError('Tu nie można przypisać wartości',line);
+            return{k:'assign',target,op,value:expr(),line};
+          }
+          if(target.k!=='call')throw new NexusError('Ta linia nic nie robi – brakuje wywołania funkcji lub przypisania',line);
+          return{k:'expr',expr:target,line};
+        }
+      }
+    }
+    function expr(){return or();}
+    function or(){let l=and();while(peek().type==='or'){const line=next().line;l={k:'or',l,r:and(),line};}return l;}
+    function and(){let l=not();while(peek().type==='and'){const line=next().line;l={k:'and',l,r:not(),line};}return l;}
+    function not(){if(peek().type==='not'){const line=next().line;return{k:'not',e:not(),line};}return cmp();}
+    function cmp(){let l=add();while(peek().type==='op'&&['==','!=','<','>','<=','>='].includes(peek().value)){const k=next();l={k:'bin',op:k.value,l,r:add(),line:k.line};}return l;}
+    function add(){let l=mul();while(isOp('+')||isOp('-')){const k=next();l={k:'bin',op:k.value,l,r:mul(),line:k.line};}return l;}
+    function mul(){let l=unary();while(isOp('*')||isOp('/')||isOp('%')){const k=next();l={k:'bin',op:k.value,l,r:unary(),line:k.line};}return l;}
+    function unary(){if(isOp('-')){const line=next().line;return{k:'neg',e:unary(),line};}return postfix();}
+    function postfix(){
+      let e=primary();
+      for(;;){
+        if(isOp('(')){const line=next().line;const args=[];skipLines();if(!isOp(')')){do{skipLines();args.push(expr());skipLines();}while(eat(','));}expect(')','po argumentach funkcji');e={k:'call',callee:e,args,line};}
+        else if(isOp('[')){const line=next().line;const index=expr();expect(']');e={k:'index',obj:e,index,line};}
+        else if(isOp('.')){const line=next().line;e={k:'member',obj:e,name:ident('pola'),line};}
+        else return e;
+      }
+    }
+    function primary(){
+      const k=next();
+      switch(k.type){
+        case 'num':case 'str':return{k:'lit',v:k.value,line:k.line};
+        case 'true':return{k:'lit',v:true,line:k.line};
+        case 'false':return{k:'lit',v:false,line:k.line};
+        case 'null':return{k:'lit',v:null,line:k.line};
+        case 'id':return{k:'name',name:k.value,line:k.line};
+        case 'op':
+          if(k.value==='('){skipLines();const e=expr();skipLines();expect(')');return e;}
+          if(k.value==='['){const items=[];skipLines();if(!isOp(']')){do{skipLines();if(isOp(']'))break;items.push(expr());skipLines();}while(eat(','));}expect(']','na końcu listy');return{k:'list',items,line:k.line};}
+      }
+      throw new NexusError('Nieoczekiwane: '+desc(k),k.line);
+    }
+    const body=[];skipSep();
+    while(peek().type!=='eof'){body.push(statement(true));endOf();skipSep();}
+    return body;
+  }
+
+  // ---------- Runtime ----------
+  class Scope{
+    constructor(parent){this.parent=parent;this.vars=new Map();}
+    find(name){let s=this;while(s){if(s.vars.has(name))return s;s=s.parent;}return null;}
+  }
+  class Wait{constructor(seconds){this.seconds=seconds;}}
+  class Return{constructor(value){this.value=value;}}
+  const BREAK={b:1},CONTINUE={c:1},SLICED={s:1},PLAYER=Object.freeze({__player:true});
+  const typeName=v=>v===null||v===undefined?'null':Array.isArray(v)?'lista':v===PLAYER?'player':typeof v==='number'?'liczba':typeof v==='string'?'tekst':typeof v==='boolean'?'prawda/fałsz':'wartość';
+  const truthy=v=>!(v===false||v===null||v===undefined||v===0||v==='');
+  function show(v){
+    if(v===null||v===undefined)return 'null';
+    if(typeof v==='number')return Number.isInteger(v)?String(v):String(Math.round(v*1000)/1000);
+    if(typeof v==='boolean')return v?'true':'false';
+    if(Array.isArray(v))return '['+v.slice(0,50).map(show).join(', ')+(v.length>50?', …':'')+']';
+    if(v===PLAYER)return 'player';
+    return String(v);
+  }
+  const BUILTIN_NAMES=new Set(['spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
+
+  class Runtime{
+    constructor(source,api,options={}){
+      this.api=api;this.options=options;this.errors=[];this.threads=[];this.funcs=new Map();this.handlers=[];this.time=0;this.depth=0;this.budget=0;this.frameSteps=0;
+      this.globals=new Scope(null);this.globals.vars.set('player',PLAYER);
+      this.ast=parse(source);
+      for(const s of this.ast){
+        if(s.k==='func'){if(this.funcs.has(s.name))throw new NexusError('Funkcja „'+s.name+'” jest zdefiniowana dwa razy',s.line);this.funcs.set(s.name,s);}
+        if(s.k==='when')this.handlers.push({event:s.event,argNode:s.arg,body:s.body,line:s.line,arg:undefined,next:0,running:0});
+      }
+      this.builtins=this.makeBuiltins();
+    }
+    error(message,line){
+      const e={message,line:line||0};this.errors.push(e);if(this.errors.length>50)this.errors.shift();
+      try{this.options.onError?.(e);}catch{}
+    }
+    start(){
+      this.spawn(this.execBlock(this.ast.filter(s=>s.k!=='func'&&s.k!=='when'),this.globals),'program');
+      this.started=false;
+    }
+    spawn(gen,label,handler){
+      if(this.threads.length>=MAX_THREADS){if(!this.warnedThreads){this.warnedThreads=true;this.error('Za dużo jednocześnie działających zdarzeń (limit 64). Dodaj wait() lub uprość kod.');}return;}
+      const th={gen,label,waitUntil:0,handler};if(handler)handler.running++;this.threads.push(th);
+    }
+    // Handler arguments ("every 2", touch "Nazwa") are evaluated once, after the main program ran.
+    argOf(h){
+      if(h.arg===undefined){
+        try{h.arg=h.argNode?this.evalNow(h.argNode,this.globals):null;}catch(e){h.arg=null;h.broken=true;this.error(e.message,e.line||h.line);}
+        if(h.event==='every'&&!(typeof h.arg==='number'&&h.arg>0)){if(!h.broken)this.error('when every wymaga liczby sekund większej od 0',h.line);h.broken=true;}
+        if(h.event==='every')h.next=this.time+Math.max(.05,h.arg||1);
+        if(h.event==='key'&&typeof h.arg==='string')h.arg=h.arg.trim().toUpperCase();
+      }
+      return h.arg;
+    }
+    evalNow(node,scope){
+      const g=this.eval(node,scope);this.budget=1e6;let r=g.next();
+      if(!r.done)throw new NexusError('Tu nie można używać wait()',node.line);
+      return r.value;
+    }
+    fire(event,value){
+      for(const h of this.handlers){
+        if(h.event!==event||h.broken)continue;
+        const arg=this.argOf(h);
+        if(event==='touch'&&arg!==value)continue;
+        if(event==='key'&&arg!==String(value).toUpperCase())continue;
+        if((event==='tick'||event==='every')&&h.running>0)continue;
+        const scope=new Scope(this.globals);
+        if(event==='tick')scope.vars.set('dt',value);
+        this.spawn(this.execBlock(h.body,scope),event,h);
+      }
+    }
+    update(dt){
+      this.time+=dt;this.frameSteps=0;
+      if(!this.started&&this.threads.every(t=>t.label!=='program')){this.started=true;this.fire('start');}
+      for(const h of this.handlers)if(h.event==='every'&&!h.broken){this.argOf(h);if(!h.broken&&this.time>=h.next){h.next=Math.max(h.next+h.arg,this.time);this.fire('every');}}
+      if(this.handlers.some(h=>h.event==='tick'))this.fire('tick',dt);
+      const list=this.threads.slice();
+      for(const th of list){
+        if(this.frameSteps>=FRAME_BUDGET)break;
+        if(th.waitUntil>this.time)continue;
+        this.budget=SLICE;this.depth=0;let r;
+        try{
+          r=th.gen.next();
+          while(!r.done&&r.value!==SLICED&&!(r.value instanceof Wait))r=th.gen.next();
+        }catch(e){
+          r={done:true};
+          if(e instanceof Return){}
+          else if(e===BREAK||e===CONTINUE)this.error((e===BREAK?'break':'continue')+' poza pętlą',this.line);
+          else if(e instanceof NexusError)this.error(e.message,e.line||this.line);
+          else{this.error('Błąd wykonania: '+(e&&e.message||e),this.line);}
+        }
+        if(r.done){this.threads.splice(this.threads.indexOf(th),1);if(th.handler)th.handler.running--;}
+        else if(r.value instanceof Wait)th.waitUntil=this.time+r.value.seconds;
+      }
+    }
+    *tickStep(line){
+      this.line=line;this.frameSteps++;
+      if(--this.budget<=0){yield SLICED;this.budget=SLICE;}
+    }
+    *execBlock(body,scope){for(const s of body)yield* this.exec(s,scope);}
+    *exec(s,scope){
+      yield* this.tickStep(s.line);
+      switch(s.k){
+        case 'var':{const v=s.value?yield* this.eval(s.value,scope):null;scope.vars.set(s.name,v);return;}
+        case 'func':case 'when':return;
+        case 'expr':yield* this.eval(s.expr,scope);return;
+        case 'assign':{
+          let v=yield* this.eval(s.value,scope);
+          if(s.target.k==='name'){
+            const name=s.target.name;if(name==='player')throw new NexusError('Nie można nadpisać „player”',s.line);
+            const owner=scope.find(name);
+            if(s.op!=='='){if(!owner)throw new NexusError('Nieznana zmienna „'+name+'”',s.line);v=this.arith(s.op[0],owner.vars.get(name),v,s.line);}
+            // Assigning an unknown name creates it in the nearest function or global scope.
+            let target=owner;if(!target){target=scope;while(target.parent&&!target.fn)target=target.parent;}
+            target.vars.set(name,v);return;
+          }
+          const list=yield* this.eval(s.target.obj,scope),index=yield* this.eval(s.target.index,scope);
+          if(!Array.isArray(list))throw new NexusError('Indeks [ ] działa tylko na listach',s.line);
+          const i=this.index(list,index,s.line,true);
+          list[i]=s.op==='='?v:this.arith(s.op[0],list[i],v,s.line);return;
+        }
+        case 'if':
+          if(truthy(yield* this.eval(s.cond,scope)))yield* this.execBlock(s.then,new Scope(scope));
+          else if(s.other)yield* this.execBlock(s.other,new Scope(scope));
+          return;
+        case 'while':
+          while(truthy(yield* this.eval(s.cond,scope))){
+            try{yield* this.execBlock(s.body,new Scope(scope));}catch(e){if(e===BREAK)break;if(e===CONTINUE)continue;throw e;}
+            yield* this.tickStep(s.line);
+          }
+          return;
+        case 'repeat':{
+          const n=yield* this.eval(s.count,scope);if(typeof n!=='number')throw new NexusError('repeat wymaga liczby',s.line);
+          for(let i=0;i<Math.floor(n);i++){
+            try{yield* this.execBlock(s.body,new Scope(scope));}catch(e){if(e===BREAK)break;if(e===CONTINUE)continue;throw e;}
+            yield* this.tickStep(s.line);
+          }
+          return;
+        }
+        case 'for':{
+          let list=yield* this.eval(s.list,scope);
+          if(typeof list==='string')list=[...list];
+          if(!Array.isArray(list))throw new NexusError('for … in wymaga listy lub range(…)',s.line);
+          for(const item of list.slice()){
+            const inner=new Scope(scope);inner.vars.set(s.name,item);
+            try{yield* this.execBlock(s.body,inner);}catch(e){if(e===BREAK)break;if(e===CONTINUE)continue;throw e;}
+            yield* this.tickStep(s.line);
+          }
+          return;
+        }
+        case 'return':throw new Return(s.value?yield* this.eval(s.value,scope):null);
+        case 'break':throw BREAK;
+        case 'continue':throw CONTINUE;
+      }
+    }
+    index(list,index,line,write){
+      if(typeof index!=='number'||!Number.isInteger(index))throw new NexusError('Indeks musi być liczbą całkowitą',line);
+      if(index<0||index>=list.length)throw new NexusError('Indeks '+index+' poza listą (długość '+list.length+')',line);
+      return index;
+    }
+    arith(op,l,r,line){
+      if(op==='+'){
+        if(typeof l==='string'||typeof r==='string'){const s=show(l)+show(r);if(s.length>MAX_TEXT)throw new NexusError('Tekst jest za długi',line);return s;}
+        if(Array.isArray(l)&&Array.isArray(r)){if(l.length+r.length>MAX_LIST)throw new NexusError('Lista jest za długa',line);return l.concat(r);}
+      }
+      if(typeof l!=='number'||typeof r!=='number')throw new NexusError('Działanie „'+op+'” wymaga liczb (jest: '+typeName(l)+' i '+typeName(r)+')',line);
+      switch(op){
+        case '+':return l+r;case '-':return l-r;case '*':return l*r;
+        case '/':if(r===0)throw new NexusError('Dzielenie przez zero',line);return l/r;
+        case '%':if(r===0)throw new NexusError('Dzielenie przez zero',line);return ((l%r)+r)%r;
+      }
+    }
+    *eval(e,scope){
+      switch(e.k){
+        case 'lit':return e.v;
+        case 'list':{const out=[];for(const it of e.items)out.push(yield* this.eval(it,scope));return out;}
+        case 'name':{const owner=scope.find(e.name);if(!owner){if(this.funcs.has(e.name)||BUILTIN_NAMES.has(e.name))throw new NexusError('„'+e.name+'” to funkcja – dodaj nawiasy ( )',e.line);throw new NexusError('Nieznana zmienna „'+e.name+'”',e.line);}return owner.vars.get(e.name);}
+        case 'or':{const l=yield* this.eval(e.l,scope);return truthy(l)?true:truthy(yield* this.eval(e.r,scope));}
+        case 'and':{const l=yield* this.eval(e.l,scope);return truthy(l)?truthy(yield* this.eval(e.r,scope)):false;}
+        case 'not':return !truthy(yield* this.eval(e.e,scope));
+        case 'neg':{const v=yield* this.eval(e.e,scope);if(typeof v!=='number')throw new NexusError('Minus działa tylko na liczbach',e.line);return -v;}
+        case 'bin':{
+          const l=yield* this.eval(e.l,scope),r=yield* this.eval(e.r,scope);
+          switch(e.op){
+            case '==':return l===r||(l==null&&r==null);case '!=':return !(l===r||(l==null&&r==null));
+            case '<':case '>':case '<=':case '>=':{
+              if(!((typeof l==='number'&&typeof r==='number')||(typeof l==='string'&&typeof r==='string')))throw new NexusError('Porównanie „'+e.op+'” wymaga dwóch liczb lub dwóch tekstów',e.line);
+              return e.op==='<'?l<r:e.op==='>'?l>r:e.op==='<='?l<=r:l>=r;
+            }
+            default:return this.arith(e.op,l,r,e.line);
+          }
+        }
+        case 'index':{
+          const obj=yield* this.eval(e.obj,scope),i=yield* this.eval(e.index,scope);
+          if(typeof obj==='string')return obj[this.index(obj,i,e.line)];
+          if(!Array.isArray(obj))throw new NexusError('Indeks [ ] działa tylko na listach i tekstach',e.line);
+          return obj[this.index(obj,i,e.line)];
+        }
+        case 'member':{
+          const obj=yield* this.eval(e.obj,scope);
+          if(obj===PLAYER){if(!['x','y','z','hp','coins'].includes(e.name))throw new NexusError('player ma tylko pola x, y, z, hp i coins',e.line);return this.api.playerGet(e.name);}
+          throw new NexusError('Kropka działa tylko z player (np. player.x)',e.line);
+        }
+        case 'call':{
+          if(e.callee.k!=='name')throw new NexusError('Można wywoływać tylko funkcje po nazwie',e.line);
+          const name=e.callee.name,args=[];
+          for(const a of e.args)args.push(yield* this.eval(a,scope));
+          if(this.funcs.has(name)){
+            const f=this.funcs.get(name);
+            if(this.depth>=MAX_DEPTH)throw new NexusError('Za głęboka rekurencja w „'+name+'”',e.line);
+            const inner=new Scope(this.globals);inner.fn=true;f.params.forEach((pn,i)=>inner.vars.set(pn,args[i]??null));
+            this.depth++;
+            try{yield* this.execBlock(f.body,inner);}
+            catch(x){if(x instanceof Return)return x.value;if(x===BREAK||x===CONTINUE)throw new NexusError((x===BREAK?'break':'continue')+' poza pętlą',e.line);throw x;}
+            finally{this.depth--;}
+            return null;
+          }
+          const fn=this.builtins[name];
+          if(!fn)throw new NexusError('Nieznana funkcja „'+name+'”',e.line);
+          this.line=e.line;
+          const result=fn(args,e.line);
+          if(result instanceof Wait){if(result.seconds>0)yield result;return null;}
+          return result===undefined?null:result;
+        }
+      }
+      throw new NexusError('Nieznane wyrażenie',e.line);
+    }
+    makeBuiltins(){
+      const api=this.api,rt=this;
+      const num=(v,fn,i,def)=>{if(v===undefined||v===null){if(def!==undefined)return def;throw new NexusError(fn+': brakuje argumentu nr '+(i+1),rt.line);}if(typeof v!=='number'||!isFinite(v))throw new NexusError(fn+': argument nr '+(i+1)+' musi być liczbą (jest: '+typeName(v)+')',rt.line);return v;};
+      const str=(v,fn,i,def)=>{if(v===undefined||v===null){if(def!==undefined)return def;throw new NexusError(fn+': brakuje argumentu nr '+(i+1),rt.line);}if(typeof v!=='string')throw new NexusError(fn+': argument nr '+(i+1)+' musi być tekstem w cudzysłowie',rt.line);return v;};
+      const color=(v,fn,i,def)=>{const c=str(v,fn,i,def);if(c&&!/^#[0-9a-fA-F]{6}$/.test(c))throw new NexusError(fn+': kolor zapisz jako "#rrggbb", np. "#ff8800"',rt.line);return c;};
+      const part=(v,fn)=>{const n=str(v,fn,0);if(!api.exists(n))throw new NexusError(fn+': nie ma klocka „'+n+'”',rt.line);return n;};
+      const list=(v,fn)=>{if(!Array.isArray(v))throw new NexusError(fn+': pierwszy argument musi być listą',rt.line);return v;};
+      return {
+        spawn:a=>{const type=str(a[0],'spawn',0);if(!['block','lava','coin','spawn','finish','checkpoint','spring','enemy','glass'].includes(type))throw new NexusError('spawn: nieznany typ „'+type+'”. Dostępne: block, glass, lava, coin, spawn, finish, checkpoint, spring, enemy',rt.line);
+          const name=a[8]==null?null:str(a[8],'spawn',8);
+          const r=api.spawn(type,num(a[1],'spawn',1,0),num(a[2],'spawn',2,0),num(a[3],'spawn',3,0),num(a[4],'spawn',4,type==='coin'?1:4),num(a[5],'spawn',5,1),num(a[6],'spawn',6,type==='coin'?1:4),color(a[7],'spawn',7,''),name);
+          if(r==null)throw new NexusError('spawn: osiągnięto limit 600 klocków',rt.line);return r;},
+        move:a=>{const n=part(a[0],'move');const s=Math.max(0,num(a[4],'move',4,0));api.move(n,num(a[1],'move',1),num(a[2],'move',2),num(a[3],'move',3),s);return new Wait(s);},
+        moveBy:a=>{const n=part(a[0],'moveBy');const pos=api.getPos(n),s=Math.max(0,num(a[4],'moveBy',4,0));api.move(n,pos[0]+num(a[1],'moveBy',1),pos[1]+num(a[2],'moveBy',2),pos[2]+num(a[3],'moveBy',3),s);return new Wait(s);},
+        color:a=>{api.color(part(a[0],'color'),color(a[1],'color',1));},
+        resize:a=>{api.resize(part(a[0],'resize'),Math.max(.2,num(a[1],'resize',1)),Math.max(.2,num(a[2],'resize',2)),Math.max(.2,num(a[3],'resize',3)));},
+        spin:a=>{api.spin(part(a[0],'spin'),num(a[1],'spin',1));},
+        hide:a=>{api.visible(part(a[0],'hide'),false);},
+        show:a=>{api.visible(part(a[0],'show'),true);},
+        remove:a=>{api.remove(part(a[0],'remove'));},
+        exists:a=>api.exists(str(a[0],'exists',0)),
+        getX:a=>api.getPos(part(a[0],'getX'))[0],getY:a=>api.getPos(part(a[0],'getY'))[1],getZ:a=>api.getPos(part(a[0],'getZ'))[2],
+        sky:a=>{api.sky(color(a[0],'sky',0));},
+        teleport:a=>{api.teleport(num(a[0],'teleport',0),num(a[1],'teleport',1),num(a[2],'teleport',2));},
+        damage:a=>{api.damage(num(a[0],'damage',0));},
+        heal:a=>{api.heal(num(a[0],'heal',0));},
+        checkpoint:a=>{api.checkpoint(num(a[0],'checkpoint',0),num(a[1],'checkpoint',1),num(a[2],'checkpoint',2));},
+        setSpeed:a=>{api.setStat('speed',num(a[0],'setSpeed',0));},
+        setJump:a=>{api.setStat('jump',num(a[0],'setJump',0));},
+        setGravity:a=>{api.setStat('gravity',num(a[0],'setGravity',0));},
+        win:a=>{api.win(a[0]==null?'':show(a[0]));},
+        lose:a=>{api.lose(a[0]==null?'':show(a[0]));},
+        say:a=>{api.say(show(a[0]??''),Math.max(.5,Math.min(30,num(a[1],'say',1,3))));},
+        hint:a=>{api.hint(show(a[0]??''));},
+        setScore:a=>{api.setScore(num(a[0],'setScore',0));},
+        addScore:a=>{api.setScore(api.getScore()+num(a[0],'addScore',0,1));},
+        getScore:()=>api.getScore(),
+        print:a=>{api.print(a.map(show).join(' '));},
+        sound:a=>{api.sound(str(a[0],'sound',0));},
+        wait:a=>new Wait(Math.max(0,Math.min(3600,num(a[0],'wait',0,0)))),
+        time:()=>Math.round(rt.time*1000)/1000,
+        random:a=>{if(a[0]==null)return Math.random();const lo=num(a[0],'random',0),hi=num(a[1],'random',1);if(Number.isInteger(lo)&&Number.isInteger(hi))return lo+Math.floor(Math.random()*(hi-lo+1));return lo+Math.random()*(hi-lo);},
+        round:a=>Math.round(num(a[0],'round',0)),floor:a=>Math.floor(num(a[0],'floor',0)),ceil:a=>Math.ceil(num(a[0],'ceil',0)),abs:a=>Math.abs(num(a[0],'abs',0)),
+        min:a=>Math.min(num(a[0],'min',0),num(a[1],'min',1)),max:a=>Math.max(num(a[0],'max',0),num(a[1],'max',1)),
+        sqrt:a=>{const v=num(a[0],'sqrt',0);if(v<0)throw new NexusError('sqrt: liczba nie może być ujemna',rt.line);return Math.sqrt(v);},
+        sin:a=>Math.sin(num(a[0],'sin',0)*Math.PI/180),cos:a=>Math.cos(num(a[0],'cos',0)*Math.PI/180),
+        text:a=>show(a[0]),
+        number:a=>{const v=typeof a[0]==='number'?a[0]:parseFloat(show(a[0]).replace(',','.'));return isFinite(v)?v:0;},
+        len:a=>{if(typeof a[0]==='string'||Array.isArray(a[0]))return a[0].length;throw new NexusError('len: wymaga listy lub tekstu',rt.line);},
+        push:a=>{const l=list(a[0],'push');if(l.length>=MAX_LIST)throw new NexusError('push: lista ma już 10 000 elementów',rt.line);l.push(a[1]??null);return l.length;},
+        pop:a=>{const l=list(a[0],'pop');return l.length?l.pop():null;},
+        contains:a=>typeof a[0]==='string'?a[0].includes(show(a[1])):list(a[0],'contains').includes(a[1]),
+        range:a=>{const from=num(a[0],'range',0),to=num(a[1],'range',1),step=num(a[2],'range',2,from<=to?1:-1);if(step===0)throw new NexusError('range: krok nie może być 0',rt.line);const out=[];for(let v=from;step>0?v<to:v>to;v+=step){out.push(v);if(out.length>MAX_LIST)throw new NexusError('range: za długi zakres (limit 10 000)',rt.line);}return out;},
+      };
+    }
+  }
+  // Pulls the program out of an AI answer: the first ``` block if there is one.
+  function extract(text){
+    const s=String(text||'');const m=s.match(/```[a-zA-Z]*[ \t]*\r?\n([\s\S]*?)```/);
+    return (m?m[1]:s).replace(/\r\n/g,'\n').trim()+'\n';
+  }
+  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,version:'1.0'};
+})();
+</script>
+<style id="nexus-engine-style">
+.nx-player{position:fixed;inset:0;z-index:950;background:#000;touch-action:none;user-select:none;-webkit-user-select:none;font-family:Inter,system-ui,sans-serif}
+.nx-player canvas{display:block;width:100%;height:100%}
+.nx-top{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+.nx-top button{pointer-events:auto}
+.nx-btn{min-height:40px;padding:8px 14px;border-radius:10px;border:1px solid #ffffff33;background:#0d1117d9;color:#fff;font:600 14px Inter,system-ui,sans-serif;cursor:pointer}
+.nx-btn.primary{background:#ff8a4c;color:#1b0f08;border-color:#ff8a4c}
+.nx-stats{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.nx-pill{padding:6px 12px;border-radius:999px;background:#0d1117cc;color:#fff;font:700 14px Inter,system-ui,sans-serif;white-space:nowrap}
+.nx-hp{width:150px;height:10px;border-radius:6px;background:#ffffff26;overflow:hidden}
+.nx-hp>i{display:block;height:100%;background:linear-gradient(90deg,#ff5a4a,#ffb23c);transition:width .2s}
+.nx-title{color:#fff;font:700 15px Inter,system-ui,sans-serif;text-shadow:0 1px 3px #000;align-self:center}
+.nx-hint{position:absolute;top:62px;left:50%;transform:translateX(-50%);padding:6px 14px;border-radius:8px;background:#0d1117c4;color:#ffe2a8;font:700 15px Inter,system-ui,sans-serif;pointer-events:none;max-width:90vw;text-align:center}
+.nx-say{position:absolute;top:28%;left:50%;transform:translateX(-50%);color:#fff;font:800 26px/1.25 Inter,system-ui,sans-serif;text-align:center;text-shadow:0 2px 6px #000,0 0 16px #000a;pointer-events:none;max-width:90vw;transition:opacity .25s;white-space:pre-line}
+.nx-result{position:absolute;inset:0;display:grid;place-items:center;background:#000a}
+.nx-result section{background:#141a22;border:1px solid #ffffff22;border-radius:14px;padding:22px;max-width:360px;width:calc(100% - 32px);color:#fff;text-align:center}
+.nx-result h2{margin:0 0 8px;font-size:22px}.nx-result p{color:#c8d0da;margin:0 0 16px;white-space:pre-line}
+.nx-result .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.nx-console{position:absolute;left:10px;bottom:10px;max-width:min(520px,calc(100vw - 20px));max-height:30vh;overflow:auto;padding:8px 10px;border-radius:8px;background:#200c0ce6;color:#ffb4a8;font:12px/1.4 ui-monospace,Consolas,monospace;pointer-events:auto}
+.nx-console b{color:#fff}
+.nx-joy{position:absolute;left:18px;bottom:18px;width:120px;height:120px;border-radius:50%;background:#ffffff1f;border:2px solid #ffffff40;touch-action:none}
+.nx-joy i{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:#00e691;box-shadow:0 2px 8px #0008}
+.nx-touch{position:absolute;right:18px;bottom:18px;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.nx-touch button{width:72px;height:72px;border-radius:50%;border:2px solid #ffffff55;background:#1f8f5fdd;color:#fff;font:800 13px Inter,system-ui,sans-serif;touch-action:none}
+.nx-touch button.act{width:58px;height:58px;background:#2d3a4ddd}
+body.nx-playing{overflow:hidden}
+@media (max-width:600px){.nx-say{font-size:20px}.nx-title{display:none}.nx-hp{width:110px}}
+</style>
+<script id="nexus-engine">
+// NexusGame: plays a Studio 3D project (parts + NexusScript) in its own renderer overlay.
+(() => {
+  'use strict';
+  const TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy'];
+  const DEFAULT_COLOR={block:'#4eae79',glass:'#9fd8ff',lava:'#ff5a2a',coin:'#f5c542',spawn:'#4a9eff',finish:'#ffffff',checkpoint:'#b47cff',spring:'#ff9d3c',enemy:'#e0383b'};
+  const SOLID=new Set(['block','glass','lava','spawn','finish','checkpoint','spring']);
+  const MAX_PARTS=600,STEP=1/60,PW=.8,PH=3.4;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
+  function texture(draw,size=64){const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;}
+  const checker=()=>texture((x,s)=>{for(let i=0;i<4;i++)for(let j=0;j<4;j++){x.fillStyle=(i+j)%2?'#111':'#fff';x.fillRect(i*s/4,j*s/4,s/4,s/4);}});
+  function material(type,color){
+    const c=new THREE.Color(color);
+    if(type==='glass')return new THREE.MeshLambertMaterial({color:c,transparent:true,opacity:.45});
+    if(type==='lava')return new THREE.MeshLambertMaterial({color:c,emissive:c.clone().multiplyScalar(.55)});
+    if(type==='coin')return new THREE.MeshPhongMaterial({color:c,emissive:0x5a3c00,shininess:90});
+    if(type==='finish')return new THREE.MeshLambertMaterial({map:checker()});
+    if(type==='enemy')return new THREE.MeshLambertMaterial({color:c,emissive:0x330000});
+    const map=typeof createStudsTexture==='function'?createStudsTexture(color):null;
+    return new THREE.MeshLambertMaterial(map?{map}:{color:c});
+  }
+  function buildMesh(part){
+    const [w,h,d]=part.size,g=new THREE.Group();
+    let body;
+    if(part.type==='coin'){body=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(.2,w/2),Math.max(.2,w/2),.18,20),material('coin',part.color));body.rotation.x=Math.PI/2;}
+    else{body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material(part.type,part.color));const map=body.material.map;if(map)map.repeat.set(Math.max(1,w/2),Math.max(1,d/2));}
+    g.add(body);
+    if(part.type==='checkpoint'){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,3,8),new THREE.MeshLambertMaterial({color:0xdddddd}));pole.position.set(-w/2+.3,h/2+1.5,0);const flag=new THREE.Mesh(new THREE.BoxGeometry(1.1,.7,.05),new THREE.MeshLambertMaterial({color:part.color}));flag.position.set(-w/2+.9,h/2+2.6,0);g.add(pole,flag);}
+    if(part.type==='spring'){for(let i=0;i<3;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(Math.min(w,d)*.3,.07,6,16),new THREE.MeshLambertMaterial({color:0xffe9b0}));ring.rotation.x=Math.PI/2;ring.position.y=h/2+.12+i*.18;g.add(ring);}}
+    if(part.type==='enemy'){const eye=new THREE.MeshBasicMaterial({color:0x111111});for(const s of[-1,1]){const e=new THREE.Mesh(new THREE.BoxGeometry(w*.18,h*.18,.05),eye);e.position.set(s*w*.22,h*.15,d/2+.03);g.add(e);}const brow=new THREE.Mesh(new THREE.BoxGeometry(w*.7,h*.08,.05),eye);brow.position.set(0,h*.33,d/2+.03);g.add(brow);}
+    if(part.type==='spawn'){const ring=new THREE.Mesh(new THREE.TorusGeometry(Math.min(w,d)*.35,.08,6,24),new THREE.MeshBasicMaterial({color:0xffffff}));ring.rotation.x=Math.PI/2;ring.position.y=h/2+.03;g.add(ring);}
+    g.position.set(...part.pos);g.rotation.y=(part.rot||0)*Math.PI/180;
+    return g;
+  }
+  function disposeTree(o){o.traverse(m=>{m.geometry?.dispose?.();const mats=Array.isArray(m.material)?m.material:m.material?[m.material]:[];for(const x of mats){x.map?.dispose?.();x.dispose?.();}});}
+  function normalizeParts(list){
+    const out=[];
+    for(const raw of Array.isArray(list)?list:[]){
+      if(!raw||!TYPES.includes(raw.t))continue;
+      const pos=(raw.p||[0,0,0]).map(v=>clamp(Number(v)||0,-500,500)),size=(raw.s||[4,1,4]).map(v=>clamp(Number(v)||1,.2,200));
+      out.push({type:raw.t,pos,size,color:/^#[0-9a-f]{6}$/i.test(raw.c||'')?raw.c:DEFAULT_COLOR[raw.t],name:raw.n||'',rot:Number(raw.r)||0});
+      if(out.length>=MAX_PARTS)break;
+    }
+    return out;
+  }
+  // Runs the script without a player to collect the parts it builds (editor preview).
+  function previewParts(project){
+    const parts=[];let errors=[];
+    const api={spawn:(type,x,y,z,w,h,d,color,name)=>{if(parts.length>=MAX_PARTS)return null;const n=name||'part'+(parts.length+1);parts.push({type,pos:[x,y,z],size:[w,h,d],color:color||DEFAULT_COLOR[type],name:n});return n;},
+      exists:n=>parts.some(p=>p.name===n),getPos:n=>(parts.find(p=>p.name===n)||{pos:[0,0,0]}).pos,
+      move(){},color(n,c){const p=parts.find(q=>q.name===n);if(p)p.color=c;},resize(){},spin(){},visible(){},remove(n){const i=parts.findIndex(p=>p.name===n);if(i>=0)parts.splice(i,1);},
+      sky(){},teleport(){},damage(){},heal(){},checkpoint(){},setStat(){},win(){},lose(){},say(){},hint(){},setScore(){},getScore:()=>0,print(){},sound(){},playerGet:()=>0};
+    try{const rt=new NexusScript.Runtime(project.script||'',api,{onError:e=>errors.push(e)});rt.start();for(let i=0;i<4;i++)rt.update(0);}
+    catch(e){errors.push({message:e.message,line:e.line||0});}
+    return {parts,errors};
+  }
+
+  function play(project,opts={}){
+    if(typeof THREE==='undefined')throw Error('Brak WebGL – nie można uruchomić gry 3D.');
+    const root=el('div','nx-player');root.setAttribute('role','dialog');root.setAttribute('aria-label',project.name||'Gra 3D');
+    const renderer=new THREE.WebGLRenderer({antialias:!window.isMobileDevice});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,window.isMobileDevice?1.25:1.75));
+    root.append(renderer.domElement);
+    const top=el('div','nx-top'),exit=el('button','nx-btn','✕ Wyjdź'),restartBtn=el('button','nx-btn','Restart'),title=el('div','nx-title',project.name||'Gra 3D');
+    const stats=el('div','nx-stats'),hpBox=el('div','nx-hp'),hpBar=el('i'),coinsPill=el('div','nx-pill'),scorePill=el('div','nx-pill');
+    hpBox.append(hpBar);stats.append(hpBox,coinsPill,scorePill);top.append(exit,restartBtn);
+    for(const b of opts.buttons||[]){const x=el('button','nx-btn',b.label);x.onclick=()=>b.onClick(controller);top.append(x);}
+    top.append(title,stats);
+    const hint=el('div','nx-hint'),say=el('div','nx-say'),consoleBox=el('div','nx-console');hint.hidden=true;consoleBox.hidden=true;
+    root.append(top,hint,say,consoleBox);
+    const touch=!!window.isMobileDevice||matchMedia('(pointer:coarse)').matches;
+    let joy=null,knob=null;const joyVec={x:0,y:0};
+    if(touch){
+      joy=el('div','nx-joy');knob=el('i');joy.append(knob);const pad=el('div','nx-touch'),act=el('button','act','AKCJA'),jumpB=el('button','','SKOK');pad.append(act,jumpB);root.append(joy,pad);
+      let jid=null;const moveJoy=e=>{const r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),len=Math.hypot(dx,dy),m=Math.min(len,45);joyVec.x=len?dx/len*m/45:0;joyVec.y=len?dy/len*m/45:0;knob.style.transform=`translate(${joyVec.x*45}px,${joyVec.y*45}px)`;};
+      joy.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();jid=e.pointerId;joy.setPointerCapture(jid);moveJoy(e);});
+      joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)moveJoy(e);});
+      for(const n of['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(n,e=>{if(e.pointerId===jid){jid=null;joyVec.x=joyVec.y=0;knob.style.transform='';}});
+      jumpB.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();input.jump=true;});
+      for(const n of['pointerup','pointercancel','pointerleave'])jumpB.addEventListener(n,()=>input.jump=false);
+      act.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();keyEvent('E');});
+    }
+    document.body.append(root);document.body.classList.add('nx-playing');
+    const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(70,1,.1,600);
+    scene.add(new THREE.HemisphereLight(0xffffff,0x667788,.85));const sun=new THREE.DirectionalLight(0xfff2dd,.7);sun.position.set(-30,60,20);scene.add(sun);
+    // Player
+    let rig=null;
+    try{if(typeof createCharacterRig3D==='function'){rig=createCharacterRig3D(typeof avatarData==='object'?avatarData:{});rig.group.scale.setScalar(.56);}}catch{rig=null;}
+    const playerObj=rig?rig.group:new THREE.Mesh(new THREE.BoxGeometry(PW*2,PH,PW*2),new THREE.MeshLambertMaterial({color:0xf5c542}));
+    if(!rig)playerObj.geometry.translate(0,PH/2,0);
+    playerObj.rotation.y=Math.PI;scene.add(playerObj);
+    const input={keys:new Set(),jump:false};
+    let state,parts,byName,runtime,yaw=Math.PI,pitch=.35,dist=13,frame=0,last=0,acc=0,serial=0,stopped=false,touching=new Set(),hurtCd=0,result=null,sayTimer=0,minY=0,errors=[];
+    function addPart(p){
+      if(parts.length>=MAX_PARTS)return null;
+      let name=p.name&&!byName.has(p.name)?p.name:'';if(!name){do{name='part'+(++serial);}while(byName.has(name));}
+      const part={type:p.type,pos:[...p.pos],size:[...p.size],color:p.color||DEFAULT_COLOR[p.type],name,rot:p.rot||0,visible:true,anim:null,spin:0,delta:[0,0,0],home:[...p.pos]};
+      part.mesh=buildMesh(part);scene.add(part.mesh);parts.push(part);byName.set(name,part);minY=Math.min(minY,part.pos[1]-part.size[1]/2);
+      return name;
+    }
+    function removePart(part){scene.remove(part.mesh);disposeTree(part.mesh);parts.splice(parts.indexOf(part),1);byName.delete(part.name);touching.delete(part);}
+    function spawnPoint(){const s=parts.find(p=>p.type==='spawn');return s?[s.pos[0],s.pos[1]+s.size[1]/2+.05,s.pos[2]]:[0,2,0];}
+    function message(text,secs){say.textContent=text;say.style.opacity='1';sayTimer=secs;}
+    function sound(name){const f={coin:[880,.08],jump:[420,.06],win:[660,.3],hit:[140,.15],beep:[520,.08]}[name];if(f)try{window.bloxTone?.(f[0],f[1],'triangle',.05);}catch{}}
+    function showErrors(){if(!opts.showErrors||!errors.length){consoleBox.hidden=true;return;}consoleBox.hidden=false;consoleBox.replaceChildren(...errors.slice(-4).map(e=>{const d=el('div');const b=el('b',null,e.line?'Linia '+e.line+': ':'');d.append(b,document.createTextNode(e.message));return d;}));}
+    const api={
+      spawn:(type,x,y,z,w,h,d,color,name)=>addPart({type,pos:[x,y,z],size:[w,h,d],color,name}),
+      exists:n=>byName.has(n)&&!byName.get(n).removed,
+      getPos:n=>[...byName.get(n).pos],
+      move(n,x,y,z,s){const p=byName.get(n);if(!p)return;if(s>0)p.anim={from:[...p.pos],to:[x,y,z],t:0,dur:s};else{p.anim=null;setPos(p,[x,y,z]);}},
+      color(n,c){const p=byName.get(n);if(!p)return;p.color=c;scene.remove(p.mesh);disposeTree(p.mesh);p.mesh=buildMesh(p);p.mesh.visible=p.visible;scene.add(p.mesh);},
+      resize(n,w,h,d){const p=byName.get(n);if(!p)return;p.size=[w,h,d];scene.remove(p.mesh);disposeTree(p.mesh);p.mesh=buildMesh(p);p.mesh.visible=p.visible;scene.add(p.mesh);},
+      spin(n,v){const p=byName.get(n);if(p)p.spin=v;},
+      visible(n,v){const p=byName.get(n);if(p){p.visible=v;p.mesh.visible=v;}},
+      remove(n){const p=byName.get(n);if(p)removePart(p);},
+      sky(c){scene.background=new THREE.Color(c);scene.fog.color=new THREE.Color(c);},
+      teleport(x,y,z){state.pos=[x,y,z];state.vel=[0,0,0];},
+      damage(v){hurt(v);},
+      heal(v){state.hp=clamp(state.hp+v,0,100);},
+      checkpoint(x,y,z){state.respawn=[x,y,z];},
+      setStat(k,v){const lim={speed:[4,16],jump:[6,22],gravity:[10,45]}[k];state[k]=clamp(v,lim[0],lim[1]);},
+      win(t){finish(true,t);},lose(t){finish(false,t);},
+      say(t,s){message(t,s);},
+      hint(t){hint.textContent=t;hint.hidden=!t;},
+      setScore(v){state.score=v;state.scoreShown=true;},getScore:()=>state.score,
+      print(t){errors.push({message:t,line:0,info:true});if(opts.showErrors)showErrors();try{opts.onPrint?.(t);}catch{}},
+      sound,
+      playerGet(k){return k==='hp'?state.hp:k==='coins'?state.coins:Math.round(state.pos['xyz'.indexOf(k)]*100)/100;}
+    };
+    function setPos(p,pos){p.delta=[p.delta[0]+pos[0]-p.pos[0],p.delta[1]+pos[1]-p.pos[1],p.delta[2]+pos[2]-p.pos[2]];p.pos=pos;p.mesh.position.set(...pos);}
+    function reset(){
+      if(parts)for(const p of parts.slice())removePart(p);
+      parts=[];byName=new Map();serial=0;minY=0;touching=new Set();errors=[];result?.remove();result=null;hint.hidden=true;say.style.opacity='0';
+      const sky=project.settings?.sky||'#8fd3ff';scene.background=new THREE.Color(sky);scene.fog=new THREE.Fog(sky,120,420);
+      for(const p of normalizeParts(project.parts))addPart(p);
+      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0};
+      try{runtime=new NexusScript.Runtime(project.script||'',api,{onError:e=>{errors.push(e);showErrors();try{opts.onError?.(e);}catch{}}});runtime.start();runtime.update(0);}
+      catch(e){runtime=null;errors.push({message:e.message,line:e.line||0});showErrors();try{opts.onError?.({message:e.message,line:e.line||0});}catch{}}
+      state.pos=spawnPoint();state.respawn=null;showErrors();
+    }
+    function hurt(v){if(state.over||state.deadUntil)return;state.hp=clamp(state.hp-v,0,100);sound('hit');if(state.hp<=0)die();}
+    function die(){
+      if(state.over||state.deadUntil)return;state.hp=0;state.deadUntil=runtime?runtime.time+.8:.8;runtime?.fire('die');message('Auć! Spróbuj jeszcze raz.',1.2);
+    }
+    function respawn(){state.deadUntil=0;state.hp=100;state.pos=state.respawn?[...state.respawn]:spawnPoint();state.vel=[0,0,0];}
+    function finish(won,text){
+      if(state.over)return;state.over=true;if(won){sound('win');runtime?.fire('win');}
+      result=el('div','nx-result');const box=el('section');box.append(el('h2',null,won?'Wygrana!':'Koniec gry'),el('p',null,text||(won?'Udało ci się ukończyć grę.':'Spróbuj jeszcze raz.')));
+      const row=el('div','row'),again=el('button','nx-btn primary','Zagraj ponownie'),out=el('button','nx-btn','Wyjdź');again.onclick=()=>reset();out.onclick=()=>stop();row.append(again,out);box.append(row);result.append(box);root.append(result);
+      try{opts.onFinish?.(won);}catch{}
+    }
+    function keyEvent(k){if(!state.over&&runtime)runtime.fire('key',k);}
+    const onKey=e=>{
+      if(stopped)return;const t=e.target;if(t&&/INPUT|TEXTAREA|SELECT/.test(t.tagName))return;
+      const down=e.type==='keydown',code=e.code;
+      if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(code)){e.preventDefault();e.stopPropagation();if(code==='Space')input.jump=down;else if(down)input.keys.add(code);else input.keys.delete(code);}
+      if(down&&!e.repeat){if(code==='Escape'){e.preventDefault();stop();return;}if(code==='Space')keyEvent('SPACE');else if(/^Key[A-Z]$/.test(code))keyEvent(code.slice(3));else if(/^Digit\d$/.test(code))keyEvent(code.slice(5));}
+    };
+    addEventListener('keydown',onKey,true);addEventListener('keyup',onKey,true);
+    // Camera: drag on the scene to look around, wheel to zoom.
+    let drag=null;
+    renderer.domElement.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY};renderer.domElement.setPointerCapture(e.pointerId);});
+    renderer.domElement.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.006;pitch=clamp(pitch+(e.clientY-drag.y)*.004,-.2,1.2);drag.x=e.clientX;drag.y=e.clientY;});
+    for(const n of['pointerup','pointercancel'])renderer.domElement.addEventListener(n,()=>drag=null);
+    renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();dist=clamp(dist+e.deltaY*.01,5,30);},{passive:false});
+    exit.onclick=()=>stop();restartBtn.onclick=()=>reset();
+    function overlaps(a,p,pad=0){const [x,y,z]=p.pos,[w,h,d]=p.size;return a.x1>x-w/2-pad&&a.x0<x+w/2+pad&&a.y1>y-h/2-pad&&a.y0<y+h/2+pad&&a.z1>z-d/2-pad&&a.z0<z+d/2+pad;}
+    const box=pos=>({x0:pos[0]-PW,x1:pos[0]+PW,y0:pos[1],y1:pos[1]+PH,z0:pos[2]-PW,z1:pos[2]+PW});
+    function step(dt){
+      // Deltas collect every move this step (script and animations) so riders can be carried.
+      for(const p of parts)p.delta=[0,0,0];
+      runtime?.update(dt);
+      for(const p of parts){if(p.anim){p.anim.t=Math.min(p.anim.dur,p.anim.t+dt);const k=p.anim.t/p.anim.dur,s=k*k*(3-2*k);setPos(p,p.anim.from.map((v,i)=>v+(p.anim.to[i]-v)*s));if(p.anim.t>=p.anim.dur)p.anim=null;}if(p.spin)p.mesh.rotation.y+=p.spin*Math.PI/180*dt;}
+      if(state.over)return;
+      if(state.deadUntil){if(runtime&&runtime.time>=state.deadUntil)respawn();return;}
+      if(state.ground&&parts.includes(state.ground)){const d=state.ground.delta;state.pos=[state.pos[0]+d[0],state.pos[1]+d[1],state.pos[2]+d[2]];}
+      let mx=(input.keys.has('KeyD')||input.keys.has('ArrowRight')?1:0)-(input.keys.has('KeyA')||input.keys.has('ArrowLeft')?1:0)+joyVec.x;
+      let mz=(input.keys.has('KeyS')||input.keys.has('ArrowDown')?1:0)-(input.keys.has('KeyW')||input.keys.has('ArrowUp')?1:0)+joyVec.y;
+      const len=Math.hypot(mx,mz);if(len>1){mx/=len;mz/=len;}
+      const sin=Math.sin(yaw),cos=Math.cos(yaw),vx=(mx*cos+mz*sin)*state.speed,vz=(-mx*sin+mz*cos)*state.speed;
+      // The avatar model faces -Z, so it turns half a circle to face the direction of travel.
+      if(len>.1)playerObj.rotation.y=Math.atan2(vx,vz)+Math.PI;
+      state.walk+=len>.1&&state.grounded?dt*9:0;
+      const v=state.vel;v[0]=vx;v[2]=vz;
+      if(input.jump&&state.grounded){v[1]=state.jump;state.grounded=false;sound('jump');}
+      v[1]=Math.max(-60,v[1]-state.gravity*dt);
+      const solids=parts.filter(p=>p.visible&&SOLID.has(p.type));
+      let pos=[...state.pos];
+      for(const axis of[0,2,1]){
+        pos[axis]+=v[axis]*dt;let b=box(pos);
+        for(const p of solids){
+          if(!overlaps(b,p))continue;
+          const half=axis===1?0:PW,c=p.pos[axis],s=p.size[axis]/2;
+          if(axis===1){
+            if(v[1]<=0){pos[1]=c+s;v[1]=0;state.grounded=true;state.ground=p;if(p.type==='spring'){v[1]=state.jump*1.65;state.grounded=false;sound('jump');}}
+            else{pos[1]=c-s-PH;v[1]=0;}
+          }else{
+            // Small ledges (stairs up to 0.6) are stepped onto instead of blocking.
+            const rise=(p.pos[1]+p.size[1]/2)-pos[1],stepUp=state.grounded&&rise>0&&rise<=.6;
+            if(stepUp){pos[1]=p.pos[1]+p.size[1]/2;}
+            else pos[axis]=v[axis]>0?c-s-half-.001:c+s+half+.001;
+          }
+          b=box(pos);
+        }
+        if(axis===1&&v[1]!==0){state.grounded=false;state.ground=null;}
+      }
+      state.pos=pos;
+      if(pos[1]<minY-30){die();return;}
+      // Touch events, coins, hazards and goals.
+      const b=box(pos),now=new Set();hurtCd=Math.max(0,hurtCd-dt);
+      for(const p of parts.slice()){
+        if(!p.visible||!overlaps(b,p,.08))continue;now.add(p);
+        if(p.type==='lava'){die();break;}
+        if(p.type==='enemy'&&hurtCd<=0){hurtCd=1;hurt(25);}
+        if(touching.has(p))continue;
+        if(p.name)runtime?.fire('touch',p.name);
+        if(p.type==='coin'){state.coins++;sound('coin');removePart(p);runtime?.fire('collect');continue;}
+        if(p.type==='checkpoint'){state.respawn=[p.pos[0],p.pos[1]+p.size[1]/2+.05,p.pos[2]];sound('beep');}
+        if(p.type==='finish'){finish(true,'');}
+      }
+      touching=now;
+      // Enemies chase a nearby player along the ground.
+      for(const p of parts){if(p.type!=='enemy'||!p.visible)continue;const dx=pos[0]-p.pos[0],dz=pos[2]-p.pos[2],dd=Math.hypot(dx,dz);
+        if(dd<18&&dd>.5&&Math.abs(pos[1]-p.pos[1])<8){const sp=Math.min(dd,4*dt);setPos(p,[p.pos[0]+dx/dd*sp,p.pos[1],p.pos[2]+dz/dd*sp]);p.mesh.rotation.y=Math.atan2(dx,dz);}
+        else if(!p.anim){const h=p.home,ex=h[0]-p.pos[0],ez=h[2]-p.pos[2],e=Math.hypot(ex,ez);if(e>.3){const sp=Math.min(e,2*dt);setPos(p,[p.pos[0]+ex/e*sp,p.pos[1],p.pos[2]+ez/e*sp]);}}}
+    }
+    function render(){
+      const w=root.clientWidth,h=root.clientHeight;if(renderer.domElement.width!==Math.floor(w*renderer.getPixelRatio())||renderer.domElement.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+      const p=state.pos;playerObj.position.set(p[0],p[1],p[2]);playerObj.visible=!state.deadUntil;
+      if(rig){const s=Math.sin(state.walk)*.7;rig.lLegPiv&&(rig.lLegPiv.rotation.x=s);rig.rLegPiv&&(rig.rLegPiv.rotation.x=-s);rig.lArmPiv&&(rig.lArmPiv.rotation.x=-s);rig.rArmPiv&&(rig.rArmPiv.rotation.x=s);}
+      for(const q of parts)if(q.type==='coin')q.mesh.rotation.y+=.04;
+      const tx=p[0],ty=p[1]+PH*.75,tz=p[2];camera.position.set(tx+Math.sin(yaw)*Math.cos(pitch)*dist,ty+Math.sin(pitch)*dist,tz+Math.cos(yaw)*Math.cos(pitch)*dist);camera.lookAt(tx,ty,tz);
+      hpBar.style.width=state.hp+'%';coinsPill.textContent='Monety: '+state.coins;scorePill.textContent='Wynik: '+NexusScript.show(state.score);scorePill.hidden=!state.scoreShown;
+      renderer.render(scene,camera);
+    }
+    function loop(t){
+      if(stopped)return;frame=requestAnimationFrame(loop);
+      const dt=Math.min(.1,(t-(last||t))/1000);last=t;
+      if(sayTimer>0){sayTimer-=dt;if(sayTimer<=0)say.style.opacity='0';}
+      if(!document.hidden){acc+=dt;let n=0;while(acc>=STEP&&n<6){step(STEP);acc-=STEP;n++;}if(n===6)acc=0;}
+      render();
+    }
+    function stop(){
+      if(stopped)return;stopped=true;cancelAnimationFrame(frame);removeEventListener('keydown',onKey,true);removeEventListener('keyup',onKey,true);
+      for(const p of parts.slice())removePart(p);disposeTree(playerObj);renderer.dispose();root.remove();document.body.classList.remove('nx-playing');
+      try{opts.onExit?.();}catch{}
+    }
+    const controller={stop,restart:reset,get errors(){return errors.slice();},get state(){return state;},get runtime(){return runtime;},get parts(){return parts;}};
+    reset();frame=requestAnimationFrame(loop);
+    return controller;
+  }
+  window.NexusGame={play,previewParts,normalizeParts,buildMesh,TYPES,DEFAULT_COLOR,MAX_PARTS};
+})();
+</script>
+<script id="nexus-assistant">
+// Offline NexusScript assistant: turns a Polish game description into a working program.
+// It is a rule-based generator (no network); the server model handles free-form requests.
+(() => {
+  'use strict';
+  const COLORS=[[/czerwon/,'#e5484d'],[/niebiesk/,'#3b82f6'],[/zielon/,'#4eae79'],[/żółt|zolt/,'#f5c542'],[/fiolet/,'#9b5de5'],[/różow|rozow/,'#ff6fb5'],[/pomarańcz|pomarancz/,'#ff8a4c'],[/czarn/,'#2a2f36'],[/biał|bial/,'#f2f2f2'],[/szar/,'#8a96a3'],[/złot|zlot/,'#e8b830'],[/tęcz|tecz/,'rainbow']];
+  const has=(t,re)=>re.test(t);
+  function count(t,re,def,lo,hi){const m=t.match(new RegExp('(\\d+)\\s*(?:'+re.source+')'))||t.match(new RegExp('(?:'+re.source+')\\D{0,12}(\\d+)'));const n=m?parseInt(m[1],10):def;return Math.max(lo,Math.min(hi,n));}
+  function generate(description){
+    const t=String(description||'').toLowerCase();
+    const want={
+      maze:has(t,/labirynt|maze/),tower:has(t,/wież|wiez|tower|w górę|w gore/),arena:has(t,/arena|przetrw|survival|fal[ai]/),
+      coins:has(t,/monet|zbier|coin|skarb/),lava:has(t,/law|lava|ogień|ogien/),enemies:has(t,/wr[oó]g|potwor|zombie|enemy|przeciwnik/),
+      moving:has(t,/rusz|wind|ruchom|jeżdż|jezdz|przesuw/),springs:has(t,/trampolin|sprężyn|sprezyn|skocz/),timer:has(t,/czas|sekund|minut|timer|na czas/),
+      night:has(t,/noc|ciemn|kosmos|space/),sunset:has(t,/zach[oó]d|wiecz/),glass:has(t,/szkł|szkl|lód|lod|ice/),checkpoints:has(t,/checkpoint|zapis/)
+    };
+    if(!want.maze&&!want.tower&&!want.arena&&!has(t,/obby|parkour|tor|skak|platform/))want.obby=true;else want.obby=has(t,/obby|parkour|tor|skak|platform/)&&!want.maze&&!want.arena&&!want.tower;
+    let color='#4eae79';for(const [re,c] of COLORS)if(re.test(t)){color=c;break;}
+    const rainbow=color==='rainbow';if(rainbow)color='#4eae79';
+    const platforms=count(t,/platform|poziom|skok|plansz/,want.tower?16:10,3,40);
+    const coinsWanted=count(t,/monet/,8,1,40);
+    const enemyCount=count(t,/wrog|wrogów|wrogow|potwor|zombie|przeciwnik/,3,1,12);
+    const seconds=count(t,/sekund|s\b/,want.arena?60:90,15,600);
+    const sky=want.night?'#0b1530':want.sunset?'#ff9a6b':'#8fd3ff';
+    const L=[];const add=s=>L.push(s);
+    add('// Gra wygenerowana przez wbudowanego asystenta BloxWeb');
+    add('// Opis: '+String(description||'obby').replace(/\s+/g,' ').slice(0,120));
+    add('sky("'+sky+'")');
+    add('var kolory = '+(rainbow?'["#e5484d", "#ff8a4c", "#f5c542", "#4eae79", "#3b82f6", "#9b5de5"]':'["'+color+'"]'));
+    add('var monety = 0');
+    add('');
+    if(want.maze){
+      add('// Labirynt '+(platforms>12?'9×9':'7×7')+' generowany losowo przy każdym starcie');
+      const n=platforms>12?9:7;
+      add('var N = '+n);add('var S = 6');
+      add('spawn("block", (N * S) / 2 - 3, -1, (N * S) / 2 - 3, N * S + 6, 1, N * S + 6, "#8a96a3")');
+      add('spawn("spawn", 0, 0, 0, 4, 1, 4)');
+      add('var odwiedzone = []');add('repeat N * N { push(odwiedzone, false) }');
+      add('// Ściany: każda komórka ma ścianę w prawo (pion) i w dół (poziom)');
+      add('var prawe = []');add('var dolne = []');add('repeat N * N { push(prawe, true)\n  push(dolne, true) }');
+      add('var stos = [0]');add('odwiedzone[0] = true');
+      add('while len(stos) > 0 {\n  var c = stos[len(stos) - 1]\n  var x = c % N\n  var z = floor(c / N)\n  var opcje = []\n  if x > 0 and not odwiedzone[c - 1] { push(opcje, c - 1) }\n  if x < N - 1 and not odwiedzone[c + 1] { push(opcje, c + 1) }\n  if z > 0 and not odwiedzone[c - N] { push(opcje, c - N) }\n  if z < N - 1 and not odwiedzone[c + N] { push(opcje, c + N) }\n  if len(opcje) == 0 {\n    pop(stos)\n  } else {\n    var n = opcje[random(0, len(opcje) - 1)]\n    if n == c + 1 { prawe[c] = false }\n    if n == c - 1 { prawe[n] = false }\n    if n == c + N { dolne[c] = false }\n    if n == c - N { dolne[n] = false }\n    odwiedzone[n] = true\n    push(stos, n)\n  }\n}');
+      add('for c in range(0, N * N) {\n  var x = c % N\n  var z = floor(c / N)\n  if prawe[c] and x < N - 1 { spawn("block", x * S + S / 2, 2, z * S, 1, 5, S + 1, kolory[0]) }\n  if dolne[c] and z < N - 1 { spawn("block", x * S, 2, z * S + S / 2, S + 1, 5, 1, kolory[0]) }\n}');
+      add('// Zewnętrzne ściany');
+      add('spawn("block", -S / 2, 2, (N - 1) * S / 2, 1, 5, N * S, kolory[0])');add('spawn("block", (N - 1) * S + S / 2, 2, (N - 1) * S / 2, 1, 5, N * S, kolory[0])');
+      add('spawn("block", (N - 1) * S / 2, 2, -S / 2, N * S, 5, 1, kolory[0])');add('spawn("block", (N - 1) * S / 2, 2, (N - 1) * S + S / 2, N * S, 5, 1, kolory[0])');
+      add('spawn("finish", (N - 1) * S, 0, (N - 1) * S, 4, 1, 4)');
+      if(want.coins)add('repeat '+Math.min(coinsWanted,15)+' {\n  spawn("coin", random(1, N - 1) * S, 1.5, random(1, N - 1) * S)\n}');
+      if(want.enemies)add('repeat '+Math.min(enemyCount,4)+' {\n  spawn("enemy", random(2, N - 1) * S, 1, random(2, N - 1) * S, 2, 2, 2)\n}');
+    }else if(want.tower){
+      add('// Wieża: spirala platform wokół środka');
+      add('spawn("spawn", 0, 0, -13, 6, 1, 6)');add('spawn("block", 0, '+(Math.ceil(platforms*1.6/2)+1)+', 0, 3, '+(platforms*1.6+4)+', 3, "#5b6b7c")');
+      add('var kat = 140');add('var h = 0');add('var nr = 0');
+      add('repeat '+platforms+' {\n  kat += 40\n  h += 1.6\n  nr += 1\n  var typ = "block"');
+      if(want.springs)add('  if nr % 5 == 0 { typ = "spring" }');
+      if(want.glass)add('  if nr % 3 == 0 { typ = "glass" }');
+      add('  spawn(typ, sin(kat) * 7, h, cos(kat) * 7, 3, 1, 3, kolory[nr % len(kolory)])');
+      if(want.coins)add('  if nr % 2 == 0 { spawn("coin", sin(kat) * 7, h + 2, cos(kat) * 7) }');
+      if(want.checkpoints)add('  if nr % 6 == 0 { spawn("checkpoint", sin(kat) * 7, h, cos(kat) * 7, 3, 1, 3) }');
+      add('}');
+      add('spawn("finish", sin(kat + 40) * 7, h + 1.6, cos(kat + 40) * 7, 4, 1, 4)');
+      if(want.lava)add('spawn("lava", 0, -3, 0, 60, 1, 60)');
+    }else if(want.arena){
+      add('// Arena: przetrwaj, unikając wrogów');
+      add('spawn("block", 0, -1, 0, 60, 1, 60, kolory[0])');add('spawn("spawn", 0, 0, 0, 6, 1, 6)');
+      add('for i in range(0, 4) {\n  spawn("block", random(-20, 20), 0.5, random(-20, 20), 4, 2, 4, "#8a96a3")\n}');
+      if(want.lava)add('spawn("lava", 0, -1.4, 0, 120, 1, 120)');
+      add('var przetrwane = 0');
+      add('when start {\n  say("Przetrwaj '+seconds+' sekund!", 3)\n}');
+      add('when every 1 {\n  przetrwane += 1\n  hint("Przetrwaj: " + ('+seconds+' - przetrwane) + " s")\n  if przetrwane >= '+seconds+' {\n    win("Przetrwałeś ' + seconds + ' sekund!")\n  }\n}');
+      add('when every '+Math.max(3,Math.round(12/enemyCount))+' {\n  var kat = random(0, 359)\n  spawn("enemy", sin(kat) * 25, 1, cos(kat) * 25, 2, 2, 2)\n}');
+      if(want.coins)add('when every 4 {\n  spawn("coin", random(-25, 25), 1.5, random(-25, 25))\n}');
+    }
+    if(want.obby){
+      add('// Tor przeszkód: '+platforms+' platform');
+      add('spawn("spawn", 0, 0, 0, 6, 1, 6)');
+      add('var z = 0');add('var y = 0');add('var x = 0');add('var nr = 0');
+      add('repeat '+platforms+' {\n  nr += 1\n  z += random(6, 7)\n  x = random(-4, 4)\n  y += random(0, 1)\n  var typ = "block"');
+      if(want.springs)add('  if nr % 4 == 0 { typ = "spring" }');
+      if(want.glass)add('  if nr % 3 == 0 { typ = "glass" }');
+      add('  var nazwa = "P" + nr');
+      add('  spawn(typ, x, y, z, 4, 1, 4, kolory[nr % len(kolory)], nazwa)');
+      if(want.springs)add('  if typ == "spring" { y += 4 }');
+      if(want.coins)add('  if nr % 2 == 0 { spawn("coin", x, y + 2, z) }');
+      if(want.checkpoints||platforms>=12)add('  if nr % 6 == 0 { spawn("checkpoint", x, y, z, 4, 1, 4, "#b47cff") }');
+      if(want.moving)add('  if nr % 3 == 0 {\n    push(ruchome, nazwa)\n    push(bazaX, x)\n  }');
+      add('}');
+      add('spawn("finish", 0, y, z + 7, 6, 1, 6)');
+      if(want.lava)add('spawn("lava", 0, -4, z / 2, 40, 1, z + 30)');
+      if(want.enemies)add('repeat '+Math.min(enemyCount,6)+' {\n  var ez = random(10, max(12, z - 6))\n  spawn("block", random(-12, 12), y / 2, ez, 8, 1, 8, "#8a96a3")\n  spawn("enemy", 0, y / 2 + 1.5, ez, 2, 2, 2)\n}');
+    }
+    if(want.moving&&want.obby){
+      L.splice(L.indexOf('var monety = 0')+1,0,'var ruchome = []','var bazaX = []');
+      add('// Co trzecia platforma jeździ w bok (gracz jedzie razem z nią)');
+      add('when tick {\n  var off = sin(time() * 60) * 4\n  for i in range(0, len(ruchome)) {\n    var p = ruchome[i]\n    move(p, bazaX[i] + off, getY(p), getZ(p))\n  }\n}');
+    }
+    add('');
+    if(!want.arena)add('when start {\n  say("'+(want.maze?'Znajdź wyjście z labiryntu!':want.tower?'Wespnij się na szczyt wieży!':'Dotrzyj do mety!')+'", 3)'+(want.coins?'\n  hint("Monety: 0")':'')+(want.timer?'\n  setScore('+seconds+')':'')+'\n}');
+    if(want.coins)add('when collect {\n  monety += 1\n  hint("Monety: " + monety)\n  sound("coin")\n}');
+    if(want.timer&&!want.arena)add('// Limit czasu: wynik pokazuje pozostałe sekundy\nwhen every 1 {\n  addScore(-1)\n  if getScore() <= 0 {\n    lose("Koniec czasu! Spróbuj szybciej.")\n  }\n}');
+    add('when die {\n  sound("hit")\n}');
+    add('when win {\n  say("Brawo!'+(want.coins?' Monety: " + monety':'"')+', 4)\n}');
+    return L.join('\n')+'\n';
+  }
+  window.NexusAssistant={generate};
+})();
+</script>
+<style id="nexus-studio-style">
+.nx-home{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.nx-section{margin:22px 0;padding:18px;border:1px solid var(--line,#2b3440);border-radius:14px;background:var(--panel,#141a22)}
+.nx-section h2{margin:0 0 4px;font-size:20px}
+.nx-section>p.lead{margin:0 0 14px;color:var(--muted,#9aa6b4);font-size:14px}
+.nx-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
+.nx-card{border:1px solid var(--line,#2b3440);border-radius:12px;padding:14px;background:#0f141b;display:flex;flex-direction:column;gap:6px;min-width:0}
+.nx-card strong{font-size:16px;overflow-wrap:anywhere}.nx-card small{color:var(--muted,#9aa6b4)}
+.nx-card p{margin:0;color:#c9d2dc;font-size:13px;overflow-wrap:anywhere}
+.nx-card .nx-row{margin-top:auto;padding-top:6px}
+.nx-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#ff8a4c22;color:#ffb27f}
+.nx-tag.warn{background:#ff4a3a22;color:#ff9a8a}
+.nx-input,.nx-select,.nx-area{background:#0b0f14;border:1px solid #2f3a47;border-radius:8px;color:#eef2f6;padding:8px 10px;font:inherit;min-width:0}
+.nx-area{width:100%;min-height:150px;font:13px/1.5 ui-monospace,Consolas,monospace;resize:vertical;box-sizing:border-box}
+.nx-code{min-height:340px;tab-size:2;white-space:pre;overflow:auto}
+.nx-work{display:grid;grid-template-columns:150px minmax(0,1fr) 240px;gap:12px;margin-top:12px}
+.nx-tools{display:flex;flex-direction:column;gap:6px}
+.nx-tool{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid #2f3a47;background:#0f141b;color:#e8edf2;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;text-align:left}
+.nx-tool[aria-pressed=true]{border-color:#ff8a4c;background:#ff8a4c22}
+.nx-tool i{width:14px;height:14px;border-radius:4px;flex:none}
+.nx-view{position:relative;border-radius:12px;overflow:hidden;background:#0b0f14;min-height:420px;touch-action:none}
+.nx-view canvas{display:block;width:100%;height:100%;position:absolute;inset:0}
+.nx-view .nx-zoom{position:absolute;right:8px;bottom:8px;display:flex;gap:6px}
+.nx-view .nx-zoom button{width:38px;height:38px;border-radius:8px;border:1px solid #ffffff33;background:#0d1117cc;color:#fff;font:700 18px Inter,system-ui,sans-serif}
+.nx-view .nx-help{position:absolute;left:8px;top:8px;padding:4px 8px;border-radius:6px;background:#0d1117b8;color:#c9d2dc;font-size:12px;pointer-events:none;max-width:calc(100% - 16px)}
+.nx-props{display:flex;flex-direction:column;gap:8px;font-size:13px}
+.nx-props label{display:flex;flex-direction:column;gap:3px;color:#9aa6b4}
+.nx-props .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.nx-props .trio .nx-input{width:100%;box-sizing:border-box;padding:6px}
+.nx-props h3{margin:4px 0 0;font-size:14px;color:#eef2f6}
+.nx-tabs{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+.nx-tabs button[aria-selected=true]{background:#ff8a4c;color:#1b0f08;border-color:#ff8a4c}
+.nx-pane{margin-top:10px}
+.nx-msg{font-size:13px;color:#a3efbe;min-height:18px;margin:6px 0;white-space:pre-line}
+.nx-msg.error{color:#ff9a8a}
+.nx-ref{max-height:420px;overflow:auto;white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Consolas,monospace;background:#0b0f14;border-radius:8px;padding:12px;color:#d5dde6}
+.nx-dialog-back{position:fixed;inset:0;z-index:960;background:#000a;display:grid;place-items:center;padding:16px}
+.nx-dialog{background:#141a22;border:1px solid #2f3a47;border-radius:14px;padding:18px;width:min(460px,100%);max-height:calc(100vh - 32px);overflow:auto;color:#eef2f6;display:flex;flex-direction:column;gap:10px}
+.nx-dialog h2{margin:0;font-size:19px}
+@media (max-width:900px){.nx-work{grid-template-columns:1fr}.nx-tools{flex-direction:row;flex-wrap:wrap}.nx-tool{padding:7px 9px}.nx-view{min-height:320px;height:52vh}}
+</style>
+<script id="nexus-studio">
+// Studio 3D: block editor, NexusScript editor, assistants, publishing and the "Gry graczy" catalogue.
+(() => {
+  'use strict';
+  if(typeof THREE==='undefined'||!window.NexusScript||!window.NexusGame)return;
+  const $=id=>document.getElementById(id);
+  const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
+  const btn=(text,fn,cls='v11-button')=>{const b=el('button',cls,text);b.type='button';b.onclick=fn;return b;};
+  const section=$('view-studio');if(!section)return;
+  const REFERENCE=($('nexusReference')?.textContent||'').trim();
+  const storeKey='blox_nexus_v1_'+(typeof myPlayerId!=='undefined'?myPlayerId:'local');
+  const TOOLS=[['select','Wybierz','#ffffff'],['block','Blok','#4eae79'],['glass','Szkło','#9fd8ff'],['lava','Lawa','#ff5a2a'],['coin','Moneta','#f5c542'],['spawn','Start','#4a9eff'],['finish','Meta','#dddddd'],['checkpoint','Checkpoint','#b47cff'],['spring','Trampolina','#ff9d3c'],['enemy','Wróg','#e0383b'],['erase','Gumka','#555555']];
+  const SIZE={block:[4,1,4],glass:[4,1,4],lava:[4,1,4],coin:[1,1,1],spawn:[6,1,6],finish:[6,1,6],checkpoint:[4,1,4],spring:[3,1,3],enemy:[2,2,2]};
+  const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  const clone=v=>JSON.parse(JSON.stringify(v));
+  let projects=[],current=null,tool='block',selected=null,undo=[],redo=[],saveTimer=0,showScriptParts=true,playing=null;
+  try{const raw=JSON.parse(accountStore.getItem(storeKey)||'[]');if(Array.isArray(raw))projects=raw.filter(p=>p&&p.format==='bloxweb-nexus').slice(0,20);}catch{}
+
+  function online(){return window.bloxOnline;}
+  async function api(op,body){
+    const o=online();if(!o?.api)throw Error('Brak połączenia z serwerem BloxWeb.');
+    if(!o.state.connected){try{await o.connect?.();}catch{}}
+    if(!o.state.connected)throw Error('Połącz się z serwerem (Ustawienia → Połączenie), aby korzystać z gier graczy.');
+    return o.api(op,body,true,op==='ai_code'?70000:15000);
+  }
+  function template(){
+    return {format:'bloxweb-nexus',version:1,id:uid(),name:'Moja gra 3D',description:'',settings:{speed:8,jump:12,gravity:30,sky:'#8fd3ff'},
+      parts:[{t:'spawn',p:[0,0,0],s:[6,1,6],c:'#4a9eff'},{t:'block',p:[0,0,9],s:[4,1,4],c:'#4eae79'},{t:'block',p:[4,1,15],s:[4,1,4],c:'#4eae79'},{t:'coin',p:[4,3,15],s:[1,1,1],c:'#f5c542'},{t:'finish',p:[0,1,22],s:[6,1,6],c:'#ffffff'}],
+      script:'// NexusScript: kod Twojej gry\nwhen start {\n  say("Witaj w mojej grze!")\n  hint("Dojdź do mety")\n}\n\nwhen collect {\n  hint("Monety: " + player.coins)\n}\n',updated:Date.now()};
+  }
+  function persist(msg){
+    clearTimeout(saveTimer);saveTimer=0;
+    if(current){current.updated=Date.now();const i=projects.findIndex(p=>p.id===current.id);if(i>=0)projects[i]=clone(current);else projects.unshift(clone(current));}
+    try{accountStore.setItem(storeKey,JSON.stringify(projects));if(msg)status(msg);}catch{status('Nie udało się zapisać. Skopiuj kod gry w zakładce Skrypt.',true);}
+    renderLibrary();
+  }
+  function changed(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist('Zapisano automatycznie.'),600);}
+  function snapshot(){if(!current)return;undo.push(clone(current.parts));if(undo.length>40)undo.shift();redo=[];}
+  function status(text,error){const m=$('nxStatus');if(m){m.textContent=text;m.classList.toggle('error',!!error);}}
+
+  // ---------- Layout ----------
+  const lib=el('section','nx-section');lib.id='nxLibrary';
+  lib.innerHTML='<h2>Gry 3D · NexusScript</h2><p class="lead">Buduj światy 3D z klocków, programuj je w NexusScript i publikuj dla innych graczy.</p>';
+  const libRow=el('div','nx-row');libRow.append(btn('+ Nowa gra 3D',()=>createProject(),'v11-primary'),btn('Wklej grę (kod JSON)',()=>importDialog()));
+  const libGrid=el('div','nx-grid');libGrid.id='nxProjects';lib.append(libRow,libGrid);
+  const work=el('section','nx-section');work.id='nxWorkbench';work.hidden=true;
+  work.innerHTML=`<div class="nx-row"><input id="nxName" class="nx-input" maxlength="40" aria-label="Nazwa gry" style="flex:1;min-width:160px;font-weight:700">
+    <span id="nxActions" class="nx-row"></span></div><div id="nxStatus" class="nx-msg" role="status" aria-live="polite"></div>
+    <div class="nx-work"><div class="nx-tools" id="nxTools" role="toolbar" aria-label="Narzędzia"></div>
+    <div class="nx-view" id="nxView"><div class="nx-help" id="nxHelp">Kliknij, aby postawić klocek. Przeciągnij, aby obrócić widok.</div><div class="nx-zoom"><button type="button" id="nxZoomIn" aria-label="Przybliż">+</button><button type="button" id="nxZoomOut" aria-label="Oddal">−</button><button type="button" id="nxCenter" aria-label="Wyśrodkuj widok">◎</button></div></div>
+    <div class="nx-props" id="nxProps"></div></div>
+    <div class="nx-tabs" role="tablist" id="nxTabs"></div><div class="nx-pane" id="nxPane"></div>`;
+  const catalog=el('section','nx-section');catalog.id='nxCatalog';
+  catalog.innerHTML=`<h2>Gry graczy</h2><p class="lead">Gry stworzone przez innych w Studio 3D. Jeśli coś jest nieodpowiednie, zgłoś grę – po 3 zgłoszeniach znika do sprawdzenia.</p>
+    <div class="nx-row"><select id="nxSort" class="nx-select" aria-label="Sortowanie"><option value="new">Najnowsze</option><option value="popular">Najpopularniejsze</option></select>
+    <input id="nxSearch" class="nx-input" placeholder="Szukaj po tytule" maxlength="40" aria-label="Szukaj gry"><input id="nxCodeInput" class="nx-input" placeholder="Kod gry, np. G-1A2B3C" maxlength="12" aria-label="Kod gry" style="width:170px"></div>
+    <div id="nxCatalogMsg" class="nx-msg" role="status"></div><div class="nx-grid" id="nxGames"></div>
+    <h3 style="margin:18px 0 0">Moje opublikowane</h3><div class="nx-grid" id="nxMine"></div>`;
+  const head=section.querySelector('.studio-head');
+  (head?head.nextElementSibling:section.firstChild)?.before?.(catalog,lib,work);
+  if(!catalog.isConnected)section.prepend(catalog,lib,work);
+  const catalogRow=catalog.querySelector('.nx-row');catalogRow.append(btn('Odśwież',()=>loadCatalog()),btn('Otwórz po kodzie',()=>{const code=$('nxCodeInput').value.trim().toUpperCase();if(code)playPublished(code);}));
+  $('nxSort').onchange=()=>loadCatalog();
+  let searchTimer=0;$('nxSearch').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(loadCatalog,350);};
+  // Home entry
+  const homeEntry=document.querySelector('.studio-home-entry');
+  if(homeEntry){const row=el('div','nx-home');row.append(btn('Gry graczy',()=>{switchTab('studio');setTimeout(()=>catalog.scrollIntoView({block:'start'}),50);loadCatalog();}),btn('Stwórz grę 3D',()=>{switchTab('studio');if(!current)projects.length?openProject(projects[0]):createProject();setTimeout(()=>work.scrollIntoView({block:'start'}),50);},'v11-primary'));homeEntry.querySelector('div')?.append(row);}
+  const noteEl=section.querySelector('.studio-note');if(noteEl)noteEl.textContent='Studio 2D (niżej) zapisuje mapy w tej przeglądarce. Gry 3D z NexusScript możesz opublikować dla innych graczy.';
+  const oldSwitch=switchTab;
+  switchTab=function(name){const r=oldSwitch.apply(this,arguments);if(name==='studio'){renderLibrary();if(!catalogLoaded)loadCatalog();if(current)requestAnimationFrame(()=>editor.resize());}return r;};
+  window.switchTab=switchTab;
+
+  // ---------- Library ----------
+  function renderLibrary(){
+    libGrid.replaceChildren();
+    if(!projects.length){libGrid.append(el('p','v11-muted','Nie masz jeszcze gier 3D. Kliknij „Nowa gra 3D”.'));return;}
+    for(const p of projects){
+      const card=el('article','nx-card');card.append(el('strong',null,p.name),el('small',null,(p.parts?.length||0)+' klocków · '+(p.script||'').split('\n').length+' linii kodu'+(p.publishedId?' · opublikowana '+p.publishedId:'')));
+      const row=el('div','nx-row');row.append(btn('Edytuj',()=>{openProject(p);work.scrollIntoView({block:'start'});}),btn('Graj',()=>{openProject(p);test();}),btn('Usuń',()=>confirmDialog('Usunąć projekt?','„'+p.name+'” zniknie z tej przeglądarki. Opublikowana wersja zostaje w katalogu.','Usuń',()=>{projects=projects.filter(x=>x.id!==p.id);if(current?.id===p.id){current=null;work.hidden=true;editor.stop();}persist('Usunięto projekt.');})));
+      card.append(row);libGrid.append(card);
+    }
+  }
+  function createProject(){if(projects.length>=20){alertDialog('Limit projektów','Możesz mieć 20 gier 3D. Usuń jedną, aby dodać nową.');return;}persist();const p=template();projects.unshift(p);openProject(p);persist('Utworzono grę 3D. Postaw klocki albo napisz kod w zakładce Skrypt.');}
+  function openProject(p){
+    if(current&&current.id!==p.id)persist();
+    current=clone(projects.find(x=>x.id===p.id)||p);selected=null;undo=[];redo=[];work.hidden=false;$('nxName').value=current.name;
+    editor.start();refreshScriptParts();renderProps();showTab(activeTab);status('Otwarto „'+current.name+'”.');
+  }
+  $('nxName').oninput=()=>{if(!current)return;current.name=$('nxName').value.trim()||'Moja gra 3D';changed();};
+  const actions=$('nxActions');
+  actions.append(btn('▶ Testuj',()=>test(),'v11-primary'),btn('Zapisz',()=>persist('Zapisano projekt.')),btn('Cofnij',()=>doUndo()),btn('Publikuj',()=>publishDialog()),btn('Kod gry',()=>exportDialog()),btn('Zamknij',()=>{persist();current=null;work.hidden=true;editor.stop();}));
+
+  // ---------- 3D editor ----------
+  const editor=(()=>{
+    let renderer=null,scene,camera,frame=0,meshes=[],ghosts=[],helper=null,yaw=-.8,pitch=.75,dist=40,target=new THREE.Vector3(0,0,8),pointer=null,cursor=null;
+    const view=$('nxView'),ray=new THREE.Raycaster(),ground=new THREE.Plane(new THREE.Vector3(0,1,0),.5);
+    function start(){
+      if(!renderer){
+        renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));view.prepend(renderer.domElement);renderer.domElement.tabIndex=0;renderer.domElement.setAttribute('aria-label','Widok 3D edytora');
+        scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(55,1,.1,800);
+        scene.add(new THREE.HemisphereLight(0xffffff,0x667788,.9));const sun=new THREE.DirectionalLight(0xffffff,.6);sun.position.set(-30,60,20);scene.add(sun);
+        const grid=new THREE.GridHelper(200,100,0x5b6b7c,0x2c3642);grid.position.y=-.5;scene.add(grid);
+        cursor=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.25,depthWrite:false}));cursor.visible=false;scene.add(cursor);
+        bind();
+      }
+      rebuild();resize();cancelAnimationFrame(frame);const loop=()=>{frame=requestAnimationFrame(loop);if(work.hidden||!view.offsetWidth)return;render();};loop();
+    }
+    function stop(){cancelAnimationFrame(frame);frame=0;}
+    function resize(){if(!renderer)return;const w=view.clientWidth,h=view.clientHeight||420;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+    addEventListener('resize',()=>resize());
+    function clearMeshes(list){for(const m of list){scene.remove(m);m.traverse(o=>{o.geometry?.dispose?.();o.material?.map?.dispose?.();o.material?.dispose?.();});}list.length=0;}
+    function rebuild(){
+      if(!renderer||!current)return;clearMeshes(meshes);
+      scene.background=new THREE.Color(current.settings.sky||'#8fd3ff');
+      current.parts.forEach((raw,i)=>{const part=NexusGame.normalizeParts([raw])[0];if(!part)return;const m=NexusGame.buildMesh(part);m.userData.index=i;scene.add(m);meshes.push(m);});
+      if(helper){scene.remove(helper);helper=null;}
+      const sm=selected!=null&&meshes.find(m=>m.userData.index===selected);
+      if(sm){helper=new THREE.BoxHelper(sm,0xffb23c);scene.add(helper);}
+    }
+    function setGhosts(parts){
+      if(!renderer)return;clearMeshes(ghosts);
+      for(const part of parts){const m=NexusGame.buildMesh({...part,size:part.size.map(v=>Math.max(.2,Math.min(200,v)))});m.traverse(o=>{if(o.material){o.material.transparent=true;o.material.opacity=.38;o.material.depthWrite=false;}});scene.add(m);ghosts.push(m);}
+    }
+    function render(){
+      const w=view.clientWidth,h=view.clientHeight;if(Math.abs(renderer.domElement.clientWidth-w)>1||Math.abs(renderer.domElement.clientHeight-h)>1)resize();
+      camera.position.set(target.x+Math.sin(yaw)*Math.cos(pitch)*dist,target.y+Math.sin(pitch)*dist,target.z+Math.cos(yaw)*Math.cos(pitch)*dist);camera.lookAt(target);
+      helper?.update?.();renderer.render(scene,camera);
+    }
+    function pick(e){
+      const r=renderer.domElement.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);
+      const hit=ray.intersectObjects(meshes,true)[0];
+      if(hit){let m=hit.object;while(m.parent&&m.userData.index===undefined)m=m.parent;return{index:m.userData.index,point:hit.point,normal:hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld).round():new THREE.Vector3(0,1,0)};}
+      const p=new THREE.Vector3();return ray.ray.intersectPlane(ground,p)?{index:null,point:p,normal:new THREE.Vector3(0,1,0)}:null;
+    }
+    function placement(hit){
+      const size=SIZE[tool]||[4,1,4],snap=v=>Math.round(v);
+      // The editor floor sits at y=-0.5, so a 1-high block placed on it is centred at y=0 like the templates.
+      if(hit.index==null)return [snap(hit.point.x),tool==='coin'?1:size[1]/2-.5,snap(hit.point.z)];
+      const base=current.parts[hit.index],n=hit.normal,pos=[snap(hit.point.x),snap(hit.point.y),snap(hit.point.z)];
+      for(let a=0;a<3;a++){const k=[n.x,n.y,n.z][a];if(k){pos[a]=base.p[a]+k*(base.s[a]/2+size[a]/2);}}
+      if(n.y>0&&tool==='coin')pos[1]=base.p[1]+base.s[1]/2+1;
+      return pos.map(v=>Math.round(v*2)/2);
+    }
+    function bind(){
+      const c=renderer.domElement;
+      c.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;pointer={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};try{c.setPointerCapture(e.pointerId);}catch{}c.focus({preventScroll:true});});
+      c.addEventListener('pointermove',e=>{
+        if(pointer&&pointer.id===e.pointerId){const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;if(Math.abs(dx)+Math.abs(dy)>4)pointer.moved=true;if(pointer.moved){yaw-=dx*.007;pitch=Math.max(.08,Math.min(1.45,pitch+dy*.005));pointer.x=e.clientX;pointer.y=e.clientY;}return;}
+        if(e.pointerType==='mouse'&&current&&!['select','erase'].includes(tool)){const hit=pick(e);if(hit){const pos=placement(hit),s=SIZE[tool];cursor.visible=true;cursor.position.set(...pos);cursor.scale.set(...s);}else cursor.visible=false;}
+      });
+      const up=e=>{if(!pointer||pointer.id!==e.pointerId)return;const wasClick=!pointer.moved;pointer=null;if(wasClick&&e.type==='pointerup')click(e);};
+      c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);c.addEventListener('lostpointercapture',e=>{if(pointer&&pointer.id===e.pointerId&&pointer.moved)pointer=null;});
+      c.addEventListener('pointerleave',()=>{cursor.visible=false;});
+      c.addEventListener('wheel',e=>{e.preventDefault();dist=Math.max(8,Math.min(160,dist*(e.deltaY>0?1.1:.9)));},{passive:false});
+      c.addEventListener('keydown',e=>{
+        if(!current)return;
+        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();doUndo();return;}
+        if(selected==null)return;const map={ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[2,-1],ArrowDown:[2,1],PageUp:[1,1],PageDown:[1,-1]};
+        if(map[e.key]){e.preventDefault();nudge(...map[e.key]);}
+        if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();}
+      });
+      $('nxZoomIn').onclick=()=>dist=Math.max(8,dist*.8);$('nxZoomOut').onclick=()=>dist=Math.min(160,dist*1.25);
+      $('nxCenter').onclick=()=>{const sp=current?.parts.find(p=>p.t==='spawn');target.set(sp?sp.p[0]:0,0,(sp?sp.p[2]:0)+8);yaw=-.8;pitch=.75;dist=40;};
+    }
+    function click(e){
+      if(!current)return;const hit=pick(e);if(!hit)return;
+      if(tool==='select'){selected=hit.index;renderProps();rebuild();return;}
+      if(tool==='erase'){if(hit.index==null)return;snapshot();current.parts.splice(hit.index,1);selected=null;afterEdit();return;}
+      if(current.parts.length>=NexusGame.MAX_PARTS){status('Limit 600 klocków.',true);return;}
+      snapshot();
+      if(tool==='spawn')current.parts=current.parts.filter(p=>p.t!=='spawn');
+      const pos=placement(hit),size=[...SIZE[tool]],color=$('nxNewColor')?.value||NexusGame.DEFAULT_COLOR[tool];
+      current.parts.push({t:tool,p:pos,s:size,c:tool==='finish'?'#ffffff':color});selected=current.parts.length-1;afterEdit();
+    }
+    return {start,stop,resize,rebuild,setGhosts,focus:p=>{target.set(p[0],p[1],p[2]);}};
+  })();
+  function afterEdit(){editor.rebuild();renderProps();changed();}
+  function doUndo(){if(!current||!undo.length)return;redo.push(clone(current.parts));current.parts=undo.pop();selected=null;afterEdit();status('Cofnięto.');}
+  function nudge(axis,d){if(selected==null)return;snapshot();current.parts[selected].p[axis]+=d;afterEdit();}
+  function deleteSelected(){if(selected==null)return;snapshot();current.parts.splice(selected,1);selected=null;afterEdit();}
+  // Tools
+  for(const [id,label,color] of TOOLS){const b=el('button','nx-tool');b.type='button';b.dataset.tool=id;const sw=el('i');sw.style.background=color;b.append(sw,document.createTextNode(label));b.setAttribute('aria-pressed',String(id===tool));b.onclick=()=>{tool=id;document.querySelectorAll('#nxTools .nx-tool').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.tool===tool)));$('nxHelp').textContent=id==='select'?'Kliknij klocek, aby go zaznaczyć i edytować. Strzałki przesuwają zaznaczony.':id==='erase'?'Kliknij klocek, aby go usunąć.':'Kliknij, aby postawić: '+label+'. Przeciągnij, aby obrócić widok.';renderProps();};$('nxTools').append(b);}
+  function renderProps(){
+    const box=$('nxProps');box.replaceChildren();if(!current)return;
+    if(selected==null||!current.parts[selected]){
+      box.append(el('h3',null,'Nowy klocek'));
+      const l=el('label',null,'Kolor nowych klocków');const c=el('input','nx-input');c.type='color';c.id='nxNewColor';c.value=NexusGame.DEFAULT_COLOR[tool]||'#4eae79';l.append(c);box.append(l);
+      box.append(el('p','v11-muted','Zaznacz klocek narzędziem „Wybierz”, aby zmienić jego nazwę, pozycję, rozmiar i kolor. Nazwa pozwala używać go w kodzie, np. when touch "Most".'));
+      box.append(el('p','v11-muted',current.parts.length+'/600 klocków w edytorze.'));return;
+    }
+    const p=current.parts[selected];
+    box.append(el('h3',null,'Zaznaczony klocek'));
+    const typeL=el('label',null,'Typ');const typeS=el('select','nx-select');for(const t of NexusGame.TYPES){const o=el('option',null,TOOLS.find(x=>x[0]===t)?.[1]||t);o.value=t;typeS.append(o);}typeS.value=p.t;typeS.onchange=()=>{snapshot();p.t=typeS.value;afterEdit();};typeL.append(typeS);
+    const nameL=el('label',null,'Nazwa (do kodu)');const name=el('input','nx-input');name.maxLength=24;name.value=p.n||'';name.placeholder='np. Most';name.onchange=()=>{snapshot();const v=name.value.trim().slice(0,24);if(v)p.n=v;else delete p.n;afterEdit();};nameL.append(name);
+    const trio=(label,key)=>{const l=el('label',null,label),row=el('div','trio');for(let a=0;a<3;a++){const i=el('input','nx-input');i.type='number';i.step=key==='s'?'.5':'.5';i.value=p[key][a];i.setAttribute('aria-label',label+' '+'xyz'[a]);i.onchange=()=>{const v=Number(i.value);if(!isFinite(v))return;snapshot();p[key][a]=key==='s'?Math.max(.2,Math.min(200,v)):Math.max(-500,Math.min(500,v));afterEdit();};row.append(i);}l.append(row);return l;};
+    const colL=el('label',null,'Kolor');const col=el('input','nx-input');col.type='color';col.value=p.c||'#4eae79';col.onchange=()=>{snapshot();p.c=col.value;afterEdit();};colL.append(col);
+    const moves=el('div','nx-row');for(const [label,a,d] of [['←X',0,-1],['X→',0,1],['↑Y',1,1],['↓Y',1,-1],['Z−',2,-1],['Z+',2,1]])moves.append(btn(label,()=>nudge(a,d)));
+    const row=el('div','nx-row');row.append(btn('Duplikuj',()=>{snapshot();const c=clone(p);c.p[0]+=p.s[0];delete c.n;current.parts.push(c);selected=current.parts.length-1;afterEdit();}),btn('Usuń',deleteSelected),btn('Odznacz',()=>{selected=null;afterEdit();}));
+    box.append(typeL,nameL,trio('Pozycja x y z','p'),trio('Rozmiar szer. wys. głęb.','s'),colL,moves,row);
+  }
+
+  // ---------- Tabs ----------
+  let activeTab='script';
+  const TABS=[['script','Skrypt NexusScript'],['ai','Asystent AI'],['settings','Ustawienia gry'],['help','Pomoc: język']];
+  for(const [id,label] of TABS){const b=btn(label,()=>showTab(id));b.setAttribute('role','tab');b.dataset.tab=id;$('nxTabs').append(b);}
+  function showTab(id){
+    activeTab=id;document.querySelectorAll('#nxTabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===id)));
+    const pane=$('nxPane');pane.replaceChildren();if(!current)return;
+    if(id==='script'){
+      const area=el('textarea','nx-area nx-code');area.id='nxCode';area.spellcheck=false;area.value=current.script||'';area.setAttribute('aria-label','Kod NexusScript');
+      area.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();const s=area.selectionStart,t=area.selectionEnd;area.setRangeText('  ',s,t,'end');area.dispatchEvent(new Event('input'));}});
+      let checkTimer=0;area.oninput=()=>{current.script=area.value;changed();clearTimeout(checkTimer);checkTimer=setTimeout(()=>{check(false);refreshScriptParts();},700);};
+      const msg=el('div','nx-msg');msg.id='nxCheck';
+      const row=el('div','nx-row');const toggle=btn(showScriptParts?'Ukryj klocki z kodu':'Pokaż klocki z kodu',()=>{showScriptParts=!showScriptParts;toggle.textContent=showScriptParts?'Ukryj klocki z kodu':'Pokaż klocki z kodu';refreshScriptParts();});
+      row.append(btn('Sprawdź kod',()=>check(true)),toggle,btn('▶ Testuj',()=>test(),'v11-primary'));
+      pane.append(row,msg,area);check(false);
+    }
+    if(id==='ai')renderAiTab(pane);
+    if(id==='settings'){
+      const s=current.settings;const wrap=el('div','nx-props');wrap.style.maxWidth='460px';
+      const slider=(label,key,min,max)=>{const l=el('label',null,label+': '+s[key]);const i=el('input');i.type='range';i.min=min;i.max=max;i.step=1;i.value=s[key];i.oninput=()=>{s[key]=Number(i.value);l.firstChild.textContent=label+': '+s[key];changed();};l.append(i);return l;};
+      const skyL=el('label',null,'Kolor nieba');const sky=el('input','nx-input');sky.type='color';sky.value=s.sky;sky.oninput=()=>{s.sky=sky.value;editor.rebuild();changed();};skyL.append(sky);
+      const descL=el('label',null,'Opis gry (widoczny w katalogu)');const desc=el('textarea','nx-area');desc.style.minHeight='80px';desc.maxLength=300;desc.value=current.description||'';desc.oninput=()=>{current.description=desc.value;changed();};descL.append(desc);
+      wrap.append(slider('Prędkość','speed',4,16),slider('Skok','jump',6,22),slider('Grawitacja','gravity',10,45),skyL,descL);pane.append(wrap);
+    }
+    if(id==='help'){const pre=el('div','nx-ref');pre.textContent=REFERENCE;const row=el('div','nx-row');row.append(btn('Kopiuj prompt dla AI',()=>copyPrompt()));pane.append(row,pre);}
+  }
+  function check(verbose){
+    const m=$('nxCheck');if(!m||!current)return true;
+    try{NexusScript.parse(current.script||'');const prev=NexusGame.previewParts(current);
+      if(prev.errors.length){m.textContent='Linia '+prev.errors[0].line+': '+prev.errors[0].message;m.classList.add('error');return false;}
+      m.textContent=verbose||prev.parts.length?'Kod jest poprawny.'+(prev.parts.length?' Kod buduje '+prev.parts.length+' klocków (pokazane półprzezroczyście).':''):'';m.classList.remove('error');return true;}
+    catch(e){m.textContent='Linia '+(e.line||'?')+': '+e.message;m.classList.add('error');return false;}
+  }
+  function refreshScriptParts(){if(!current)return;editor.setGhosts(showScriptParts?NexusGame.previewParts(current).parts:[]);}
+
+  // ---------- AI ----------
+  function promptText(task){
+    return 'Jesteś programistą gier w języku NexusScript dla platformy BloxWeb. Poniżej pełna dokumentacja języka. Używaj tylko opisanych funkcji.\n\n'+REFERENCE+
+      '\n\n## Zadanie\n'+(task||'Ulepsz moją grę: dodaj więcej poziomów, przeszkód i nagród.')+
+      (current?.script?.trim()?'\n\n## Obecny kod gry (rozbuduj go albo popraw)\n```nexus\n'+current.script.trim()+'\n```':'')+
+      (current?.parts?.length?'\n\nW edytorze są już ręcznie postawione klocki ('+current.parts.length+'), w tym start'+(current.parts.some(p=>p.t==='spawn')?'':' (brak)')+'. Nazwane klocki: '+(current.parts.filter(p=>p.n).map(p=>'"'+p.n+'" ('+p.t+')').join(', ')||'brak')+'.':'')+
+      '\n\nOdpowiedz wyłącznie jednym blokiem kodu ```nexus ... ``` z całym programem.';
+  }
+  async function copyText(text,okMsg,target){try{await navigator.clipboard.writeText(text);status(okMsg);if(target)target.textContent=okMsg;}catch{const a=el('textarea');a.value=text;document.body.append(a);a.select();try{document.execCommand('copy');status(okMsg);if(target)target.textContent=okMsg;}catch{status('Nie udało się skopiować – zaznacz tekst ręcznie.',true);}a.remove();}}
+  function copyPrompt(task){copyText(promptText(task),'Skopiowano prompt. Wklej go do dowolnego AI (np. ChatGPT, Claude, Gemini), a odpowiedź wklej w „Wklej kod od AI”.',$('nxAiMsg'));}
+  function applyCode(code,mode){
+    try{NexusScript.parse(code);}catch(e){return 'Kod ma błąd w linii '+(e.line||'?')+': '+e.message+'. Poproś AI o poprawkę albo popraw ręcznie.';}
+    current.script=mode==='append'?(current.script||'').replace(/\s*$/,'\n\n')+code:code;persist('Wstawiono kod NexusScript.');refreshScriptParts();return null;
+  }
+  function renderAiTab(pane){
+    const msg=el('div','nx-msg');msg.id='nxAiMsg';
+    const descL=el('label','nx-props');descL.append(document.createTextNode('Opisz grę, którą chcesz zrobić (np. „obby z lawą, 10 platform, ruchome windy i monety”)'));
+    const desc=el('textarea','nx-area');desc.id='nxAiDesc';desc.style.minHeight='70px';desc.maxLength=600;desc.value=current.aiDescription||'';desc.oninput=()=>{current.aiDescription=desc.value;changed();};descL.append(desc);
+    const r1=el('div','nx-row');
+    r1.append(btn('Generuj wbudowanym asystentem',()=>{const code=NexusAssistant.generate(desc.value);const err=applyCode(code,'replace');msg.textContent=err||'Asystent wbudowany stworzył grę (działa bez internetu). Klocki z kodu widać w edytorze. Kliknij „Testuj”.';msg.classList.toggle('error',!!err);},'v11-primary'),
+      btn('Zapytaj AI na serwerze',async b=>{const button=b?.target||null;msg.textContent='AI na serwerze pisze kod… (do minuty)';msg.classList.remove('error');
+        try{const res=await api('ai_code',{prompt:desc.value||'Zrób ciekawą grę obby',code:current.script||''});const code=NexusScript.extract(res.text);const err=applyCode(code,'replace');msg.textContent=err||'AI na serwerze wstawiło nowy kod. Sprawdź go i kliknij „Testuj”.';msg.classList.toggle('error',!!err);if(err){pasteArea.value=code;}}
+        catch(e){msg.textContent=e.message;msg.classList.add('error');}}),
+      btn('Kopiuj prompt dla innego AI',()=>copyPrompt(desc.value)));
+    const pasteL=el('label','nx-props');pasteL.append(document.createTextNode('Wklej kod od AI (może być cała odpowiedź – wyciągnę blok kodu)'));
+    const pasteArea=el('textarea','nx-area');pasteArea.id='nxPaste';pasteArea.spellcheck=false;pasteL.append(pasteArea);
+    const r2=el('div','nx-row');
+    r2.append(btn('Zastąp kod gry',()=>{const err=applyCode(NexusScript.extract(pasteArea.value),'replace');msg.textContent=err||'Wstawiono kod. Kliknij „Testuj”.';msg.classList.toggle('error',!!err);if(!err)pasteArea.value='';},'v11-primary'),
+      btn('Dopisz na końcu',()=>{const err=applyCode(NexusScript.extract(pasteArea.value),'append');msg.textContent=err||'Dopisano kod.';msg.classList.toggle('error',!!err);if(!err)pasteArea.value='';}));
+    pane.append(descL,r1,msg,pasteL,r2,el('p','v11-muted','Asystent wbudowany działa offline i rozumie typowe pomysły: obby, parkour, monety, lawa, wrogowie, labirynt, wieża, arena, trampoliny, ruchome platformy, limit czasu, kolory i noc. AI na serwerze rozumie dowolny opis, ma dzienny limit. Kod zawsze sprawdzam przed wstawieniem.'));
+  }
+
+  // ---------- Test / publish / export ----------
+  function project(){return {format:'bloxweb-nexus',version:1,name:current.name,settings:clone(current.settings),parts:clone(current.parts),script:current.script||''};}
+  function test(){
+    if(!current)return;persist();
+    try{NexusScript.parse(current.script||'');}catch(e){showTab('script');check(true);status('Popraw błąd w kodzie, linia '+(e.line||'?')+': '+e.message,true);return;}
+    if(typeof currentPlayingGame!=='undefined'&&currentPlayingGame){status('Najpierw wyjdź z uruchomionej gry.',true);return;}
+    editor.stop();playing=NexusGame.play({...project()},{showErrors:true,onExit:()=>{playing=null;editor.start();}});
+  }
+  function dialog(title){const back=el('div','nx-dialog-back'),box=el('section','nx-dialog');box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.append(el('h2',null,title));back.append(box);document.body.append(back);back.addEventListener('click',e=>{if(e.target===back)back.remove();});return {back,box,close:()=>back.remove()};}
+  function alertDialog(title,text){const d=dialog(title);d.box.append(el('p',null,text));const r=el('div','nx-row');r.append(btn('OK',d.close,'v11-primary'));d.box.append(r);}
+  function confirmDialog(title,text,ok,fn){const d=dialog(title);d.box.append(el('p',null,text));const r=el('div','nx-row');r.append(btn('Anuluj',d.close),btn(ok,()=>{d.close();fn();},'v11-primary'));d.box.append(r);}
+  function publishDialog(){
+    if(!current)return;persist();
+    try{NexusScript.parse(current.script||'');}catch(e){alertDialog('Najpierw popraw kod','Linia '+(e.line||'?')+': '+e.message);return;}
+    const prev=NexusGame.previewParts(current);if(!current.parts.some(p=>p.t==='spawn')&&!prev.parts.some(p=>p.type==='spawn')){alertDialog('Brakuje startu','Dodaj klocek „Start”, aby gracze wiedzieli, gdzie zaczynają.');return;}
+    const d=dialog(current.publishedId?'Aktualizuj opublikowaną grę':'Opublikuj grę');
+    const t=el('input','nx-input');t.maxLength=40;t.value=current.name;t.setAttribute('aria-label','Tytuł');
+    const ds=el('textarea','nx-area');ds.style.minHeight='80px';ds.maxLength=300;ds.value=current.description||'';ds.placeholder='Krótki opis gry';ds.setAttribute('aria-label','Opis');
+    const m=el('div','nx-msg');
+    d.box.append(el('p','v11-muted','Gra pojawi się w katalogu „Gry graczy” razem z Twoim nickiem. Nie wpisuj danych osobowych. Niestosowne słowa są blokowane, a gry zgłoszone przez 3 osoby są ukrywane.'),t,ds,m);
+    const r=el('div','nx-row');const go=btn(current.publishedId?'Aktualizuj':'Publikuj',async()=>{
+      go.disabled=true;m.textContent='Publikuję…';m.classList.remove('error');
+      try{const res=await api('games_publish',{id:current.publishedId||'',title:t.value.trim(),description:ds.value.trim(),game:project()});current.publishedId=res.id;current.description=ds.value.trim();persist('Opublikowano grę '+res.id+'.');
+        m.textContent='Gotowe! Kod gry: '+res.id+'. Znajomi mogą go wpisać w „Gry graczy”.';loadCatalog();go.hidden=true;}
+      catch(e){m.textContent=e.message;m.classList.add('error');go.disabled=false;}
+    },'v11-primary');
+    r.append(btn('Zamknij',d.close),go);d.box.append(r);t.focus();
+  }
+  function exportDialog(){
+    if(!current)return;const d=dialog('Kod gry (JSON)');const a=el('textarea','nx-area');a.readOnly=true;a.value=JSON.stringify(project());
+    const r=el('div','nx-row');r.append(btn('Kopiuj',()=>copyText(a.value,'Skopiowano kod gry.')),btn('Zamknij',d.close));d.box.append(el('p','v11-muted','Zawiera klocki, ustawienia i skrypt. Wklej go w „Wklej grę (kod JSON)”, aby przenieść grę.'),a,r);
+  }
+  function importDialog(){
+    const d=dialog('Wklej grę (kod JSON)');const a=el('textarea','nx-area');const m=el('div','nx-msg');
+    const r=el('div','nx-row');r.append(btn('Anuluj',d.close),btn('Importuj',()=>{
+      try{const v=JSON.parse(a.value);if(v.format!=='bloxweb-nexus'||!Array.isArray(v.parts))throw Error('To nie jest kod gry 3D z BloxWeb.');if(projects.length>=20)throw Error('Masz już 20 projektów.');
+        NexusScript.parse(String(v.script||''));const p={...template(),name:String(v.name||'Gra').slice(0,40),settings:{...template().settings,...(v.settings||{})},parts:NexusGame.normalizeParts(v.parts).map(x=>({t:x.type,p:x.pos,s:x.size,c:x.color,...(x.name?{n:x.name}:{})})),script:String(v.script||'')};
+        projects.unshift(p);openProject(p);persist('Zaimportowano grę.');d.close();}
+      catch(e){m.textContent=e instanceof SyntaxError?'To nie jest poprawny JSON.':(e.line?'Linia '+e.line+': ':'')+e.message;m.classList.add('error');}},'v11-primary'));
+    d.box.append(a,m,r);a.focus();
+  }
+
+  // ---------- Catalogue ----------
+  let catalogLoaded=false;
+  async function loadCatalog(){
+    const msg=$('nxCatalogMsg'),grid=$('nxGames'),mine=$('nxMine');msg.textContent='Ładuję gry graczy…';msg.classList.remove('error');
+    try{
+      const res=await api('games_list',{sort:$('nxSort').value,query:$('nxSearch').value.trim()});catalogLoaded=true;
+      grid.replaceChildren(...(res.games.length?res.games.map(g=>gameCard(g,false)):[el('p','v11-muted','Brak opublikowanych gier. Bądź pierwszy!')]));
+      mine.replaceChildren(...(res.mine.length?res.mine.map(g=>gameCard(g,true)):[el('p','v11-muted','Nie opublikowałeś jeszcze żadnej gry.')]));
+      msg.textContent='';
+    }catch(e){msg.textContent=e.message;msg.classList.add('error');}
+  }
+  function gameCard(g,own){
+    const card=el('article','nx-card');card.append(el('strong',null,g.title),el('small',null,'autor: '+g.author+' · zagrano '+g.plays+'× · '+g.id));
+    if(g.description)card.append(el('p',null,g.description));
+    if(own&&g.hidden===1)card.append(el('span','nx-tag warn','Ukryta po zgłoszeniach – czeka na sprawdzenie'));
+    const row=el('div','nx-row');row.append(btn('▶ Graj',()=>playPublished(g.id),'v11-primary'));
+    if(own)row.append(btn('Wycofaj',()=>confirmDialog('Wycofać grę?','„'+g.title+'” zniknie z katalogu. Projekt zostaje u Ciebie w Studio.','Wycofaj',async()=>{try{await api('games_unpublish',{id:g.id});for(const p of projects)if(p.publishedId===g.id)delete p.publishedId;persist();loadCatalog();}catch(e){alertDialog('Błąd',e.message);}})));
+    else row.append(btn('Zgłoś',()=>reportDialog(g)));
+    card.append(row);return card;
+  }
+  function reportDialog(g){
+    const d=dialog('Zgłoś grę „'+g.title+'”');const s=el('select','nx-select');for(const r of ['Nieodpowiednie treści','Wulgarne słowa','Dane osobowe','Oszustwo lub spam','Inne'])s.append(el('option',null,r));
+    const m=el('div','nx-msg');const r=el('div','nx-row');r.append(btn('Anuluj',d.close),btn('Zgłoś',async()=>{try{await api('games_report',{id:g.id,reason:s.value});m.textContent='Dziękujemy. Zgłoszenie zapisane.';m.classList.remove('error');setTimeout(d.close,1200);}catch(e){m.textContent=e.message;m.classList.add('error');}},'v11-primary'));
+    d.box.append(el('p','v11-muted','Gra zgłoszona przez 3 różne osoby zostanie ukryta do sprawdzenia.'),s,m,r);
+  }
+  async function playPublished(id){
+    const msg=$('nxCatalogMsg');msg.textContent='Wczytuję grę '+id+'…';msg.classList.remove('error');
+    try{
+      if(typeof currentPlayingGame!=='undefined'&&currentPlayingGame)throw Error('Najpierw wyjdź z uruchomionej gry.');
+      const res=await api('games_get',{id});msg.textContent='';editor.stop();
+      NexusGame.play({...res.game,name:res.card.title},{buttons:res.card.authorId===online()?.state.id?[]:[{label:'Zgłoś',onClick:()=>reportDialog(res.card)}],onExit:()=>{if(current)editor.start();}});
+    }catch(e){msg.textContent=e.message;msg.classList.add('error');}
+  }
+  renderLibrary();
+  window.NexusStudio={open:openProject,create:createProject,loadCatalog,playPublished,promptText,get current(){return current;},get projects(){return projects;}};
 })();
 </script>
 </body>

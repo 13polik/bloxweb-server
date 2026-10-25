@@ -37,6 +37,12 @@ if not secret_file.exists():
     secret_file.chmod(0o600)
 SERVER_SECRET = secret_file.read_text().strip().encode()
 TRUST_VISITOR = os.environ.get("TRUST_PREVIEW_PROXY") == "1"
+# Optional Cloudflare Worker running the NexusScript assistant model.
+AI_URL = os.environ.get("BLOX_AI_URL", "")
+AI_KEY = os.environ.get("BLOX_AI_KEY", "")
+AI_DAILY_LIMIT = int(os.environ.get("BLOX_AI_DAILY_LIMIT", "250"))
+# The same language reference is embedded in the page for the copyable AI prompt.
+NEXUS_REFERENCE = (ROOT / "nexusscript.md").read_text(encoding="utf-8") if (ROOT / "nexusscript.md").exists() else ""
 rooms = {}
 presence = {}
 rates = defaultdict(deque)
@@ -220,6 +226,78 @@ def relations(uid):
                                    incoming=[r["sender"] for r in ins], outgoing=[r["target"] for r in outs],
                                    messages=[dict(r) for r in msgs])
     return relation_cache[uid]
+
+
+# ---------- Player-made games (Studio 3D + NexusScript) ----------
+PART_TYPES = {"block", "lava", "coin", "spawn", "finish", "checkpoint", "spring", "enemy", "glass"}
+HEX = re.compile(r"#[0-9a-fA-F]{6}")
+# Short stems of common Polish/English swear words; titles, descriptions,
+# part names and script text are all checked because other children see them.
+BLOCKED_WORDS = re.compile(r"kurw|chuj|\bhuj|pierdol|jeba|jebi|\bjeb|pizd|spierd|kutas|dziwk|cwel|pedal|fuck|shit|bitch|nigg|whore|cunt")
+game_publish_times = defaultdict(deque)
+game_plays_seen = set()
+ai_calls = defaultdict(deque)
+ai_daily = deque()
+
+
+def unfold(text):
+    return str(text).casefold().translate(str.maketrans("ąćęłńóśźż0134@$", "acelnoszzoieaas"))
+
+
+def rude(*texts):
+    return any(BLOCKED_WORDS.search(unfold(t)) for t in texts if t)
+
+
+def vec(value, low, high, default):
+    value = value if isinstance(value, list) and len(value) == 3 else [default]*3
+    return [round(number(v, default, low, high), 2) for v in value]
+
+
+def game_data(value):
+    """Validate a Studio 3D project: data only, the script stays text that the
+    client interprets in a sandbox. Returns the canonical copy that is stored."""
+    if not isinstance(value, dict) or value.get("format") != "bloxweb-nexus":
+        fail("Nieprawidłowy projekt gry.")
+    settings = value.get("settings") if isinstance(value.get("settings"), dict) else {}
+    sky = settings.get("sky") if HEX.fullmatch(str(settings.get("sky", ""))) else "#8fd3ff"
+    parts = []
+    raw_parts = value.get("parts") if isinstance(value.get("parts"), list) else []
+    if len(raw_parts) > 600:
+        fail("Gra może mieć najwyżej 600 elementów.")
+    for raw in raw_parts:
+        if not isinstance(raw, dict) or raw.get("t") not in PART_TYPES:
+            continue
+        part = dict(t=raw["t"], p=vec(raw.get("p"), -500, 500, 0), s=vec(raw.get("s"), .2, 200, 1),
+                    c=raw["c"] if HEX.fullmatch(str(raw.get("c", ""))) else "#9aa4b1")
+        name = clean(raw.get("n"), 24)
+        if name:
+            part["n"] = name
+        if raw.get("r"):
+            part["r"] = round(number(raw.get("r"), 0, -360, 360), 1)
+        parts.append(part)
+    script = str(value.get("script") or "")
+    if len(script) > 20000:
+        fail("Skrypt NexusScript może mieć najwyżej 20 000 znaków.")
+    return dict(format="bloxweb-nexus", version=1, settings=dict(
+        speed=number(settings.get("speed"), 8, 4, 16), jump=number(settings.get("jump"), 12, 6, 22),
+        gravity=number(settings.get("gravity"), 30, 10, 45), sky=sky), parts=parts, script=script)
+
+
+def game_card(row):
+    author = profile(row["author"]) or {}
+    return dict(id=row["id"], title=row["title"], description=row["description"], author=author.get("name", "Gracz"),
+                authorId=row["author"], plays=row["plays"], created=row["created"], updated=row["updated"],
+                hidden=row["hidden"])
+
+
+def ai_request(prompt, code):
+    """Forward one NexusScript request to the Cloudflare Worker running the model."""
+    import urllib.request
+    payload = json.dumps(dict(prompt=prompt, code=code, reference=NEXUS_REFERENCE)).encode()
+    request = urllib.request.Request(AI_URL, data=payload, method="POST", headers={
+        "Content-Type": "application/json", "X-Blox-Key": AI_KEY})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read().decode())
 
 
 def forget_relations(*uids):
@@ -647,7 +725,7 @@ async def unexpected_error(request, exc):
 @app.get("/health")
 async def health():
     db.execute("SELECT 1").fetchone()
-    return dict(ok=True, version=16, rooms=len(rooms),
+    return dict(ok=True, version=17, ai=bool(AI_URL and AI_KEY), rooms=len(rooms),
                 storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
 
 
@@ -659,7 +737,8 @@ async def homepage():
 @app.post("/api/{operation}")
 async def api(operation: str, request: Request):
     raw = await request.body()
-    if len(raw) > 40000:
+    # A published Studio game (parts + NexusScript) may be larger than other requests.
+    if len(raw) > (160000 if operation == "games_publish" else 40000):
         fail("Żądanie jest zbyt duże.", 413)
     try:
         body = json.loads(raw or "{}")
@@ -847,6 +926,105 @@ async def api(operation: str, request: Request):
         db.commit()
         forget_relations(uid, target)
         return dict(social=social(uid))
+    if operation == "games_publish":
+        title, description = clean(body.get("title"), 40), clean(body.get("description"), 300)
+        if len(title) < 3:
+            fail("Tytuł musi mieć co najmniej 3 znaki.")
+        data = game_data(body.get("game"))
+        if rude(title, description, data["script"], *[p.get("n", "") for p in data["parts"]]):
+            fail("Tytuł, opis lub tekst w grze zawiera niedozwolone słowa.")
+        times = game_publish_times[uid]
+        while times and times[0] < now()-3600:
+            times.popleft()
+        if len(times) >= 15:
+            fail("Możesz opublikować najwyżej 15 wersji gier na godzinę.", 429)
+        game_id = clean(body.get("id"), 12).upper()
+        existing = db.execute("SELECT author,hidden FROM published_games WHERE id=?", (game_id,)).fetchone() if game_id else None
+        stamp = time.time()
+        if existing:
+            if existing["author"] != uid:
+                fail("Możesz aktualizować tylko własne gry.", 403)
+            if existing["hidden"] == 1:
+                fail("Ta gra została ukryta po zgłoszeniach i czeka na sprawdzenie.", 403)
+            db.execute("UPDATE published_games SET title=?,description=?,data=?,updated=?,hidden=0 WHERE id=?",
+                       (title, description, json.dumps(data), stamp, game_id))
+        else:
+            if db.execute("SELECT COUNT(*) FROM published_games WHERE author=? AND hidden<>2", (uid,)).fetchone()[0] >= 20:
+                fail("Masz już 20 opublikowanych gier. Wycofaj jedną, aby dodać nową.")
+            game_id = "G-"+secrets.token_hex(3).upper()
+            db.execute("INSERT INTO published_games(id,author,title,description,data,created,updated,plays,reports,hidden) VALUES(?,?,?,?,?,?,?,0,0,0)",
+                       (game_id, uid, title, description, json.dumps(data), stamp, stamp))
+        db.commit()
+        times.append(now())
+        return dict(id=game_id)
+    if operation == "games_list":
+        order = "plays DESC, updated DESC" if body.get("sort") == "popular" else "updated DESC"
+        query = clean(body.get("query"), 40).casefold()
+        rows = db.execute(f"SELECT id,author,title,description,plays,created,updated,hidden FROM published_games WHERE hidden=0 ORDER BY {order} LIMIT 200").fetchall()
+        games = [game_card(r) for r in rows if not query or query in r["title"].casefold()][:60]
+        mine = [game_card(r) for r in db.execute("SELECT id,author,title,description,plays,created,updated,hidden FROM published_games WHERE author=? AND hidden<>2 ORDER BY updated DESC", (uid,)).fetchall()]
+        return dict(games=games, mine=mine)
+    if operation == "games_get":
+        game_id = clean(body.get("id"), 12).upper()
+        row = db.execute("SELECT * FROM published_games WHERE id=?", (game_id,)).fetchone()
+        if not row or (row["hidden"] and row["author"] != uid):
+            fail("Nie znaleziono tej gry albo została ukryta.", 404)
+        if (uid, game_id) not in game_plays_seen:
+            game_plays_seen.add((uid, game_id))
+            db.execute("UPDATE published_games SET plays=plays+1 WHERE id=?", (game_id,))
+            db.commit()
+        return dict(card=game_card(row), game=json.loads(row["data"]))
+    if operation == "games_report":
+        game_id = clean(body.get("id"), 12).upper()
+        row = db.execute("SELECT author FROM published_games WHERE id=?", (game_id,)).fetchone()
+        if not row:
+            fail("Nie znaleziono tej gry.", 404)
+        if row["author"] == uid:
+            fail("Nie możesz zgłosić własnej gry.")
+        if not db.execute("SELECT 1 FROM game_reports WHERE game_id=? AND reporter=?", (game_id, uid)).fetchone():
+            db.execute("INSERT INTO game_reports(game_id,reporter,reason,created) VALUES(?,?,?,?)",
+                       (game_id, uid, clean(body.get("reason"), 200), time.time()))
+            # Three different players hide the game until an administrator checks it.
+            db.execute("UPDATE published_games SET reports=reports+1, hidden=CASE WHEN reports+1>=3 AND hidden=0 THEN 1 ELSE hidden END WHERE id=?", (game_id,))
+            db.commit()
+        return dict(ok=True)
+    if operation == "games_unpublish":
+        game_id = clean(body.get("id"), 12).upper()
+        row = db.execute("SELECT author FROM published_games WHERE id=?", (game_id,)).fetchone()
+        if not row or row["author"] != uid:
+            fail("Możesz wycofać tylko własną grę.", 403)
+        # Withdrawn games stay stored (hidden=2), nothing is deleted.
+        db.execute("UPDATE published_games SET hidden=2 WHERE id=? AND hidden<>1", (game_id,))
+        db.commit()
+        return dict(ok=True)
+    if operation == "ai_code":
+        if not AI_URL or not AI_KEY:
+            fail("Asystent AI na serwerze nie jest jeszcze włączony. Użyj asystenta wbudowanego lub promptu dla AI.", 503)
+        prompt, code = clean(body.get("prompt"), 600), str(body.get("code") or "")[:8000]
+        if len(prompt) < 3:
+            fail("Opisz, co ma zrobić AI.")
+        if rude(prompt):
+            fail("Prośba zawiera niedozwolone słowa.")
+        calls = ai_calls[uid]
+        while calls and calls[0] < now()-600:
+            calls.popleft()
+        while ai_daily and ai_daily[0] < now()-86400:
+            ai_daily.popleft()
+        if len(calls) >= 6:
+            fail("Limit: 6 próśb do AI na 10 minut. Spróbuj za chwilę.", 429)
+        if len(ai_daily) >= AI_DAILY_LIMIT:
+            fail("Dzienny limit AI na serwerze został wyczerpany. Wróć jutro albo użyj promptu dla innego AI.", 429)
+        calls.append(now())
+        ai_daily.append(now())
+        try:
+            answer = await asyncio.to_thread(ai_request, prompt, code)
+        except Exception:
+            log.exception("AI worker request failed")
+            fail("Serwer AI nie odpowiedział. Spróbuj ponownie za chwilę.", 502)
+        text = str(answer.get("text") or "")[:20000] if isinstance(answer, dict) else ""
+        if not text:
+            fail("AI nie zwróciło kodu. Spróbuj opisać grę inaczej.", 502)
+        return dict(text=text)
     if operation == "room":
         action = body.get("action")
         if action == "leave":
