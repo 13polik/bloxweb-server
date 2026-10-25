@@ -14,7 +14,7 @@
     <style>
     html.blox-booting { background: #101114; }
     html.blox-booting body { visibility: hidden; }
-    html.blox-booting::after { content: 'BloxWeb'; position: fixed; inset: 0; display: grid; place-items: center; background: #101114; color: #ff995c; font: 700 30px/1 'Segoe UI', system-ui, sans-serif; letter-spacing: .01em; visibility: visible; z-index: 2147483647; }
+    html.blox-booting::after { content: 'BloxWeb'; position: fixed; inset: 0; display: grid; place-items: center; padding-top: 120px; background: #101114 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffb26b'/%3E%3Cstop offset='1' stop-color='%23f0603a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='4' width='42' height='42' rx='12' fill='%23c44a28'/%3E%3Crect x='2' y='2' width='42' height='42' rx='12' fill='url(%23g)'/%3E%3Cpath fill='%23fff' fill-rule='evenodd' d='M13 11h12.5a7 7 0 0 1 4.9 12 7.5 7.5 0 0 1-4.4 13.5H13zM19 16.5v5h6a2.5 2.5 0 0 0 0-5zM19 26.5v5h7a2.5 2.5 0 0 0 0-5z'/%3E%3Cpath d='M37 4l6 3.4-6 3.4-6-3.4z' fill='%23ffe7a6'/%3E%3Cpath d='M31 7.4l6 3.4v6.6l-6-3.4z' fill='%23ffc94a'/%3E%3Cpath d='M43 7.4v6.6l-6 3.4v-6.6z' fill='%23e8a020'/%3E%3C/svg%3E") no-repeat center calc(50% - 30px) / 84px; color: #f4f6fa; font: 800 28px/1 'Segoe UI', system-ui, sans-serif; letter-spacing: -.02em; visibility: visible; z-index: 2147483647; }
     @media (prefers-reduced-motion: no-preference) { html.blox-booting::after { animation: bloxBoot 1.2s ease-in-out infinite alternate; } }
     @keyframes bloxBoot { from { opacity: .45; } to { opacity: 1; } }
     </style>
@@ -10462,6 +10462,107 @@ button:focus-visible,.nav-btn:focus-visible,.cat-pill:focus-visible,.game-card:f
   }
   // Rendered after the first paint so it never delays the loading screen.
   setTimeout(()=>{const url=obbyCover();if(!url)return;GAME_THUMBNAILS.obby=`<img src="${url}" alt="Postać skacząca po kolorowych platformach nad lawą w stronę złotego pucharu" loading="lazy">`;try{renderGames(getFilteredGamesList());renderContinuePlaying();}catch{}},600);
+})();
+</script>
+<style id="v16-home-mobile">/* BloxWeb 16: new logo, a tidier home screen and compact game HUD on small phones. */
+.logo-area{gap:9px!important;align-items:center}
+.logo-area .v16-mark{width:34px;height:34px;flex:0 0 34px;display:block;filter:drop-shadow(0 2px 6px #ff7a3d55)}
+.logo-area .v16-word{font-weight:800;font-size:21px;letter-spacing:-.6px;color:#f4f6fa;line-height:1}
+.logo-area .v16-word b{color:#ff995c;font-weight:800}
+.logo-area .ver-badge,.logo-area .device-badge,.logo-area .blox13-mark,.logo-area .blox13-word{display:none!important}
+body.device-mobile .logo-area .v16-word{display:none}
+/* Home: "recently played" becomes a swipeable row instead of a tall grid. */
+#continueGameContainer{display:flex!important;gap:12px!important;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;grid-template-columns:none!important;scrollbar-width:thin}
+#continueGameContainer .game-card{flex:0 0 min(260px,72vw);scroll-snap-align:start}
+#continueGameContainer .game-stats{display:none}
+#view-home .game-card button.quick-play-card-btn{background:#ff995c!important;color:#22160e!important;border:0!important;font-weight:800!important;border-radius:8px!important}
+#view-home .game-card button.quick-play-card-btn:hover{background:#ffb07e!important}
+body.device-mobile .topbar .logo-area{flex:0 0 36px!important;width:36px!important;overflow:visible!important}
+.home-friends-strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.home-friends-strip button{white-space:nowrap;border-radius:999px!important;padding:8px 14px!important}
+.home-friends-strip button:first-child{background:#34271f!important;color:#ffc29a!important;border-color:#765138!important}
+@media(max-width:520px){
+  #gamesContainer{grid-template-columns:1fr!important;gap:12px!important}
+  #gamesContainer .game-card{min-height:0!important;height:auto!important;display:grid!important;grid-template-columns:132px 1fr;grid-template-rows:auto auto 1fr;column-gap:12px;padding:10px!important;align-items:start}
+  #gamesContainer .game-card .game-thumb{grid-row:1/4;aspect-ratio:4/3;height:auto!important;margin:0!important;border-radius:8px;overflow:hidden}
+  #gamesContainer .game-card .game-title{font-size:16px!important;margin:2px 0 4px!important}
+  #gamesContainer .game-card .game-stats{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px!important}
+  #gamesContainer .game-card .quick-play-card-btn{align-self:end;margin-top:8px!important;min-height:38px;padding:6px 10px!important}
+  .hub-create{min-height:0!important;padding:18px!important}
+  .hub-create .create-art,.hub-create svg:not(.v16-keep),.hub-create [class*=art]{display:none!important}
+  .category-pills{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+  .category-pills .cat-pill{flex:0 0 auto}
+}
+/* In-game: small phones keep only the essentials on screen. */
+body.device-mobile #v10Debug{display:none!important}
+.v16-more-btn{display:none}
+@media(max-width:700px),(max-height:440px){
+  body.device-mobile .ingame-left-btns .v16-extra{display:none!important}
+  body.device-mobile .ingame-left-btns.v16-open .v16-extra{display:inline-flex!important}
+  body.device-mobile .ingame-left-btns.v16-open{flex-wrap:wrap!important;background:#13161ce8;border-radius:12px;padding:6px;max-width:calc(100vw - 16px)}
+  body.device-mobile .v16-more-btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:44px}
+  body.device-mobile .v16-place-btn{position:fixed!important;right:14px!important;bottom:16px!important;width:72px!important;height:72px!important;border-radius:50%!important;padding:0!important;font-size:12px!important;line-height:1.1;z-index:560!important;background:#ff995c!important;color:#22160e!important;border:3px solid #ffd2b3!important;box-shadow:0 6px 16px #0007;display:flex!important;align-items:center;justify-content:center;text-align:center}
+  body.device-mobile[data-game=castle_defense] #touchJumpBtn{right:98px!important}
+  body.device-mobile #cdTurretBar{flex-wrap:nowrap!important;overflow-x:auto!important;left:146px!important;right:184px!important;width:auto!important;max-width:none!important;transform:none!important;bottom:10px!important;max-height:none!important;padding:5px!important;gap:5px!important;scrollbar-width:none}
+  body.device-mobile #cdTurretBar button{flex:0 0 auto;min-height:40px!important;padding:5px 9px!important;font-size:12px!important;white-space:nowrap}
+  body.device-mobile .v13-tower-info{display:none!important}
+  body.device-mobile #v10CdActions button{min-height:34px!important;padding:4px 8px!important;font-size:11px!important}
+  body.device-mobile .v13-foot-notice.v16-keyboard{display:none!important}
+}
+@media(max-height:440px){
+  body.device-mobile .v13-tactical{top:140px!important;width:84px!important;padding:6px!important}
+  body.device-mobile .v13-tactical h3{display:none}
+  body.device-mobile #v10MatchHud{max-width:300px!important}
+}
+@media(max-width:420px) and (min-height:500px){
+  body.device-mobile #cdTurretBar{left:12px!important;right:12px!important;bottom:150px!important}
+  body.device-mobile .v16-place-btn{bottom:226px!important}
+}
+</style>
+<script>/* BloxWeb 16: logo, home clean-up and compact in-game controls on small phones. */
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id);
+  // ---------- Logo ----------
+  const MARK=`<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BloxWeb"><defs><linearGradient id="v16g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb26b"/><stop offset=".55" stop-color="#ff8a4c"/><stop offset="1" stop-color="#f0603a"/></linearGradient></defs>
+    <rect x="2" y="4" width="42" height="42" rx="12" fill="#c44a28"/><rect x="2" y="2" width="42" height="42" rx="12" fill="url(#v16g)"/><path d="M8 9q0-5 5-5h20q5 0 5 5v2H8z" fill="#fff" opacity=".18"/>
+    <path fill="#fff" fill-rule="evenodd" d="M13 11h12.5a7 7 0 0 1 4.9 12 7.5 7.5 0 0 1-4.4 13.5H13zM19 16.5v5h6a2.5 2.5 0 0 0 0-5zM19 26.5v5h7a2.5 2.5 0 0 0 0-5z"/>
+    <path d="M37 4l6 3.4-6 3.4-6-3.4z" fill="#ffe7a6"/><path d="M31 7.4l6 3.4v6.6l-6-3.4z" fill="#ffc94a"/><path d="M43 7.4v6.6l-6 3.4v-6.6z" fill="#e8a020"/></svg>`;
+  const area=document.querySelector('.logo-area');
+  if(area&&!area.querySelector('.v16-mark')){
+    // Divs, not spans: an older mobile rule hides every span inside the logo area.
+    const holder=document.createElement('div');holder.className='v16-mark';holder.innerHTML=MARK;
+    const word=document.createElement('div');word.className='v16-word';word.innerHTML='Blox<b>Web</b>';
+    area.prepend(holder,word);
+  }
+  const favicon=document.querySelector('link[rel=icon]')||document.head.appendChild(Object.assign(document.createElement('link'),{rel:'icon'}));
+  favicon.href='data:image/svg+xml,'+encodeURIComponent(MARK.replace('role="img" aria-label="BloxWeb"',''));
+  // ---------- Home screen ----------
+  function tidyHome(){
+    for(const b of document.querySelectorAll('#view-home .quick-play-card-btn')){const t=b.textContent.replace(/^[▶►]\s*/,'').trim();if(t!==b.textContent)b.textContent=t;}
+    const all=document.querySelector('.category-pills .cat-pill');if(all&&/^Wszystkie gry/.test(all.textContent)){const t=`Wszystkie gry (${defaultGames.length})`;if(all.textContent!==t)all.textContent=t;}
+  }
+  const home=$('view-home');
+  if(home){let queued=false;const watch=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;watch.disconnect();tidyHome();watch.observe(home,{childList:true,subtree:true});});});tidyHome();watch.observe(home,{childList:true,subtree:true});}
+  // ---------- Compact in-game controls ----------
+  function compactControls(){
+    const row=document.querySelector('.ingame-left-btns');
+    if(row&&!row.querySelector('.v16-more-btn')){
+      for(const b of row.querySelectorAll('button')){if(/Wyjdź/.test(b.textContent)||b.id==='v10PauseBtn')continue;b.classList.add('v16-extra');}
+      const more=document.createElement('button');more.type='button';more.className='roblox-esc-btn v16-more-btn';more.textContent='Menu';more.setAttribute('aria-expanded','false');
+      more.onclick=()=>{const open=row.classList.toggle('v16-open');more.setAttribute('aria-expanded',String(open));more.textContent=open?'Zamknij':'Menu';};
+      const pause=$('v10PauseBtn');(pause||row.firstElementChild).after(more);
+    }
+    // Late buttons (pause, sound) are tagged as soon as the game adds them.
+    if(row)for(const b of row.querySelectorAll('button:not(.v16-more-btn):not(.v16-extra)'))if(!/Wyjdź/.test(b.textContent)&&b.id!=='v10PauseBtn')b.classList.add('v16-extra');
+    const place=$('cdPlaceBtn');if(place&&!place.classList.contains('v16-place-btn')){place.classList.add('v16-place-btn');place.textContent='POSTAW';const bar=$('cdTurretBar');if(bar)bar.scrollLeft=0;}
+    if(window.isMobileDevice){
+      for(const b of document.querySelectorAll('.v13-foot-controls button')){const t=b.textContent.replace(/\s*\[[A-Z]\]/,'');if(t!==b.textContent)b.textContent=t;}
+      const notice=document.querySelector('.v13-foot-notice');if(notice)notice.classList.toggle('v16-keyboard',/WASD|Shift/.test(notice.textContent));
+      for(const b of document.querySelectorAll('#v10CdActions button')){const t=b.textContent.replace(/\s*\[[A-Z]\]/,'');if(t!==b.textContent)b.textContent=t;}
+    }
+  }
+  setInterval(()=>{if(currentPlayingGame)compactControls();},400);
 })();
 </script>
 </body>
