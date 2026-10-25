@@ -98,3 +98,20 @@ def test_aimbot_headshot_rate_kicks_the_player(client):
             break
     assert "BLOX-111111" not in state["players"]
     assert "aimbot" in call(client, "sync", token=me["token"])["notice"]
+
+
+def test_socket_accepts_the_page_origin_even_with_a_site_allowlist(client, monkeypatch):
+    me, room = room_for(client, "Ala", "BLOX-111111")
+    monkeypatch.setattr(client.server, "origins", ["https://bloxweb.pages.dev"])
+    with client.websocket_connect("/ws", headers={"origin": "http://testserver"}) as ws:
+        ws.send_text(json.dumps(dict(token=me["token"])))
+        assert receive(ws, "ready")["id"] == "BLOX-111111"
+    try:
+        with client.websocket_connect("/ws", headers={"origin": "https://zla-strona.example"}) as ws:
+            ws.send_text(json.dumps(dict(token=me["token"])))
+            ws.receive_text()
+        assert False, "foreign origin must be refused"
+    except AssertionError:
+        raise
+    except Exception:
+        pass

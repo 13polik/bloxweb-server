@@ -934,8 +934,10 @@ async def socket_writer(conn):
 @app.websocket("/ws")
 async def room_socket(ws: WebSocket):
     """Live room connection: the client streams input, the server pushes state 20 times a second."""
+    # The page served by this server (same host) and the configured sites may connect.
     origin = ws.headers.get("origin")
-    if origins != ["*"] and origin and origin not in origins:
+    same_host = bool(origin) and origin.split("://", 1)[-1] == ws.headers.get("host", "")
+    if origins != ["*"] and origin and origin not in origins and not same_host:
         await ws.close(code=1008)
         return
     await ws.accept()
