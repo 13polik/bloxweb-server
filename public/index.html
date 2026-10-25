@@ -10378,11 +10378,29 @@ button:focus-visible,.nav-btn:focus-visible,.cat-pill:focus-visible,.game-card:f
     const tube=(r,len,mat,p,rot=[Math.PI/2,0,0])=>P(new THREE.CylinderGeometry(r,r,len,12),mat,p,rot);
     let tip=-.5;
     if(id==='knife'){
-      P(rbox(.12,.16,.3,.04),black,[0,-.1,.04],[-.25,0,0]);for(let i=0;i<4;i++)P(new THREE.BoxGeometry(.125,.02,.03),poly,[0,-.06-i*.05,.0+i*.012],[-.25,0,0]);
-      P(rbox(.26,.05,.07,.02),steel,[0,.06,-.1]);
-      const blade=P(new THREE.BoxGeometry(.03,.13,.5),silver,[0,.08,-.37]);P(new THREE.BoxGeometry(.032,.04,.16),steel,[0,.155,-.2]);
-      P(new THREE.CylinderGeometry(0,.065,.14,4),silver,[0,.08,-.67],[-Math.PI/2,Math.PI/4,0]);blade.scale.x=.8;
-      g.userData.tip=-.7;return g;
+      // Tactical knife: blade along -Z of K, handle along +Z; K is tilted so the blade rises out of the fist.
+      const K=new THREE.Group();K.position.set(0,-.07,-.04);K.rotation.set(.7,.55,0);K.scale.setScalar(1.1);g.add(K);
+      const Q=(geo,mat,p,r)=>part(K,geo,mat,p,r);
+      const edge=phong(0xe8edf2,140),flat=phong(0x9aa3ab,90),grip=phong(0x23262a,15),groove=phong(0x15171a,10),guardMat=phong(0x4a5057,70);
+      // Blade profile in (length, height): straight spine, clip point and a curved belly.
+      const shape=new THREE.Shape();shape.moveTo(0,.042);shape.lineTo(.3,.042);shape.quadraticCurveTo(.4,.036,.5,.006);
+      shape.quadraticCurveTo(.44,-.03,.32,-.042);shape.lineTo(.02,-.046);shape.lineTo(0,-.04);shape.closePath();
+      const bladeGeo=new THREE.ExtrudeGeometry(shape,{depth:.016,bevelEnabled:true,bevelThickness:.007,bevelSize:.006,bevelSegments:2,curveSegments:10});
+      bladeGeo.translate(0,0,-.008);bladeGeo.rotateY(Math.PI/2);Q(bladeGeo,flat,[0,0,0]);
+      // Bright sharpened edge and a dark fuller on both faces.
+      const edgeShape=new THREE.Shape();edgeShape.moveTo(.02,-.046);edgeShape.lineTo(.32,-.042);edgeShape.quadraticCurveTo(.44,-.03,.5,.006);edgeShape.lineTo(.46,.004);edgeShape.quadraticCurveTo(.41,-.018,.31,-.026);edgeShape.lineTo(.02,-.03);edgeShape.closePath();
+      const edgeGeo=new THREE.ShapeGeometry(edgeShape);edgeGeo.rotateY(Math.PI/2);
+      edge.side=THREE.DoubleSide;for(const x of[.0155,-.0155])Q(edgeGeo,edge,[x,0,0]);
+      for(const x of[.016,-.016])Q(new THREE.BoxGeometry(.004,.012,.22),groove,[x,.016,-.15]);
+      // Serrated spine near the guard.
+      for(let i=0;i<7;i++)Q(new THREE.BoxGeometry(.03,.016,.016),flat,[0,.044,-.04-i*.026],[Math.PI/4,0,0]);
+      // Guard, grip with finger grooves and rings, pommel with lanyard hole.
+      Q(rbox(.05,.15,.028,.008),guardMat,[0,-.008,.012]);Q(rbox(.055,.024,.03,.008),guardMat,[0,-.07,.012]);
+      Q(rbox(.06,.085,.3,.03),grip,[0,-.004,.17]);
+      for(let i=0;i<4;i++)Q(new THREE.BoxGeometry(.064,.012,.016),groove,[0,-.044,.07+i*.06]);
+      for(let i=0;i<5;i++)Q(new THREE.TorusGeometry(.041,.004,4,12),groove,[0,-.004,.06+i*.055],[0,Math.PI/2,0]).scale.set(1,1.05,.75);
+      Q(rbox(.068,.095,.05,.02),guardMat,[0,-.004,.34]);Q(new THREE.TorusGeometry(.016,.005,6,12),guardMat,[0,-.004,.375],[0,Math.PI/2,0]);
+      g.userData.knife=K;g.userData.tip=-.45;return g;
     }
     if(['glock','usp','deagle'].includes(id)){
       const len=id==='glock'?.46:.6,slide=id==='deagle'?silver:id==='usp'?steel:poly,frame=id==='deagle'?black:poly;
@@ -10829,7 +10847,7 @@ body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);
   // ---------- Knife ----------
   function slash(){
     const clock=now();if(clock<(R.knifeReady||0))return;R.knifeReady=clock+.45;
-    if(cs2GunMesh)cs2GunMesh.userData.kick=1;sound(260,.05,'triangle',.03);
+    R.slashAt=clock;sound(260,.05,'triangle',.03);
     scene.updateMatrixWorld(true);const d=new THREE.Vector3();camera.getWorldDirection(d);
     const ray=new THREE.Raycaster(camera.position.clone(),d,0,3.4);
     const wall=ray.intersectObjects(platforms.map(p=>p.mesh),false)[0];
@@ -11028,6 +11046,8 @@ body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);
     }
     updateBase(dt);
     if(!inCs())return;
+    // Knife slash: the view model sweeps right to left on each strike.
+    if(cs2GunMesh&&cs2.weapons[cs2.currentWeapon]?.id==='knife'){const p=(now()-(R.slashAt??-9))/.26,t=p>=0&&p<1?Math.sin(p*Math.PI):0;cs2GunMesh.rotation.y+=.25+t*.9;cs2GunMesh.rotation.z+=t*.7;cs2GunMesh.position.x-=t*.16;cs2GunMesh.position.z-=t*.08;}
     renderHud();
     if(!solo()||!R.on)return;
     const clock=now();
