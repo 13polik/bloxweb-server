@@ -20,7 +20,7 @@ from pathlib import Path
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
@@ -47,6 +47,11 @@ rooms = {}
 presence = {}
 rates = defaultdict(deque)
 login_failures = defaultdict(deque)
+# Live room connections (uid -> socket state) and anti-cheat bookkeeping.
+sockets = {}
+cheat_strikes = defaultdict(deque)
+coin_buckets = {}
+COIN_BUCKET, COIN_REFILL = 5000, 30
 # This single process is the only writer, so profiles, sessions and social
 # relations can be cached and invalidated on every write. A /sync then needs
 # no database round trip at all, which keeps the room simulation smooth.
@@ -184,11 +189,32 @@ def merge_progress(server, base, current):
                 badges=sorted(set(server["badges"]) | set(current["badges"])), quests=quests)
 
 
+def coin_allowance(uid, gained):
+    """Token bucket for BloxBux earned in the browser: up to 5000 at once
+    (the largest single reward is 2500) refilling 30 per second. Anything above
+    is dropped, so edited local saves or auto-clickers cannot mint coins."""
+    level, stamp = coin_buckets.get(uid, (COIN_BUCKET, now()))
+    level = min(COIN_BUCKET, level + (now()-stamp)*COIN_REFILL)
+    allowed = min(gained, int(level))
+    coin_buckets[uid] = (level-allowed, now())
+    if allowed < gained:
+        strike(uid, "bloxbux", f"+{gained} zablokowano {gained-allowed}")
+    return allowed
+
+
 def save_progress(uid, change):
     if not isinstance(change, dict):
         return
     current = profile(uid)
     merged = merge_progress(current["progress"], change.get("base"), change.get("current"))
+    # The first upload imports an existing browser save as it is, so players
+    # who earned coins before accounts existed keep them; later gains are rate-limited.
+    if current["progress"] is None:
+        if merged["coins"] > 100000:
+            log.warning("anticheat %s first import with %s BloxBux", uid, merged["coins"])
+    elif merged["coins"] > current["progress"]["coins"]:
+        before = current["progress"]["coins"]
+        merged["coins"] = before + coin_allowance(uid, merged["coins"]-before)
     if merged != current["progress"]:
         db.execute("UPDATE users SET progress=? WHERE id=?", (json.dumps(merged), uid))
         db.commit()
@@ -361,6 +387,72 @@ def leave(uid):
     p["room"] = None
 
 
+def strike(uid, kind, detail=""):
+    """Record a suspicious action. Many in a minute remove the player from the room."""
+    log.warning("anticheat %s %s %s", uid, kind, detail)
+    q = cheat_strikes[uid]
+    q.append(now())
+    while q and q[0] < now()-60:
+        q.popleft()
+    if len(q) >= 25 and presence.get(uid, {}).get("room"):
+        q.clear()
+        kick(uid, "Wykryto nieprawidłowe działanie gry (" + kind + "). Zostałeś usunięty z pokoju.")
+
+
+def kick(uid, reason):
+    log.warning("anticheat kick %s: %s", uid, reason)
+    leave(uid)
+    presence.setdefault(uid, dict(seen=now(), room=None))["notice"] = reason
+    conn = sockets.get(uid)
+    if conn:
+        conn["notice"] = reason
+        conn["event"].set()
+
+
+def room_input(uid, body):
+    """Apply one player's position and queued actions (shared by /sync and the socket)."""
+    room = rooms.get(presence.get(uid, {}).get("room"))
+    if not room or uid not in room["players"]:
+        return None
+    p = room["players"][uid]
+    p["seen"] = now()
+    pos = body.get("position")
+    if isinstance(pos, dict):
+        elapsed = min(2, max(.05, now()-p["lastMove"]))
+        x, z = number(pos.get("x"), p["x"], -89, 89), number(pos.get("z"), p["z"], -89, 89)
+        distance = math.hypot(x-p["x"], z-p["z"])
+        maximum = elapsed*18+1
+        if distance > maximum:
+            # Lag spikes are covered by `elapsed`; a far bigger jump is a teleport/speed hack.
+            if distance > maximum*1.6:
+                strike(uid, "ruch", f"{distance:.1f}>{maximum:.1f}")
+            ratio = maximum/distance
+            x, z = p["x"]+(x-p["x"])*ratio, p["z"]+(z-p["z"])*ratio
+        y = number(pos.get("y"), .5, .5, 16)
+        if room["game"] == "cs2" and y > 11:
+            # Arena walls are 12 high and crates plus a jump reach about 8: higher means flying.
+            strike(uid, "lot", f"y={y:.1f}")
+            y = 11
+        p.update(x=x, y=y, z=z, rotY=number(pos.get("rotY")),
+                 moving=bool(pos.get("moving")), dancing=bool(pos.get("dancing")), lastMove=now())
+    actions = body.get("actions", [])
+    if not isinstance(actions, list):
+        fail("Nieprawidłowa lista akcji.")
+    for action in actions[:30]:
+        if not isinstance(action, dict):
+            continue
+        sequence = int(number(action.get("seq"), 0, 0, 1e12))
+        if sequence <= p["sequence"]:
+            continue
+        p["sequence"] = sequence
+        message = act(room, p, action)
+        p["acknowledgements"].append(dict(seq=sequence, error=message))
+        p["acknowledgements"] = p["acknowledgements"][-35:]
+        if uid not in room["players"]:
+            return None
+    return room
+
+
 def spawn_bot(room):
     points = [(-28,-39),(32,-38),(-14,20),(58,18),(-25,52),(62,55)]
     random.shuffle(points)
@@ -438,7 +530,13 @@ def act(room, p, action):
         return "Mecz jest już zakończony."
     if kind == "chat":
         text = clean(action.get("text"), 300)
+        if text and now()-p.get("chatAt", 0) < .8:
+            return "Za szybko piszesz. Odczekaj chwilę."
+        if text and rude(text):
+            strike(p["id"], "czat")
+            return "Wiadomość zawiera niedozwolone słowa."
         if text:
+            p["chatAt"] = now()
             room["serial"] += 1
             room["chat"].append(dict(id=room["serial"], sender=p["id"], name=user_view(p["id"])["name"], text=text))
             room["chat"] = room["chat"][-60:]
@@ -555,6 +653,14 @@ def act(room, p, action):
                     distance, target, head = hit, enemy, is_head
         endpoint = [o[i]+d[i]*min(distance, 140) for i in range(3)]
         emit(room, "shot", origin=o, end=endpoint, player=p["id"], hit=bool(target))
+        stats = p.setdefault("aim", dict(shots=0, hits=0, heads=0))
+        stats["shots"] += 1
+        stats["hits"] += bool(target)
+        stats["heads"] += bool(target and head)
+        if stats["shots"] >= 40 and stats["heads"] >= stats["shots"]*.9:
+            # Bots move and strafe; 90% headshots over 40+ shots is an aimbot.
+            kick(p["id"], "Wykryto nienaturalną celność (aimbot). Zostałeś usunięty z pokoju.")
+            return
         if target:
             damage = spec["headshot"] if head else spec["damage"]
             target["hp"] -= damage
@@ -658,18 +764,52 @@ def tick(room, dt):
         director.update(room["enemies"],list(room["players"].values()),dt,now(),sight,bot_fire)
 
 
+ROUND = {"x", "y", "z", "rotY", "rot", "hp", "countdown"}
+
+
+def compact(item):
+    return {k: round(v, 2) if k in ROUND and isinstance(v, float) else v for k, v in item.items()}
+
+
+def public_room(room):
+    players = []
+    for p in room["players"].values():
+        public = compact({k: p[k] for k in ("id", "x", "y", "z", "rotY", "hp", "kills", "deaths", "moving", "dancing")})
+        public.update(user_view(p["id"]) or {})
+        players.append(public)
+    view = {k: room[k] for k in ("code", "game", "owner", "public", "revision", "phase", "gold", "hp", "wave", "countdown", "betweenWaves", "pending", "kills", "round", "generation", "turrets", "fx")}
+    view["countdown"] = round(view["countdown"], 2)
+    view["enemies"] = [compact(e) for e in room["enemies"]]
+    view["chat"] = room["chat"][-20:]
+    return view | dict(players=players)
+
+
+def private_view(p):
+    return {k: p[k] for k in ("id", "money", "weapons", "currentWeapon", "sequence", "acknowledgements")} | dict(reloadRemaining=round(max(0, p["reloadUntil"]-now()), 2))
+
+
 def room_view(room, uid):
     if not room:
         return None
-    players = []
-    for p in room["players"].values():
-        public = {k: p[k] for k in ("id", "x", "y", "z", "rotY", "hp", "kills", "deaths", "moving", "dancing")}
-        public.update(user_view(p["id"]) or {})
-        if p["id"] == uid:
-            public.update({k: p[k] for k in ("money", "weapons", "currentWeapon", "sequence", "acknowledgements")})
-            public["reloadRemaining"] = max(0, p["reloadUntil"]-now())
-        players.append(public)
-    return {k: room[k] for k in ("code", "game", "owner", "public", "revision", "phase", "gold", "hp", "wave", "countdown", "betweenWaves", "pending", "kills", "round", "generation", "enemies", "turrets", "fx", "chat")} | dict(players=players)
+    view = public_room(room)
+    if uid in room["players"]:
+        me = private_view(room["players"][uid])
+        view["players"] = [p | me if p["id"] == uid else p for p in view["players"]]
+    return view
+
+
+def broadcast():
+    """Push each room's state to its connected players: the shared part is
+    encoded once per room, only the small personal part per player."""
+    for room in rooms.values():
+        listeners = [uid for uid in room["players"] if uid in sockets]
+        if not listeners:
+            continue
+        shared = json.dumps(public_room(room), separators=(",", ":"))
+        for uid in listeners:
+            conn = sockets[uid]
+            conn["latest"] = '{"type":"room","room":' + shared + ',"me":' + json.dumps(private_view(room["players"][uid]), separators=(",", ":")) + '}'
+            conn["event"].set()
 
 
 async def simulation():
@@ -685,6 +825,11 @@ async def simulation():
             tick(room, dt)
             if room["emptySince"] and current-room["emptySince"] > 180:
                 rooms.pop(code, None)
+        broadcast()
+        if len(cheat_strikes) > 5000:
+            cheat_strikes.clear()
+        if len(coin_buckets) > 20000:
+            coin_buckets.clear()
         if len(rates) > 10000:
             rates.clear()
         if len(login_failures) > 10000:
@@ -722,10 +867,81 @@ async def unexpected_error(request, exc):
     return JSONResponse({"error": "Błąd serwera. Spróbuj ponownie za chwilę."}, status_code=500)
 
 
+async def socket_writer(conn):
+    ws = conn["ws"]
+    while True:
+        await conn["event"].wait()
+        conn["event"].clear()
+        if conn.get("pong") is not None:
+            await ws.send_text(json.dumps(dict(type="pong", t=conn.pop("pong"))))
+        if conn.get("notice"):
+            await ws.send_text(json.dumps(dict(type="notice", text=conn.pop("notice"))))
+        if conn.get("latest"):
+            text, conn["latest"] = conn["latest"], None
+            await ws.send_text(text)
+
+
+@app.websocket("/ws")
+async def room_socket(ws: WebSocket):
+    """Live room connection: the client streams input, the server pushes state 20 times a second."""
+    origin = ws.headers.get("origin")
+    if origins != ["*"] and origin and origin not in origins:
+        await ws.close(code=1008)
+        return
+    await ws.accept()
+    uid, conn, writer = None, None, None
+    try:
+        hello = json.loads(await asyncio.wait_for(ws.receive_text(), 15))
+        token = hello.get("token") if isinstance(hello, dict) else None
+        uid = token_user(token) if isinstance(token, str) and len(token) <= 150 else None
+        if not uid or not profile(uid):
+            await ws.close(code=4401)
+            return
+        conn = dict(ws=ws, latest=None, event=asyncio.Event(), times=deque())
+        previous = sockets.get(uid)
+        sockets[uid] = conn
+        if previous:
+            previous["latest"] = None
+            await previous["ws"].close(code=4000)
+        writer = asyncio.create_task(socket_writer(conn))
+        await ws.send_text(json.dumps(dict(type="ready", id=uid)))
+        while True:
+            text = await ws.receive_text()
+            times = conn["times"]
+            times.append(now())
+            while times and times[0] < now()-1:
+                times.popleft()
+            if len(text) > 12000 or len(times) > 60:
+                strike(uid, "spam", f"{len(times)}/s")
+                break
+            try:
+                message = json.loads(text)
+            except ValueError:
+                continue
+            if not isinstance(message, dict):
+                continue
+            presence.setdefault(uid, dict(seen=now(), room=None))["seen"] = now()
+            if message.get("type") == "ping":
+                conn["pong"] = number(message.get("t"), 0, 0, 1e13)
+                conn["event"].set()
+            elif message.get("type") == "in":
+                try:
+                    room_input(uid, message)
+                except HTTPException:
+                    pass
+    except (WebSocketDisconnect, asyncio.TimeoutError, ValueError, RuntimeError):
+        pass
+    finally:
+        if writer:
+            writer.cancel()
+        if uid and sockets.get(uid) is conn:
+            sockets.pop(uid, None)
+
+
 @app.get("/health")
 async def health():
     db.execute("SELECT 1").fetchone()
-    return dict(ok=True, version=17, ai=bool(AI_URL and AI_KEY), rooms=len(rooms),
+    return dict(ok=True, version=18, ai=bool(AI_URL and AI_KEY), sockets=len(sockets), rooms=len(rooms),
                 storage="postgresql" if os.environ.get("DATABASE_URL") else "sqlite")
 
 
@@ -834,37 +1050,11 @@ async def api(operation: str, request: Request):
                 save_profile(uid, changes.get("name"), changes.get("avatar"))
         if body.get("progress"):
             save_progress(uid, body["progress"])
-        room = rooms.get(presence[uid].get("room"))
-        if room and uid in room["players"]:
-            p = room["players"][uid]
-            p["seen"] = now()
-            pos = body.get("position")
-            if isinstance(pos, dict):
-                elapsed = min(2, max(.05, now()-p["lastMove"]))
-                x, z = number(pos.get("x"), p["x"], -89, 89), number(pos.get("z"), p["z"], -89, 89)
-                distance = math.hypot(x-p["x"], z-p["z"])
-                maximum = elapsed*18+1
-                if distance > maximum:
-                    ratio = maximum/distance
-                    x, z = p["x"]+(x-p["x"])*ratio, p["z"]+(z-p["z"])*ratio
-                # Movement stays responsive client-side; bounds and max speed
-                # are validated here. Full anti-cheat physics is out of scope.
-                p.update(x=x, y=number(pos.get("y"), .5, .5, 16), z=z, rotY=number(pos.get("rotY")),
-                         moving=bool(pos.get("moving")), dancing=bool(pos.get("dancing")), lastMove=now())
-            actions = body.get("actions", [])
-            if not isinstance(actions, list):
-                fail("Nieprawidłowa lista akcji.")
-            for action in actions[:30]:
-                if not isinstance(action, dict):
-                    continue
-                sequence = int(number(action.get("seq"), 0, 0, 1e12))
-                if sequence <= p["sequence"]:
-                    continue
-                p["sequence"] = sequence
-                message = act(room, p, action)
-                p["acknowledgements"].append(dict(seq=sequence, error=message))
-                p["acknowledgements"] = p["acknowledgements"][-35:]
-        return dict(user=user_view(uid), room=room_view(room, uid), progress=user["progress"],
+        room = room_input(uid, body)
+        notice = presence.get(uid, {}).pop("notice", None)
+        # With a live socket the room travels there; /sync only carries the rest.
+        return dict(user=user_view(uid), room=room_view(room, uid) if body.get("room", True) else None,
+                    inRoom=bool(room), notice=notice, progress=user["progress"],
                     social=social(uid) if body.get("social", True) else None,
                     rooms=[dict(code=r["code"], game=r["game"], count=len(r["players"]), phase=r["phase"]) for r in rooms.values() if r["public"] and r["players"] and len(r["players"]) < 6][:20])
     if operation == "search":

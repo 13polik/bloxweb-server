@@ -638,7 +638,7 @@ function normalizeAvatar(value) {
                 <div class="bux-cards">
                     <div class="bux-card">
                         <div><h3>⛏️ Koparka BloxBux</h3><p style="color:#aaa; font-size:14px; margin-top:6px;">Klikaj przycisk, aby od razu otrzymać darmowe BloxBuxy.</p></div>
-                        <button class="bux-btn" onclick="mineBux()">Kliknij (+25 ◈)</button>
+                        <button class="bux-btn" onclick="mineBux(event)">Kliknij (+25 ◈)</button>
                     </div>
                     <div class="bux-card">
                         <div><h3>🎁 Pakiet Startowy</h3><p style="color:#aaa; font-size:14px; margin-top:6px;">Odbierz bonus na zakupy w sklepie Avatara.</p></div>
@@ -5331,7 +5331,15 @@ function normalizeAvatar(value) {
             else prompt("Skopiuj swoje ID:", myPlayerId);
         }
 
-        function mineBux() { coins += 25; saveAllData(false); showToast('+25 ◈ BloxBux!'); }
+        let mineClicks = [];
+        function mineBux(event) {
+            // Scripted clicks (event.isTrusted false) and auto-clickers above 6/s earn nothing.
+            if (event && event.isTrusted === false) return;
+            const t = performance.now(); mineClicks = mineClicks.filter(c => t - c < 1000);
+            if (mineClicks.length >= 6) return showToast('Za szybko! Maksymalnie 6 kliknięć na sekundę.');
+            mineClicks.push(t);
+            coins += 25; saveAllData(false); showToast('+25 ◈ BloxBux!');
+        }
         function claimDailyBonus() {
             if (usedCodes.includes('DAILY')) return showToast('Odebrałeś już bonus!');
             coins += 250; usedCodes.push('DAILY'); saveAllData(false); showToast('Odebrano +250 ◈ BloxBux!');
@@ -7334,7 +7342,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     statusEl.textContent=value;statusEl.style.color=ok?'#a3efbe':'#e8bdaa';
     $('netStatusDot')?.classList.toggle('connected',ok);
     if($('networkStatusTxt'))$('networkStatusTxt').textContent=value;
-    const bar=$('v11NetworkBar');if(bar){bar.classList.toggle('offline',!ok);$('v11ConnectionText').textContent=ok?`${room?.players.length||1}/6 · ${latency} ms`:value;bar.title=value;}
+    const bar=$('v11NetworkBar');if(bar){bar.classList.toggle('offline',!ok);$('v11ConnectionText').textContent=ok?`${room?.players.length||1}/6 · ${latency} ms${wsReady?' · na żywo':''}`:value;bar.title=value;}
   }
   // Render Free sleeps when idle and needs up to a minute to wake up, so the
   // first request of a visit gets a long timeout; game syncs stay short.
@@ -7506,9 +7514,54 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     // Network list is not an import that grants trust to local saved IDs.
     renderFriendsAll();renderMessagesTab();
   }
+  // ---------- Live room socket ----------
+  // While in a room the game state streams over a WebSocket (20 updates a second,
+  // input sent as it happens). /sync keeps profile, BloxBux and friends, and takes
+  // over the room again whenever the socket is down.
+  let ws=null,wsReady=false,wsRetry=0,wsTimer=0,wsLastSend=0,wsLastPos='',wsSentSeq=0,wsSentAt=0,wsPingAt=0;
+  function socketUrl(){try{const u=new URL(base);u.protocol=u.protocol==='https:'?'wss:':'ws:';u.pathname=u.pathname.replace(/\/$/,'')+'/ws';return u.href;}catch{return '';}}
+  function openSocket(){
+    if(ws||!active||!token||!base||typeof WebSocket==='undefined')return;
+    const url=socketUrl();if(!url)return;
+    let socket;try{socket=new WebSocket(url);}catch{return;}
+    ws=socket;
+    socket.onopen=()=>socket.send(JSON.stringify({token}));
+    socket.onmessage=event=>{
+      if(socket!==ws)return;let data;try{data=JSON.parse(event.data);}catch{return;}
+      if(data.type==='ready'){wsReady=true;wsRetry=0;wsSentSeq=0;wsLastPos='';schedulePoll();return;}
+      if(data.type==='pong'){latency=Math.round(performance.now()-data.t);return;}
+      if(data.type==='notice'){showToast(data.text);if(active)endLocalOnline();return;}
+      if(data.type==='room'&&active){
+        const value=data.room;const self=value.players.find(p=>p.id===data.me.id);if(self)Object.assign(self,data.me);
+        lastSeen=performance.now();room=value;applyRoom(value);
+      }
+    };
+    socket.onclose=()=>{
+      if(socket!==ws)return;ws=null;wsReady=false;
+      if(active){clearTimeout(wsTimer);wsTimer=setTimeout(openSocket,Math.min(8000,800*(++wsRetry)));schedulePoll();}
+    };
+    socket.onerror=()=>{};
+  }
+  function closeSocket(){clearTimeout(wsTimer);const s=ws;ws=null;wsReady=false;if(s)try{s.close();}catch{}}
+  function socketSend(force){
+    if(!wsReady||!active||!ws||ws.readyState!==1)return;
+    const t=performance.now();
+    const position=playerGroup?{x:+playerGroup.position.x.toFixed(2),y:+playerGroup.position.y.toFixed(2),z:+playerGroup.position.z.toFixed(2),rotY:+playerGroup.rotation.y.toFixed(3),moving:!!(keysPressed.KeyW||keysPressed.KeyS||keysPressed.KeyA||keysPressed.KeyD),dancing:isDancing}:null;
+    const posKey=JSON.stringify(position);
+    // New actions go out at once; unacknowledged ones are resent after 0.6 s.
+    const resend=actions.length&&t-wsSentAt>600;
+    const fresh=actions.filter(a=>a.seq>wsSentSeq);
+    if(!force&&!fresh.length&&!resend&&posKey===wsLastPos&&t-wsLastSend<250)return;
+    const out=resend?actions:fresh;
+    try{ws.send(JSON.stringify({type:'in',position,actions:out.slice(0,30)}));}catch{return;}
+    if(out.length){wsSentSeq=Math.max(wsSentSeq,...out.map(a=>a.seq));wsSentAt=t;}
+    wsLastSend=t;wsLastPos=posKey;
+    if(t-wsPingAt>2000){wsPingAt=t;try{ws.send(JSON.stringify({type:'ping',t}));}catch{}}
+  }
+  setInterval(()=>socketSend(false),50);
   function schedulePoll(){
     clearTimeout(pollTimer);
-    pollTimer=setTimeout(poll,failures>2?Math.min(15000,1000*failures):active?150:1500);
+    pollTimer=setTimeout(poll,failures>2?Math.min(15000,1000*failures):active&&!wsReady?150:1500);
   }
   async function poll(){
     if(syncing){schedulePoll();return;}
@@ -7517,8 +7570,10 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     try{
       const wantSocial=performance.now()-lastSocial>1200;
       const profile={name:username,avatar:avatarData},hash=JSON.stringify(profile),sentKey=localProfileKey();
-      const position=active&&playerGroup?{x:playerGroup.position.x,y:playerGroup.position.y,z:playerGroup.position.z,rotY:playerGroup.rotation.y,moving:!!(keysPressed.KeyW||keysPressed.KeyS||keysPressed.KeyA||keysPressed.KeyD),dancing:isDancing}:null;
-      const payload={position,actions:active?actions:[],social:wantSocial};
+      const viaSocket=wsReady&&active;
+      const position=active&&playerGroup&&!viaSocket?{x:playerGroup.position.x,y:playerGroup.position.y,z:playerGroup.position.z,rotY:playerGroup.rotation.y,moving:!!(keysPressed.KeyW||keysPressed.KeyS||keysPressed.KeyA||keysPressed.KeyD),dancing:isDancing}:null;
+      const payload={position,actions:active&&!viaSocket?actions:[],social:wantSocial};
+      if(viaSocket)payload.room=false;
       if(hash!==profileHash)payload.profile=profile;
       const sentProgress=localProgress(),progressBase=readProgressBase();
       if(progressKey(sentProgress)!==progressKey(progressBase))payload.progress={base:progressBase,current:sentProgress};
@@ -7534,9 +7589,10 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       else if(payload.progress)writeProgressBase(sentProgress);
       const publicHash=JSON.stringify(data.rooms);
       if(publicHash!==JSON.stringify(publicRooms)){publicRooms=data.rooms;renderPublicRooms();}
+      if(data.notice)showToast(data.notice);
       if(epoch===roomEpoch){
         if(active&&data.room){room=data.room;applyRoom(room);}
-        else if(active&&!data.room){endLocalOnline();showToast('Sesja pokoju wygasła. Dołącz ponownie kodem.');}
+        else if(active&&!data.inRoom&&!data.room){endLocalOnline();if(!data.notice)showToast('Sesja pokoju wygasła. Dołącz ponownie kodem.');}
         else if(!currentPlayingGame&&data.room&&!starting){await openRoom(data.room);}
       }
       setStatus('Online',true);
@@ -7793,7 +7849,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       if(self&&playerGroup)playerGroup.position.set(self.x,self.y,self.z);
       game.resetPause();generation=room.generation;
     }
-    makeNetworkBar();applyRoom(room);schedulePoll();
+    makeNetworkBar();applyRoom(room);openSocket();schedulePoll();
   }
   function clearEntities(){
     for(const e of castleDefense?.enemies||[])game.dispose(e.mesh);
@@ -7904,6 +7960,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if(!active||(!allowPaused&&game.paused)||(!connected&&kind!=='restart'))return;
     if(actions.length>=60)return showToast('Oczekiwanie na serwer. Spróbuj po odzyskaniu połączenia.');
     actions.push({seq:++sequence,kind,...payload});
+    if(wsReady){socketSend(true);return;}
     if(!syncing){clearTimeout(pollTimer);pollTimer=setTimeout(poll,5);}
   }
   window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,frame:interpolate,api,connect,
@@ -7939,7 +7996,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if(i)i.value='';action('chat',{text:text(value,300)});
   };
   function endLocalOnline(){
-    roomEpoch++;active=false;room=null;actions=[];generation=0;
+    roomEpoch++;active=false;room=null;actions=[];generation=0;closeSocket();
     entityMaps.enemies.clear();entityMaps.turrets.clear();$('v11NetworkBar')?.remove();$('v11Result')?.closest('.v10-overlay')?.remove();
     game.resetPause();if(currentPlayingGame)soloLeave();
   }

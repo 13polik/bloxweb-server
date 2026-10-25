@@ -1,5 +1,16 @@
 # BloxWeb 13: serwer i strona
 
+## Multiplayer na żywo i antycheat (18)
+
+W pokoju gra łączy się z serwerem przez WebSocket (`/ws`): serwer wysyła stan pokoju 20 razy na sekundę, a gracz wysyła ruch i akcje od razu. Wspólna część stanu jest kodowana raz na pokój, więc słaby CPU Render Free obsługuje więcej graczy. Gdy WebSocket nie działa, gra wraca do zapytań `/api/sync`. Wymaga pakietu `websockets` (jest w requirements.txt).
+
+Antycheat po stronie serwera (przeglądarce nie da się w pełni ufać):
+- BloxBux: przyrost salda ma limit (pula 5000, odnawia się 30 na sekundę); nadwyżka z edytowanego zapisu lub autoklikera jest odrzucana. Pierwszy import starego zapisu przechodzi bez zmian.
+- Ruch: teleporty i loty ponad ściany areny są przycinane i zliczane; 25 naruszeń w minutę usuwa gracza z pokoju.
+- Strzały są liczone przez serwer (amunicja, szybkostrzelność, ściany); 90% trafień w głowę przy 40+ strzałach usuwa gracza (aimbot).
+- Czat w pokoju: filtr słów i limit jednej wiadomości na 0,8 s. Przycisk kopania BloxBux przyjmuje tylko prawdziwe kliknięcia, do 6 na sekundę.
+Zdarzenia trafiają do logu Render jako `anticheat …`.
+
 ## Konta bez e-maila (14)
 
 Gość może w „Konto i logowanie” przypisać do swojego ID login i hasło (bez e-maila i danych osobowych, więc działa też na kontach dzieci z kontrolą rodzicielską).
