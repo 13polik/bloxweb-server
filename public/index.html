@@ -10493,6 +10493,13 @@ body.device-mobile .topbar .logo-area{flex:0 0 36px!important;width:36px!importa
   .category-pills{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
   .category-pills .cat-pill{flex:0 0 auto}
 }
+/* Black scroll bars everywhere, matching the dark theme. */
+html,body,*{scrollbar-color:#000 #0d0f12}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:#0d0f12}
+::-webkit-scrollbar-thumb{background:#000;border:1px solid #2a2e36;border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:#111}
+::-webkit-scrollbar-corner{background:#0d0f12}
 /* In-game: small phones keep only the essentials on screen. */
 body.device-mobile #v10Debug{display:none!important}
 .v16-more-btn{display:none}
@@ -10563,6 +10570,127 @@ body.device-mobile #v10Debug{display:none!important}
     }
   }
   setInterval(()=>{if(currentPlayingGame)compactControls();},400);
+})();
+</script>
+<style id="v16-cs-style">
+.v16-radar{position:fixed;z-index:540;left:16px;top:120px;width:150px;height:150px;border-radius:50%;border:2px solid #ffffff3a;background:#0b1410c8;box-shadow:0 4px 14px #0007;pointer-events:none}
+.v16-hurt{position:fixed;z-index:561;left:50%;top:50%;width:190px;height:190px;margin:-95px 0 0 -95px;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .5s ease-out;
+  background:conic-gradient(from -28deg,#ff3b30e6 0 56deg,transparent 56deg);-webkit-mask:radial-gradient(circle,transparent 78px,#000 80px 92px,transparent 94px);mask:radial-gradient(circle,transparent 78px,#000 80px 92px,transparent 94px)}
+.v16-hurt.on{opacity:1;transition:none}
+.v16-scope{position:absolute;inset:0;z-index:5;pointer-events:none;display:none;background:radial-gradient(circle at 50% 50%,transparent 0 min(34vh,34vw),#000 calc(min(34vh,34vw) + 2px))}
+.v16-scope::before,.v16-scope::after{content:"";position:absolute;background:#000}
+.v16-scope::before{left:0;right:0;top:50%;height:1px}
+.v16-scope::after{top:0;bottom:0;left:50%;width:1px}
+body.v16-scoped .v16-scope{display:block}
+body.v16-scoped #cs2Crosshair{display:none}
+#cs2Crosshair.v16-cross{width:44px!important;height:44px!important}
+#cs2Crosshair.v16-cross>*{display:none}
+#cs2Crosshair .v16-arm{display:block!important;position:absolute;background:#00e691;box-shadow:0 0 2px #000}
+#cs2Crosshair .v16-dot{display:block!important;position:absolute;left:21px;top:21px;width:2px;height:2px;background:#fff;border-radius:50%}
+#v16AimBtn{right:96px;bottom:184px}
+body.v16-scoped #v16AimBtn{background:#ff8a4c!important;color:#111!important}
+body.device-mobile .v16-radar{left:12px;top:150px;width:96px;height:96px}
+@media (max-height:430px){body.device-mobile .v16-radar{top:150px;width:80px;height:80px}}
+</style>
+<script id="v16-cs-script">
+// CS 1.6 gameplay: radar, hit direction, aim-down-sights and movement spread.
+(() => {
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const isPaused=()=>!!window.BloxGame?.paused;
+  const AIM_FOV={awp:22,m4a1:45,ak47:45};
+  let radar=null,hurt=null,scope=null,aimBtn=null,scoped=false,lastHp=null,lastPos=null,speed=0,bloom=0,lastAmmo=null,baseSpread=null;
+  const active=()=>activeGameMode==='cs2'&&cs2&&currentPlayingGame&&playerGroup&&camera;
+  const weaponId=()=>cs2?.weapons?.[cs2.currentWeapon]?.id;
+  function node(tag,cls,id){const n=document.createElement(tag);n.className=cls;if(id)n.id=id;document.body.append(n);return n;}
+  function setScope(on){
+    on=!!on&&active()&&!!AIM_FOV[weaponId()]&&!cs2.reloading;
+    if(on===scoped)return;scoped=on;document.body.classList.toggle('v16-scoped',on&&weaponId()==='awp');
+    if(camera){camera.fov=on?AIM_FOV[weaponId()]:camFovSetting;camera.updateProjectionMatrix();}
+    if(cs2GunMesh)cs2GunMesh.visible=!(on&&weaponId()==='awp');
+    aimBtn?.setAttribute('aria-pressed',String(on));
+  }
+  window.bloxCsAim=setScope;
+  function ensureUi(){
+    if(!radar){radar=node('canvas','v16-radar','v16Radar');radar.width=radar.height=180;radar.setAttribute('aria-label','Radar');}
+    if(!hurt)hurt=node('div','v16-hurt','v16Hurt');
+    // Inside the canvas box so joystick, jump and menu stay above the scope.
+    if(!scope){scope=node('div','v16-scope','v16Scope');($('gameCanvasContainer')||document.body).append(scope);}
+    if(window.isMobileDevice&&!aimBtn&&$('cs16FireBtn')){
+      aimBtn=document.createElement('button');aimBtn.type='button';aimBtn.id='v16AimBtn';aimBtn.className='v10-cs-touch';aimBtn.textContent='CEL';aimBtn.setAttribute('aria-label','Celuj (przybliżenie)');aimBtn.style.touchAction='none';
+      aimBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(!isPaused())setScope(!scoped);});
+      aimBtn.onclick=e=>{e.preventDefault();e.stopPropagation();if(e.detail===0)setScope(!scoped);};
+      document.body.append(aimBtn);
+    }
+    if(aimBtn){const next=$('cs16NextWeaponBtn')?.getBoundingClientRect();if(next?.width){aimBtn.style.right=(innerWidth-next.left+8)+'px';aimBtn.style.bottom=(innerHeight-next.bottom)+'px';}}
+  }
+  function clearUi(){setScope(false);for(const n of[radar,hurt,scope,aimBtn])n?.remove();radar=hurt=scope=aimBtn=null;lastHp=lastPos=lastAmmo=null;bloom=speed=0;restoreSpread();document.body.classList.remove('v16-scoped');}
+  function restoreSpread(){if(baseSpread)for(const id in baseSpread)CS16_WEAPONS[id].spread=baseSpread[id];}
+  function drawRadar(){
+    const ctx=radar.getContext('2d'),S=180,R=S/2,scale=R/42,p=playerGroup.position,yaw=camYaw,clock=gameTimeMs/1000;
+    ctx.clearRect(0,0,S,S);ctx.save();ctx.beginPath();ctx.arc(R,R,R-1,0,Math.PI*2);ctx.clip();
+    ctx.translate(R,R);ctx.rotate(yaw);
+    // World +x/+z mapped so that the view direction (-sin yaw, -cos yaw) points up.
+    const map=(x,z)=>[(x-p.x)*scale,(z-p.z)*scale];
+    ctx.fillStyle='#ffffff10';const [bx,bz]=map(-70,-70);ctx.beginPath();ctx.arc(bx,bz,16*scale,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#c9bfa6';
+    for(const b of platforms){if(!(b.h>1)||Math.max(b.w,b.d)>100)continue;const [x,z]=map(b.minX,b.minZ);ctx.fillRect(x,z,(b.maxX-b.minX)*scale,(b.maxZ-b.minZ)*scale);}
+    ctx.strokeStyle='#ffffff30';ctx.lineWidth=2;const [ax,az]=map(-88,-88);ctx.strokeRect(ax,az,176*scale,176*scale);
+    // Enemies show up when close, in line of sight or right after they fire.
+    for(const e of cs2.enemies){const q=e.rig?.group?.position;if(!q)continue;const d=Math.hypot(q.x-p.x,q.z-p.z),fired=clock-(e.flashUntil||-99)<1.6,spotted=clock-(e.seen??-99)<.6;
+      if(d>18&&!fired&&!spotted)continue;const [x,z]=map(q.x,q.z);ctx.fillStyle=fired?'#ff5a4a':'#ff9c8f';ctx.beginPath();ctx.arc(x,z,4.5,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+    ctx.fillStyle='#00e69133';ctx.beginPath();ctx.moveTo(R,R);ctx.arc(R,R,R*.8,-Math.PI/2-.55,-Math.PI/2+.55);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#00e691';ctx.beginPath();ctx.moveTo(R,R-7);ctx.lineTo(R-5,R+5);ctx.lineTo(R+5,R+5);ctx.closePath();ctx.fill();
+  }
+  function hitDirection(){
+    const clock=gameTimeMs/1000,p=playerGroup.position;let src=null,best=-Infinity;
+    for(const e of cs2.enemies){const t=e.flashUntil||-99;if(t>best){best=t;src=e;}}
+    if(!src||clock-best>1)src=cs2.enemies.reduce((a,e)=>!a||e.rig.group.position.distanceTo(p)<a.rig.group.position.distanceTo(p)?e:a,null);
+    if(!src)return;const q=src.rig.group.position;
+    // Angle relative to view: 0 = in front, clockwise positive.
+    const world=Math.atan2(q.x-p.x,q.z-p.z),view=Math.atan2(-Math.sin(camYaw),-Math.cos(camYaw));
+    hurt.style.transform=`rotate(${(view-world)*180/Math.PI}deg)`;hurt.classList.add('on');requestAnimationFrame(()=>requestAnimationFrame(()=>hurt?.classList.remove('on')));
+  }
+  function crosshair(gap){
+    const c=$('cs2Crosshair');if(!c)return;
+    if(!c.classList.contains('v16-cross')){c.classList.add('v16-cross');for(let i=0;i<4;i++){const a=document.createElement('i');a.className='v16-arm';c.append(a);}const d=document.createElement('i');d.className='v16-dot';c.append(d);}
+    const arms=c.querySelectorAll('.v16-arm'),g=Math.round(gap),L=7;
+    const set=(a,x,y,w,h)=>{a.style.left=x+'px';a.style.top=y+'px';a.style.width=w+'px';a.style.height=h+'px';};
+    set(arms[0],22-g-L,21.5,L,2);set(arms[1],22+g,21.5,L,2);set(arms[2],21.5,22-g-L,2,L);set(arms[3],21.5,22+g,2,L);
+  }
+  const oldUpdate=updateCS2;
+  updateCS2=function(dt){
+    oldUpdate(dt);
+    if(!active())return;
+    ensureUi();
+    if(!baseSpread){baseSpread={};for(const id in CS16_WEAPONS)baseSpread[id]=CS16_WEAPONS[id].spread;}
+    const p=playerGroup.position;
+    if(lastPos&&dt>0){const v=Math.hypot(p.x-lastPos.x,p.z-lastPos.z)/dt;speed+=(Math.min(v,12)-speed)*Math.min(1,dt*10);}
+    lastPos={x:p.x,z:p.z};
+    const wpn=cs2.weapons[cs2.currentWeapon],id=wpn?.id;
+    if(wpn){if(lastAmmo!==null&&wpn.ammo<lastAmmo)bloom=Math.min(1,bloom+.35);lastAmmo=wpn.ammo;}
+    bloom=Math.max(0,bloom-dt*2.2);
+    if(scoped&&(cs2.reloading||!AIM_FOV[id]))setScope(false);
+    if(scoped&&cs2GunMesh&&id==='awp')cs2GunMesh.visible=false;
+    // Running and spraying cost accuracy; standing still and aiming reward it.
+    const moving=Math.min(1,speed/5),air=p.y>2.2?1:0;
+    let factor=1+moving*.9+air*1.5+bloom*.8;
+    if(id==='awp')factor*=scoped?.15:4;else if(scoped)factor*=.45;
+    if(id&&baseSpread[id]!=null)CS16_WEAPONS[id].spread=baseSpread[id]*factor;
+    crosshair(Math.min(16,3+(factor-1)*8));
+    if(lastHp!==null&&cs2.hp<lastHp)hitDirection();lastHp=cs2.hp;
+    drawRadar();
+  };
+  const oldSwitch=switchCS2Weapon;
+  switchCS2Weapon=function(...a){setScope(false);return oldSwitch.apply(this,a);};
+  window.switchCS2Weapon=switchCS2Weapon;
+  const oldLeave=leaveGame;
+  leaveGame=function(...a){clearUi();return oldLeave.apply(this,a);};
+  addEventListener('keydown',e=>{if(e.code!=='KeyZ'||e.repeat||!active()||isPaused())return;const t=e.target;if(t&&/INPUT|TEXTAREA/.test(t.tagName))return;setScope(!scoped);});
+  // Right mouse button aims too.
+  addEventListener('contextmenu',e=>{if(active()&&e.target?.closest?.('#gameCanvasContainer')){e.preventDefault();if(!isPaused())setScope(!scoped);}});
+  setInterval(()=>{if(!active()&&(radar||scoped))clearUi();},500);
 })();
 </script>
 </body>
