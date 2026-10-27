@@ -582,7 +582,16 @@ def room_input(uid, body):
         return None
     p = room["players"][uid]
     p["seen"] = now()
+    if p.get("tab") and body.get("tab") != p["tab"]:
+        return room
     pos = body.get("position")
+    if isinstance(pos, dict) and now() < p.get("settleUntil", 0):
+        # Just placed by the server (room entry, respawn): the client may still report its old
+        # spot for a moment. Ignore far positions until it shows up near the server's one.
+        if math.hypot(number(pos.get("x"), p["x"])-p["x"], number(pos.get("z"), p["z"])-p["z"]) > 3:
+            pos = None
+        else:
+            p["settleUntil"] = 0
     if isinstance(pos, dict):
         elapsed = min(2, max(.05, now()-p["lastMove"]))
         x, z = number(pos.get("x"), p["x"], -89, 89), number(pos.get("z"), p["z"], -89, 89)
@@ -592,7 +601,9 @@ def room_input(uid, body):
         limit = SPEED_LIMIT.get(room["game"], 18)
         budget = min(limit*1.5+2, p.get("moveBudget", limit*1.5+2)+elapsed*limit)
         if distance > budget:
-            if distance > budget+1:
+            # Small overshoots are network jitter: clamped, and the client snaps back to the server's
+            # spot. Only a jump well past the budget counts as cheating.
+            if distance > budget+3:
                 strike(uid, "ruch", f"{distance:.1f}>{budget:.1f}")
             ratio = budget/distance
             x, z = p["x"]+(x-p["x"])*ratio, p["z"]+(z-p["z"])*ratio
@@ -662,11 +673,11 @@ def player_state(uid, game, slot=0):
                 y=1.5 if game == "cs2" else .5, z=-70 if game == "cs2" else 18,
                 rotY=0, hp=100, money=800, kills=0, deaths=0,
                 weapons=[dict(id="glock", ammo=20)], currentWeapon=0,
-                reloadUntil=0, shootUntil=0, shieldUntil=now()+3, lastMove=now(), seen=now(),
+                reloadUntil=0, shootUntil=0, shieldUntil=now()+3, lastMove=now(), seen=now(), settleUntil=now()+3,
                 sequence=0, acknowledgements=[], moving=False, dancing=False)
 
 
-def create_room(uid, game, public=False):
+def create_room(uid, game, public=False, tab=None):
     code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
     while code in rooms:
         code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
@@ -678,15 +689,18 @@ def create_room(uid, game, public=False):
         for _ in range(5):
             spawn_bot(room)
     rooms[code] = room
-    enter_room(uid, room)
+    enter_room(uid, room, tab)
     return room
 
 
-def enter_room(uid, room):
+def enter_room(uid, room, tab=None):
     if uid not in room["players"] and len(room["players"]) >= 6:
         fail("Pokój jest pełny (6 graczy).")
     leave(uid)
     room["players"][uid] = player_state(uid, room["game"], len(room["players"]))
+    # The browser tab that entered steers the player; another open tab of the same account
+    # must not move it (it would look like teleporting and trip the anti-cheat).
+    room["players"][uid]["tab"] = tab
     presence[uid] = dict(seen=now(), room=room["code"])
     room["emptySince"] = 0
 
@@ -742,20 +756,19 @@ def act(room, p, action):
         if p["id"] != room["owner"] or room["phase"] == "playing":
             return
         uid, game, code, players, public = room["owner"], room["game"], room["code"], list(room["players"]), room["public"]
+        tabs = {pid: room["players"][pid].get("tab") for pid in players}
         fresh = create_room(uid, game, public)
         rooms.pop(fresh["code"])
         generation = room["generation"]+1
         room.update(fresh, code=code, generation=generation)
         room.pop("_bot_director", None)
         for i, pid in enumerate(players):
-            room["players"][pid] = player_state(pid, game, i)
+            room["players"][pid] = player_state(pid, game, i) | dict(tab=tabs[pid])
             presence[pid]["room"] = code
         return
     if kind == "respawn" and room["game"] == "cs2":
-        # The server already respawns a killed player; a respawn while alive would be a free heal
-        # and a teleport back to base, so it only confirms a recent death.
-        if now()-p.get("diedAt", -99) > 5:
-            return "Odrodzenie jest możliwe tylko po śmierci."
+        # The server already respawns a killed player (the client also sends this when a match
+        # starts). A respawn while alive would be a free heal and a teleport to base: ignored.
         return
     if room["game"] == "castle_defense":
         if kind == "build":
@@ -958,7 +971,7 @@ def tick(room, dt):
                 end[0] += random.choice([-1,1])*2
             emit(room,"bot",origin=origin,end=end,enemy=enemy["id"])
             if player["hp"] <= 0:
-                player.update(hp=100,x=-70,y=1.5,z=-70,deaths=player["deaths"]+1,reloadUntil=0,shieldUntil=now()+2.5,diedAt=now(),moveBudget=0)
+                player.update(hp=100,x=-70,y=1.5,z=-70,deaths=player["deaths"]+1,reloadUntil=0,shieldUntil=now()+2.5,moveBudget=0,settleUntil=now()+3)
                 player["money"] = max(0,player["money"]-200)
                 player["kevlar"] = False
         director.update(room["enemies"],list(room["players"].values()),dt,now(),sight,bot_fire)
@@ -1535,7 +1548,7 @@ async def api(operation: str, request: Request):
             game = body.get("game")
             if game not in GAME_IDS:
                 fail("Ta gra nie obsługuje jeszcze multiplayera.")
-            room = create_room(uid, game, body.get("public") is True)
+            room = create_room(uid, game, body.get("public") is True, clean(body.get("tab"), 40) or None)
         elif action in ("join", "friend"):
             code = clean(body.get("code"), 12).upper()
             if action == "friend":
@@ -1546,7 +1559,7 @@ async def api(operation: str, request: Request):
             room = rooms.get(code)
             if not room or not room["players"]:
                 fail("Nie znaleziono aktywnego pokoju. Sprawdź kod.", 404)
-            enter_room(uid, room)
+            enter_room(uid, room, clean(body.get("tab"), 40) or None)
         else:
             fail("Nieznana operacja pokoju.")
         return dict(room=room_view(room, uid))

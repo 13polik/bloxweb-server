@@ -74,6 +74,7 @@ def test_shop_items_cost_bloxbux_and_unknown_items_are_refused(client):
 
 def test_teleporting_and_flying_get_the_player_removed(client):
     me, room = room_for(client, "Ala", "BLOX-111111")
+    client.server.rooms[room["code"]]["players"]["BLOX-111111"]["settleUntil"] = 0  # past the entry grace
     notices = []
     for i in range(30):
         x = 80 if i % 2 else -80
@@ -133,7 +134,7 @@ def test_walking_through_a_wall_is_refused(client):
     server = client.server
     player = server.rooms[room["code"]]["players"]["BLOX-111111"]
     # The wall at x=-50 runs from z=-70 to z=-50; walk straight through it at normal speed.
-    player.update(x=-52.5, z=-60, lastMove=server.now()-.2)
+    player.update(x=-52.5, z=-60, lastMove=server.now()-.2, settleUntil=0)
     server.room_input("BLOX-111111", dict(position=dict(x=-47.5, y=1.5, z=-60)))
     assert player["x"] == -52.5
     assert any(e["kind"] == "ściana" for e in server.anticheat_log)
@@ -143,7 +144,7 @@ def test_a_steady_speed_hack_is_held_to_the_game_speed(client):
     me, room = room_for(client, "Ala", "BLOX-111111")
     server = client.server
     player = server.rooms[room["code"]]["players"]["BLOX-111111"]
-    player.update(x=-70, z=-80)
+    player.update(x=-70, z=-80, settleUntil=0)
     for i in range(40):  # 4 seconds at 20 units/s, twice the real top speed
         player["lastMove"] = server.now()-.1
         server.room_input("BLOX-111111", dict(position=dict(x=player["x"]+2, y=1.5, z=-80)))
@@ -156,5 +157,31 @@ def test_respawn_while_alive_is_refused(client):
     state = server.rooms[room["code"]]
     player = state["players"]["BLOX-111111"]
     player.update(x=-60, z=-60, hp=40)
-    assert "tylko po śmierci" in server.act(state, player, dict(kind="respawn"))
+    server.act(state, player, dict(kind="respawn"))
     assert (player["x"], player["hp"]) == (-60, 40)
+
+
+def test_positions_right_after_entry_are_ignored_until_the_client_catches_up(client):
+    me, room = room_for(client, "Ala", "BLOX-111111")
+    server = client.server
+    player = server.rooms[room["code"]]["players"]["BLOX-111111"]
+    start = (player["x"], player["z"])
+    server.room_input("BLOX-111111", dict(position=dict(x=20, y=1.5, z=20)))  # old spot from before entry
+    assert (player["x"], player["z"]) == start and not server.anticheat_log
+    server.room_input("BLOX-111111", dict(position=dict(x=start[0]+.5, y=1.5, z=start[1])))
+    assert player["x"] == start[0]+.5 and player["settleUntil"] == 0
+
+
+def test_only_the_tab_that_entered_steers_the_player(client):
+    me = guest(client, "Ala", "BLOX-111111")
+    room = call(client, "room", token=me["token"], action="create", game="cs2", tab="tab-A")["room"]
+    server = client.server
+    player = server.rooms[room["code"]]["players"]["BLOX-111111"]
+    player["settleUntil"] = 0
+    start = (player["x"], player["z"])
+    # An old tab of the same account keeps sending its stale spot: ignored, no strikes.
+    for _ in range(30):
+        call(client, "sync", token=me["token"], tab="tab-B", position=dict(x=20, y=1.5, z=20))
+    assert (player["x"], player["z"]) == start and not server.anticheat_log
+    call(client, "sync", token=me["token"], tab="tab-A", position=dict(x=start[0]+.4, y=1.5, z=start[1]))
+    assert player["x"] == start[0]+.4

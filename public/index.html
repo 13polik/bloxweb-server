@@ -1803,7 +1803,7 @@ function normalizeAvatar(value) {
                 <div class="game-title">${g.title}</div>
                 <div class="game-stats">
                     <span>${g.genre === 'Sports' ? 'Mecz 3 na 3' : g.genre}</span>
-                    <span>${g.id === 'football' ? 'Beta / solo' : 'Solo / online'}</span>
+                    <span>${g.id === 'football' ? 'Beta / solo' : (g.id === 'cs2' || g.id === 'castle_defense') ? 'Tylko online' : 'Solo / online'}</span>
                 </div>
                 <button type="button" class="quick-play-card-btn">▶ Zagraj ponownie</button>
             `;
@@ -7301,7 +7301,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   const lobby=el('section','v11-lobby');lobby.id='v11Lobby';
   const lobbyCopy=el('div');lobbyCopy.append(el('div','v11-eyebrow','BloxWeb / razem w grze'),el('h2','','Jedna drużyna. Wspólny świat.'));
   lobbyCopy.append(note('Brońcie zamku albo pokonujcie boty w strzelance. Utwórz pokój i podaj kod znajomym. Do sześciu graczy w jednym meczu.'));
-  const stats=el('div','v11-stats');stats.append(el('span','','2 gry kooperacyjne'),el('span','','Pokój bez zależności od hosta'),el('span','','Solo nadal dostępne'));lobbyCopy.append(stats);
+  const stats=el('div','v11-stats');stats.append(el('span','','2 gry kooperacyjne'),el('span','','Pokój bez zależności od hosta'),el('span','','Mecz zawsze na serwerze'));lobbyCopy.append(stats);
   const lobbyActions=el('div','v11-lobby-actions');lobbyActions.append(btn('Utwórz pokój',()=>roomDialog('create'),true),btn('Mam kod pokoju',()=>roomDialog('join')));
   lobby.append(lobbyCopy,lobbyActions);
   if(welcome)welcome.after(lobby);else $('view-home').prepend(lobby);
@@ -7361,6 +7361,8 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       throw error;
     }finally{clearTimeout(timer);}
   }
+  // Identifies this browser tab, so only the tab that entered a room steers the player in it.
+  const TAB_ID=(crypto.randomUUID?.()||String(Math.random()).slice(2)).slice(0,36);
   async function connect(force=false){
     if(connecting)return;
     if(connected&&!force)return;
@@ -7554,7 +7556,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     const fresh=actions.filter(a=>a.seq>wsSentSeq);
     if(!force&&!fresh.length&&!resend&&posKey===wsLastPos&&t-wsLastSend<250)return;
     const out=resend?actions:fresh;
-    try{ws.send(JSON.stringify({type:'in',position,actions:out.slice(0,30)}));}catch{return;}
+    try{ws.send(JSON.stringify({type:'in',tab:TAB_ID,position,actions:out.slice(0,30)}));}catch{return;}
     if(out.length){wsSentSeq=Math.max(wsSentSeq,...out.map(a=>a.seq));wsSentAt=t;}
     wsLastSend=t;wsLastPos=posKey;
     if(t-wsPingAt>2000){wsPingAt=t;try{ws.send(JSON.stringify({type:'ping',t}));}catch{}}
@@ -7573,7 +7575,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       const profile={name:username,avatar:avatarData},hash=JSON.stringify(profile),sentKey=localProfileKey();
       const viaSocket=wsReady&&active;
       const position=active&&playerGroup&&!viaSocket?{x:playerGroup.position.x,y:playerGroup.position.y,z:playerGroup.position.z,rotY:playerGroup.rotation.y,moving:!!(keysPressed.KeyW||keysPressed.KeyS||keysPressed.KeyA||keysPressed.KeyD),dancing:isDancing}:null;
-      const payload={position,actions:active&&!viaSocket?actions:[],social:wantSocial};
+      const payload={position,actions:active&&!viaSocket?actions:[],social:wantSocial,tab:TAB_ID};
       if(viaSocket)payload.room=false;
       if(hash!==profileHash)payload.profile=profile;
       const sentProgress=localProgress(),progressBase=readProgressBase();
@@ -7790,7 +7792,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   function renderPublicRooms(){
     publicPanel.replaceChildren(el('h3','','Otwarte pokoje'));
     publicPanel.hidden=connected&&publicRooms.length===0;
-    if(!connected){publicPanel.append(note('Tryb solo jest dostępny bez serwera. Aby grać razem, połącz backend w Ustawieniach.'));return;}
+    if(!connected){publicPanel.append(note('CS i Obrona zamku działają tylko online. Połącz serwer w Ustawieniach.'));return;}
     if(!publicRooms.length){publicPanel.append(note('Nie ma teraz otwartych pokojów. Utwórz własny albo dołącz prywatnym kodem.'));return;}
     for(const r of publicRooms){const row=el('div','v11-room-entry');row.append(el('span','',`${gameTitle(r.game)} · ${r.count}/6 graczy`),btn('Dołącz',()=>enter({action:'join',code:r.code}),true));publicPanel.append(row);}
   }
@@ -7825,9 +7827,9 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     starting=true;
     try{
       if(!connected)await connect();
-      if(!connected)throw Error('Brak połączenia z backendem. Gry solo działają bez niego.');
+      if(!connected)throw Error('Brak połączenia z serwerem. CS i Obrona zamku działają tylko online.');
       roomEpoch++;
-      const data=await api('room',payload);close?.();
+      const data=await api('room',{...payload,tab:TAB_ID});close?.();
       await openRoom(data.room);
     }catch(error){window.bloxLastError=String(error.stack||error);showToast(error.message);throw error;}
     finally{starting=false;}
@@ -7895,8 +7897,8 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     sequence=Math.max(sequence,self.sequence);
     for(const ack of self.acknowledgements||[]){if(ack.seq>lastAck&&ack.error)showToast(ack.error);}
     lastAck=Math.max(lastAck,self.sequence);
-    // Preserve client-side motion prediction; correct only large divergence.
-    if(playerGroup&&Math.hypot(playerGroup.position.x-self.x,playerGroup.position.z-self.z)>7)playerGroup.position.set(self.x,self.y,self.z);
+    // Preserve client-side motion prediction; snap back when the server held the player (walls, speed limit).
+    if(playerGroup&&Math.hypot(playerGroup.position.x-self.x,playerGroup.position.z-self.z)>4)playerGroup.position.set(self.x,self.y,self.z);
     const otherIds=new Set(value.players.filter(p=>p.id!==onlineId()).map(p=>p.id));
     for(const id of Object.keys(remotePlayers3D))if(!otherIds.has(id))removeRemotePlayer3D(id);
     for(const p of value.players)if(p.id!==onlineId())updateRemotePlayer3D({...p,name:(window.bloxRoleTag?.(p.role)||'')+p.name,avatar:normalizeAvatar(p.avatar),isMoving:p.moving,isDancing:p.dancing,score:p.kills+' elim.'});
@@ -8005,8 +8007,11 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if(!active||closing)return soloLeave();
     endLocalOnline();api('room',{action:'leave'}).catch(e=>showToast(e.message));schedulePoll();
   };
+  // CS and Castle Defense run only on the server, so HP, ammo and bots cannot be edited in the browser.
+  const ONLINE_ONLY=window.bloxOnlineOnly=new Set(['cs2','castle_defense']);
   launch3DGame=function(id){
     if(active){endLocalOnline();api('room',{action:'leave'}).catch(()=>{});}
+    if(ONLINE_ONLY.has(id)){enter({action:'create',game:id,public:false}).catch(()=>{});return;}
     return soloLaunch(id);
   };
   const oldRenderText=window.render_game_to_text;
@@ -8862,7 +8867,7 @@ body.device-mobile[data-game=football] .ingame-hud-bottom{display:none!important
   castleCard.desc='Broń zamku przez 20 fal, buduj pięć rodzajów wież, ulepszaj je i naprawiaj twierdzę za złoto meczu. Minimapka pokazuje zagrożenia, a zbędną wieżę możesz sprzedać za 70% inwestycji. Solo lub kooperacja online do 6 osób.';
   const renderCards=renderGames;
   renderGames=function(list){renderCards(list);for(const [i,card]of [...document.querySelectorAll('#gamesContainer .game-card')].entries()){
-    const metadata=card.querySelector('.game-stats');if(metadata){metadata.replaceChildren(el('span','',list[i].genre==='Sports'?'Mecz 3 na 3':list[i].genre),el('span','',list[i].id==='football'?'Solo z botami':'Solo / online'));}
+    const metadata=card.querySelector('.game-stats');if(metadata){metadata.replaceChildren(el('span','',list[i].genre==='Sports'?'Mecz 3 na 3':list[i].genre),el('span','',list[i].id==='football'?'Solo z botami':(list[i].id==='cs2'||list[i].id==='castle_defense')?'Tylko online':'Solo / online'));}
     if(list[i].id==='football'){const badge=document.createElement('span');badge.className='v13-game-tag';badge.textContent='BETA / SOLO';card.querySelector('.game-thumb').append(badge);}
   }};
   renderGames(getFilteredGamesList());renderContinuePlaying();
@@ -9985,6 +9990,8 @@ body.blox-is-loading{overflow:hidden}
   const launch=window.launch3DGame;
   window.launch3DGame=function(id){
     const names={castle_defense:'Castle Defense',cs2:'Counter Blox',football:'Piłka Nożna 3D'};
+    // Online-only games open a server room, which shows its own loading screen.
+    if(window.bloxOnlineOnly?.has(id))return launch(id);
     return window.BloxLoading.run(()=>{
       launch(id);
       if(currentPlayingGame!==id)throw Error('Gra nie jest dostępna lub jest zablokowana.');

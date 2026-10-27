@@ -40,6 +40,9 @@ def player(name="Cheater"):
 def cs_room(token):
     status, data = api("room", token=token, action="create", game="cs2")
     assert status == 200, data
+    # Report the spawn spot once, as the real client does after entering, to end the entry grace.
+    me = next(p for p in data["room"]["players"] if p["id"] == data["user"]["id"]) if "user" in data else data["room"]["players"][-1]
+    api("sync", token=token, position=dict(x=me["x"], y=1.5, z=me["z"], rotY=0), social=False)
     return data["room"]
 
 
