@@ -106,7 +106,14 @@ token_cache = {}
 relation_cache = {}
 LOGIN_PATTERN = r"[a-z0-9_.-]{3,20}"
 log = logging.getLogger("bloxweb")
-GAME_IDS = {"castle_defense", "cs2"}
+GAME_IDS = {"castle_defense", "cs2", "obby"}
+# Simulated games run on the server; relay games (parkour and Studio games, "nexus:G-...")
+# run in each browser and the server only shares positions, chat and script messages.
+SIMULATED = {"castle_defense", "cs2"}
+
+
+def relay(game):
+    return game == "obby" or game.startswith("nexus:")
 COLORS = ["head", "torso", "leftArm", "rightArm", "leftLeg", "rightLeg"]
 TOWERS = {
     "archer": dict(cost=50, damage=15, range=16, cooldown=.85),
@@ -585,6 +592,13 @@ def room_input(uid, body):
     if p.get("tab") and body.get("tab") != p["tab"]:
         return room
     pos = body.get("position")
+    if relay(room["game"]):
+        # Nothing here is scored or rewarded by the server, so positions are only kept in bounds.
+        if isinstance(pos, dict):
+            p.update(x=number(pos.get("x"), p["x"], -5000, 5000), y=number(pos.get("y"), p["y"], -500, 2000),
+                     z=number(pos.get("z"), p["z"], -5000, 5000), rotY=number(pos.get("rotY")),
+                     moving=bool(pos.get("moving")), dancing=bool(pos.get("dancing")), lastMove=now())
+        pos = None
     if isinstance(pos, dict) and now() < p.get("settleUntil", 0):
         # Just placed by the server (room entry, respawn): the client may still report its old
         # spot for a moment. Ignore far positions until it shows up near the server's one.
@@ -766,6 +780,8 @@ def act(room, p, action):
             room["players"][pid] = player_state(pid, game, i) | dict(tab=tabs[pid])
             presence[pid]["room"] = code
         return
+    if relay(room["game"]):
+        return relay_action(room, p, kind, action)
     if kind == "respawn" and room["game"] == "cs2":
         # The server already respawns a killed player (the client also sends this when a match
         # starts). A respawn while alive would be a free heal and a teleport to base: ignored.
@@ -889,10 +905,42 @@ def act(room, p, action):
                     spawn_bot(room)
 
 
+def relay_action(room, p, kind, action):
+    """Script messages (NexusScript `send`) and parkour stages, shared with the whole room."""
+    stamps = p.setdefault("msgTimes", deque())
+    while stamps and stamps[0] < now()-1:
+        stamps.popleft()
+    if kind == "msg":
+        if len(stamps) >= 10:
+            return "Za dużo wiadomości na sekundę."
+        name = clean(action.get("name"), 24)
+        try:
+            value = action.get("value")
+            if len(json.dumps(value)) > 600:
+                return "Wiadomość skryptu jest za duża."
+        except (TypeError, ValueError):
+            return
+        if not name:
+            return
+        stamps.append(now())
+        room["serial"] += 1
+        room.setdefault("events", []).append(dict(id=room["serial"], sender=p["id"], name=name, value=value))
+        room["events"] = room["events"][-40:]
+    elif kind == "stage" and room["game"] == "obby":
+        stage = int(number(action.get("stage"), 0, 0, 999))
+        if stage <= p.get("stage", 1):
+            return
+        p["stage"] = stage
+        room["serial"] += 1
+        who = (user_view(p["id"]) or {}).get("name", "Gracz")
+        room["chat"].append(dict(id=room["serial"], sender="", name="BloxWeb", role="official", text=f"{who} dotarł do etapu {stage}!"))
+        room["chat"] = room["chat"][-60:]
+
+
 def tick(room, dt):
     room["revision"] += 1
     room["fx"] = [fx for fx in room["fx"] if fx["until"] > now()]
-    if room["phase"] != "playing" or not room["players"]:
+    if room["phase"] != "playing" or not room["players"] or room["game"] not in SIMULATED:
         return
     if room["game"] == "castle_defense":
         if room["betweenWaves"]:
@@ -994,6 +1042,7 @@ def public_room(room):
     view["countdown"] = round(view["countdown"], 2)
     view["enemies"] = [compact(e) for e in room["enemies"]]
     view["chat"] = room["chat"][-20:]
+    view["events"] = room.get("events", [])[-30:]
     return view | dict(players=players)
 
 
@@ -1546,7 +1595,12 @@ async def api(operation: str, request: Request):
             return dict(room=None)
         if action == "create":
             game = body.get("game")
-            if game not in GAME_IDS:
+            if isinstance(game, str) and game.startswith("nexus:"):
+                gid = clean(game[6:], 12).upper()
+                if not db.execute("SELECT 1 FROM published_games WHERE id=? AND hidden=0", (gid,)).fetchone():
+                    fail("Nie znaleziono tej gry w katalogu.", 404)
+                game = "nexus:" + gid
+            elif game not in GAME_IDS:
                 fail("Ta gra nie obsługuje jeszcze multiplayera.")
             room = create_room(uid, game, body.get("public") is True, clean(body.get("tab"), 40) or None)
         elif action in ("join", "friend"):

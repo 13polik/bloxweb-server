@@ -1,4 +1,4 @@
-# NexusScript 1.4 – język gier 3D w BloxWeb Studio
+# NexusScript 1.5 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -56,6 +56,8 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when arrive { ... }` – gdy gracz dotrze do znacznika z `setWaypoint` (znacznik wtedy znika).
 - `when bump "Nazwa" { ... }` (lub bez nazwy, wtedy `target` to nazwa) – gdy piłka wpadnie do nazwanego klocka lub strefy (np. bramki).
 - `when button "Tekst" { ... }` – gdy gracz naciśnie własny przycisk z `button("Tekst")`.
+- `when message "nazwa" { ... }` – gdy ktoś w pokoju online wyśle `send("nazwa", wartość)`. Zmienne: `value` (wysłana wartość) i `sender` (nick nadawcy).
+- `when playerJoin { ... }` / `when playerLeave { ... }` – gdy inny gracz wchodzi do pokoju online lub z niego wychodzi (`target` to jego nick).
 
 ## Broń i walka
 - `giveWeapon("pistol" | "rifle" | "shotgun" | "sniper" | "sword" | "none")` – daje graczowi broń (pistolet, karabin, strzelbę, snajperkę, miecz) albo ją zabiera.
@@ -85,6 +87,20 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `button("Tekst")` – własny przycisk na ekranie (działa też na telefonie), `button("Tekst", false)` go usuwa.
 - `particles(x, y, z, "#kolor", ile)` – wybuch kolorowych iskier (np. przy golu lub zebraniu monety).
 - `save("klucz", wartość)` i `load("klucz", domyślna)` – zapis postępu w przeglądarce gracza (liczby, teksty, listy, słowniki), osobno dla każdej gry. Np. rekord, odblokowane poziomy.
+
+## Gra online (multiplayer)
+Każdą opublikowaną grę można uruchomić przyciskiem **Graj online**. Powstaje pokój z kodem, do którego dołączają znajomi (do 6 osób). Gracze widzą się nawzajem (postacie z nickami), mają czat (Enter lub przycisk Czat), a skrypt działa u każdego gracza osobno. Skrypty porozumiewają się wiadomościami:
+- `send("nazwa", wartość)` – wysyła wiadomość do wszystkich w pokoju, także do siebie. Wartość: liczba, tekst, lista lub słownik (do ok. 600 znaków, najwyżej 10 wiadomości na sekundę).
+- `when message "nazwa" { ... }` – odbiór (`value`, `sender`).
+- `playerCount()` – ilu graczy jest w grze, `players()` – lista nicków, `isOnline()` – czy gra działa online, `player.name` – Twój nick.
+- Bez trybu online `send` niczego nie wysyła, a `playerCount()` zwraca 1, więc ta sama gra działa też solo.
+
+## Grafika
+- `material(nazwa, "plastic" | "metal" | "gold" | "wood" | "stone" | "grass" | "sand" | "neon" | "glass" | "ice")` – materiał klocka: metal i złoto błyszczą, drewno, kamień, trawa i piasek mają teksturę, neon świeci, szkło i lód są przezroczyste.
+- `glow(nazwa, siła)` – klocek świeci własnym kolorem (siła 0–3).
+- `var l = light(x, y, z, "#kolor", zasięg)` – kolorowe światło w świecie (najwyżej 8), `lightOff(l)` je gasi. Najlepiej wygląda w nocy (`lighting("night")`).
+- `skyGradient("#góra", "#dół")` – niebo z gradientem (np. zachód słońca: `skyGradient("#1e3a8a", "#f59e0b")`).
+- `shadows(true | false)` – cienie. Na komputerach są włączone od startu, na telefonach wyłączone (dla płynności). Przy ponad 900 klockach wyłączają się same, chyba że skrypt je włączy.
 
 ## Gotowe światy i czas
 - `buildCity(x, z, rozmiar)` – miasto: asfalt, linie, chodniki i budynki (rozmiar 1–8 kwartałów; kwartał co 38 jednostek, ulice na x i z = ..., -38, 0, 38, ...).
@@ -357,8 +373,35 @@ when win {
 }
 ```
 
+## Przykład: gra online – zbieranie punktów dla drużyny
+```nexus
+skyGradient("#0f172a", "#7c3aed")
+lighting("night")
+spawn("block", 0, -0.5, 0, 50, 1, 50, "#334155", "Podloga")
+material("Podloga", "stone")
+spawn("spawn", 0, 0, 0, 4, 1, 4)
+var razem = 0
+repeat 12 {
+  var m = spawn("coin", random(-20, 20), 1, random(-20, 20))
+}
+var lampa = light(0, 6, 0, "#a78bfa", 30)
+when collect {
+  send("moneta", player.name)
+}
+when message "moneta" {
+  razem += 1
+  hint("Drużyna: " + razem + " / 12 · ostatnio: " + value)
+  if razem >= 12 {
+    win("Wszystkie monety zebrane razem!")
+  }
+}
+when playerJoin {
+  say("Dołącza " + target + "! Graczy: " + playerCount(), 2)
+}
+```
+
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`.
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`.
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).

@@ -5113,6 +5113,7 @@ function normalizeAvatar(value) {
                             if (!unlockedBadges.includes('b_obby')) unlockedBadges.push('b_obby');
                             saveAllData(false);
                             showToast(`Checkpoint! Etap ${currentStage}!`);
+                            if (window.bloxOnline?.active) window.bloxOnline.action('stage', { stage: currentStage });
                             updateIngameHUD();
                         }
                     } else {
@@ -7248,7 +7249,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   const el=(tag,cls,value)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=value;return e;};
   const btn=(label,fn,primary=false)=>{const b=el('button',primary?'v11-primary':'v11-button',label);b.type='button';b.onclick=fn;return b;};
   const note=value=>el('p','v11-muted',value);
-  const titles={castle_defense:'Castle Defense',cs2:'Counter Strike 1.6'};
+  const titles={castle_defense:'Castle Defense',cs2:'Counter Strike 1.6',obby:'Parkour (Obby)'};
   const LOCAL=new Set(['localhost','127.0.0.1','[::1]']);
   const key='blox_online_v11_'+myPlayerId;
   let base=window.BLOX_API_BASE||accountStore.getItem('blox_api_base')||(LOCAL.has(location.hostname)?'http://127.0.0.1:8093':'');
@@ -7336,7 +7337,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   document.querySelectorAll('[onclick^="selectRoomFromSettings"]').forEach(e=>{e.disabled=true;e.closest('.settings-box')?.setAttribute('hidden','');});
   const onlineId=()=>me?.id||myPlayerId.toUpperCase();
   document.querySelectorAll('.modal-stats-row .meta-item strong').forEach(e=>{if(e.textContent.includes('Do 16'))e.textContent='Kooperacja do 6';});
-  const gameTitle=id=>titles[id]||'W menu';
+  const gameTitle=id=>String(id||'').startsWith('nexus:')?'Gra ze Studia '+id.slice(6):titles[id]||'W menu';
   function feedback(node,value,error=false){node.textContent=value;node.classList.toggle('error',error);}
   function setStatus(value,ok=false){
     statusEl.textContent=value;statusEl.style.color=ok?'#a3efbe':'#e8bdaa';
@@ -7830,6 +7831,8 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       if(!connected)throw Error('Brak połączenia z serwerem. CS i Obrona zamku działają tylko online.');
       roomEpoch++;
       const data=await api('room',{...payload,tab:TAB_ID});close?.();
+      // Studio games run in the NexusScript player, which keeps its own room connection.
+      if(String(data.room?.game).startsWith('nexus:')){await window.NexusStudio?.playRoom(data.room);return;}
       await openRoom(data.room);
     }catch(error){window.bloxLastError=String(error.stack||error);showToast(error.message);throw error;}
     finally{starting=false;}
@@ -7914,7 +7917,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
       cd.enemies=[...entityMaps.enemies.values()];cd.turrets=[...entityMaps.turrets.values()];
       for(const [id,t] of entityMaps.turrets){const s=t._target;t.level=s.level;t.mesh.scale.setScalar(1+(s.level-1)*.15);t.spec={...CD_TURRETS[s.type],range:CD_TURRETS[s.type].range+2*(s.level-1)};}
       if(value.betweenWaves&&value.wave>previousWave){advanceQuest('q_obby',1);previousWave=value.wave;if(!unlockedBadges.includes('b_obby'))unlockedBadges.push('b_obby');}
-    }else{
+    }else if(value.game==='cs2'){
       const oldWeapon=cs2.weapons[cs2.currentWeapon]?.id;
       const shopChanged=cs2.money!==self.money||cs2.weapons.length!==self.weapons.length||accepted.some(a=>a.kind==='buy');
       Object.assign(cs2,{hp:self.hp,kills:value.kills,money:self.money,round:value.round,weapons:self.weapons.map(w=>({...w})),currentWeapon:self.currentWeapon,
@@ -7967,6 +7970,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
     if(!syncing){clearTimeout(pollTimer);pollTimer=setTimeout(poll,5);}
   }
   window.bloxOnline={get active(){return active;},set active(v){active=!!v;},action,frame:interpolate,api,connect,get me(){return me;},
+    get token(){return token;},socketUrl,tab:TAB_ID,
     get state(){return {connected,id:onlineId(),room:room?{code:room.code,game:room.game,players:room.players,phase:room.phase,wave:room.wave,hp:room.hp,gold:room.gold,kills:room.kills,enemies:room.enemies,turrets:room.turrets,revision:room.revision,owner:room.owner}:null,social,latency,pending:actions.length};}};
   const soloCD=updateCastleDefense,soloCS=updateCS2,soloShot=shootCS2,soloReload=reloadCS2,soloSwitch=switchCS2Weapon,soloBuy=buyCS2Item;
   const previousRemoteUpdate=updateRemotePlayer3D,previousRemoteRemove=removeRemotePlayer3D;
@@ -7993,7 +7997,7 @@ body.device-mobile .v11-network-bar button{min-height:24px}
   switchCS2Weapon=function(index){if(!active)return soloSwitch(index);action('switch',{index});};
   buyCS2Item=function(item){if(!active)return soloBuy(item);action('buy',{item});};
   window.shootCS2=shootCS2;window.reloadCS2=reloadCS2;
-  respawnPlayer=function(){if(!active)return soloRespawn();if(room.game==='cs2')action('respawn');else{playerGroup.position.set(0,.5,18);playerVelY=0;}};
+  respawnPlayer=function(){if(!active||room.game==='obby')return soloRespawn();if(room.game==='cs2')action('respawn');else{playerGroup.position.set(0,.5,18);playerVelY=0;}};
   sendChatMessage=function(){
     if(!active)return soloSendChat();const i=$('chatInputField');const value=i?.value.trim();if(!value)return;
     if(i)i.value='';action('chat',{text:text(value,300)});
@@ -11141,7 +11145,7 @@ body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);
 })();
 </script>
 <script type="text/plain" id="nexusReference">
-# NexusScript 1.4 – język gier 3D w BloxWeb Studio
+# NexusScript 1.5 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -11199,6 +11203,8 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when arrive { ... }` – gdy gracz dotrze do znacznika z `setWaypoint` (znacznik wtedy znika).
 - `when bump "Nazwa" { ... }` (lub bez nazwy, wtedy `target` to nazwa) – gdy piłka wpadnie do nazwanego klocka lub strefy (np. bramki).
 - `when button "Tekst" { ... }` – gdy gracz naciśnie własny przycisk z `button("Tekst")`.
+- `when message "nazwa" { ... }` – gdy ktoś w pokoju online wyśle `send("nazwa", wartość)`. Zmienne: `value` (wysłana wartość) i `sender` (nick nadawcy).
+- `when playerJoin { ... }` / `when playerLeave { ... }` – gdy inny gracz wchodzi do pokoju online lub z niego wychodzi (`target` to jego nick).
 
 ## Broń i walka
 - `giveWeapon("pistol" | "rifle" | "shotgun" | "sniper" | "sword" | "none")` – daje graczowi broń (pistolet, karabin, strzelbę, snajperkę, miecz) albo ją zabiera.
@@ -11228,6 +11234,20 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `button("Tekst")` – własny przycisk na ekranie (działa też na telefonie), `button("Tekst", false)` go usuwa.
 - `particles(x, y, z, "#kolor", ile)` – wybuch kolorowych iskier (np. przy golu lub zebraniu monety).
 - `save("klucz", wartość)` i `load("klucz", domyślna)` – zapis postępu w przeglądarce gracza (liczby, teksty, listy, słowniki), osobno dla każdej gry. Np. rekord, odblokowane poziomy.
+
+## Gra online (multiplayer)
+Każdą opublikowaną grę można uruchomić przyciskiem **Graj online**. Powstaje pokój z kodem, do którego dołączają znajomi (do 6 osób). Gracze widzą się nawzajem (postacie z nickami), mają czat (Enter lub przycisk Czat), a skrypt działa u każdego gracza osobno. Skrypty porozumiewają się wiadomościami:
+- `send("nazwa", wartość)` – wysyła wiadomość do wszystkich w pokoju, także do siebie. Wartość: liczba, tekst, lista lub słownik (do ok. 600 znaków, najwyżej 10 wiadomości na sekundę).
+- `when message "nazwa" { ... }` – odbiór (`value`, `sender`).
+- `playerCount()` – ilu graczy jest w grze, `players()` – lista nicków, `isOnline()` – czy gra działa online, `player.name` – Twój nick.
+- Bez trybu online `send` niczego nie wysyła, a `playerCount()` zwraca 1, więc ta sama gra działa też solo.
+
+## Grafika
+- `material(nazwa, "plastic" | "metal" | "gold" | "wood" | "stone" | "grass" | "sand" | "neon" | "glass" | "ice")` – materiał klocka: metal i złoto błyszczą, drewno, kamień, trawa i piasek mają teksturę, neon świeci, szkło i lód są przezroczyste.
+- `glow(nazwa, siła)` – klocek świeci własnym kolorem (siła 0–3).
+- `var l = light(x, y, z, "#kolor", zasięg)` – kolorowe światło w świecie (najwyżej 8), `lightOff(l)` je gasi. Najlepiej wygląda w nocy (`lighting("night")`).
+- `skyGradient("#góra", "#dół")` – niebo z gradientem (np. zachód słońca: `skyGradient("#1e3a8a", "#f59e0b")`).
+- `shadows(true | false)` – cienie. Na komputerach są włączone od startu, na telefonach wyłączone (dla płynności). Przy ponad 900 klockach wyłączają się same, chyba że skrypt je włączy.
 
 ## Gotowe światy i czas
 - `buildCity(x, z, rozmiar)` – miasto: asfalt, linie, chodniki i budynki (rozmiar 1–8 kwartałów; kwartał co 38 jednostek, ulice na x i z = ..., -38, 0, 38, ...).
@@ -11500,8 +11520,35 @@ when win {
 }
 ```
 
+## Przykład: gra online – zbieranie punktów dla drużyny
+```nexus
+skyGradient("#0f172a", "#7c3aed")
+lighting("night")
+spawn("block", 0, -0.5, 0, 50, 1, 50, "#334155", "Podloga")
+material("Podloga", "stone")
+spawn("spawn", 0, 0, 0, 4, 1, 4)
+var razem = 0
+repeat 12 {
+  var m = spawn("coin", random(-20, 20), 1, random(-20, 20))
+}
+var lampa = light(0, 6, 0, "#a78bfa", 30)
+when collect {
+  send("moneta", player.name)
+}
+when message "moneta" {
+  razem += 1
+  hint("Drużyna: " + razem + " / 12 · ostatnio: " + value)
+  if razem >= 12 {
+    win("Wszystkie monety zebrane razem!")
+  }
+}
+when playerJoin {
+  say("Dołącza " + target + "! Graczy: " + playerCount(), 2)
+}
+```
+
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`.
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`.
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
@@ -11517,10 +11564,10 @@ when win {
   'use strict';
   class NexusError extends Error{constructor(message,line){super(message);this.line=line||0;}}
   const KEYWORDS=new Set(['var','func','return','if','else','while','repeat','for','in','break','continue','when','and','or','not','true','false','null']);
-  const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die','shoot','hit','kill','timeup','talk','enter','exit','arrive','bump','button']);
+  const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die','shoot','hit','kill','timeup','talk','enter','exit','arrive','bump','button','message','playerJoin','playerLeave']);
   const ARG_EVENTS=new Set(['every','touch','key','button']);
   // These take an optional name: `when kill { }` reacts to every enemy, `when kill "Boss" { }` to one.
-  const OPTIONAL_ARG=new Set(['hit','kill','talk','enter','exit','bump']);
+  const OPTIONAL_ARG=new Set(['hit','kill','talk','enter','exit','bump','message','playerJoin','playerLeave']);
   const MAX_SOURCE=20000,MAX_LIST=10000,MAX_TEXT=10000,MAX_DEPTH=150,MAX_THREADS=64,SLICE=3000,FRAME_BUDGET=30000;
 
   function lex(src){
@@ -11579,7 +11626,7 @@ when win {
         case 'continue':p++;return{k:'continue',line};
         case 'when':{
           p++;if(!top)throw new NexusError('Zdarzenia (when) definiuj poza innymi blokami',line);
-          const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die, shoot, hit, kill, timeup, talk, enter, exit, arrive, bump, button',line);
+          const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die, shoot, hit, kill, timeup, talk, enter, exit, arrive, bump, button, message, playerJoin, playerLeave',line);
           const arg=ARG_EVENTS.has(n.value)||(OPTIONAL_ARG.has(n.value)&&!isOp('{')&&peek().type!=='nl')?expr():null;return{k:'when',event:n.value,arg,body:block(),line};
         }
         case 'else':throw new NexusError('„else” bez pasującego „if”',line);
@@ -11661,11 +11708,14 @@ when win {
     return String(v);
   }
   const PART_TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health','npc','car','ball','zone'];
-  const PLAYER_FIELDS=['x','y','z','hp','coins','ammo','weapon','kills','money','driving'];
+  const PLAYER_FIELDS=['x','y','z','hp','coins','ammo','weapon','kills','money','driving','name'];
   const WEAPON_KINDS=['pistol','rifle','shotgun','sniper','sword','grenade','none'];
   const ENEMY_MODES=['chase','guard','patrol','shooter','ball'];
   const CAMERA_MODES=['third','first','top','side'];
-  const BUILTIN_NAMES=new Set(['camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
+  const MATERIALS=['plastic','metal','gold','wood','stone','grass','sand','neon','glass','ice'];
+  // Values travelling between players and saves: numbers, text, true/false, null, lists and dictionaries.
+  const fromJSON=v=>{if(Array.isArray(v))return v.map(fromJSON);if(v&&typeof v==='object'){const d=new Dict();for(const [k,x] of v.__d||[])d.map.set(k,fromJSON(x));return d;}return v;};
+  const BUILTIN_NAMES=new Set(['send','playerCount','players','isOnline','shadows','material','glow','light','lightOff','skyGradient','camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
 
   class Runtime{
     constructor(source,api,options={}){
@@ -11705,7 +11755,9 @@ when win {
       if(!r.done)throw new NexusError('Tu nie można używać wait()',node.line);
       return r.value;
     }
-    fire(event,value){
+    // A script message from a player in the same online room (`send` / `when message`).
+    message(name,value,sender){this.fire('message',name,{value:fromJSON(value),sender:sender??null});}
+    fire(event,value,extra){
       for(const h of this.handlers){
         if(h.event!==event||h.broken)continue;
         const arg=this.argOf(h);
@@ -11716,6 +11768,7 @@ when win {
         const scope=new Scope(this.globals);
         if(event==='tick')scope.vars.set('dt',value);
         if(event==='touch'||OPTIONAL_ARG.has(event))scope.vars.set('target',value??null);
+        if(extra)for(const k in extra)scope.vars.set(k,extra[k]);
         this.spawn(this.execBlock(h.body,scope),event,h);
       }
     }
@@ -11896,7 +11949,7 @@ when win {
       // Saved values: numbers, text, true/false, null, lists and dictionaries (stored as JSON).
       const toSaved=(v,fn,depth=0)=>{if(depth>8)throw new NexusError(fn+': zbyt zagnieżdżona wartość',rt.line);if(v===null||v===undefined||typeof v==='number'||typeof v==='string'||typeof v==='boolean')return v??null;
         if(Array.isArray(v))return v.map(x=>toSaved(x,fn,depth+1));if(v instanceof Dict)return {__d:[...v.map].map(([k,x])=>[k,toSaved(x,fn,depth+1)])};throw new NexusError(fn+': nie można zapisać wartości typu '+typeName(v),rt.line);};
-      const fromSaved=v=>{if(Array.isArray(v))return v.map(fromSaved);if(v&&typeof v==='object'){const d=new Dict();for(const [k,x] of v.__d||[])d.map.set(k,fromSaved(x));return d;}return v;};
+      const fromSaved=fromJSON;
       // A path is a list of [x, z] points, e.g. [[0, 0], [20, 0], [20, 20]].
       const points=(v,fn)=>{if(!Array.isArray(v)||v.length<2||!v.every(q=>Array.isArray(q)&&q.length>=2&&typeof q[0]==='number'&&typeof q[1]==='number'))throw new NexusError(fn+': trasa to lista punktów [x, z], np. [[0, 0], [20, 0], [20, 20]]',rt.line);return v.slice(0,100).map(q=>[q[0],q[1]]);};
       return {
@@ -11975,6 +12028,20 @@ when win {
         keys:a=>{if(!(a[0] instanceof Dict))throw new NexusError('keys: wymaga słownika',rt.line);return [...a[0].map.keys()];},
         hasKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('hasKey: wymaga słownika',rt.line);return a[0].map.has(show(a[1]));},
         removeKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('removeKey: wymaga słownika',rt.line);return a[0].map.delete(show(a[1]));},
+        // Online play: script messages to every player in the room (NexusScript 1.5)
+        send:a=>{const n=str(a[0],'send',0).trim().slice(0,24);if(!n)throw new NexusError('send: podaj nazwę wiadomości, np. send("punkt", 1)',rt.line);
+          const v=toSaved(a[1]??null,'send');if(JSON.stringify(v).length>600)throw new NexusError('send: wiadomość jest za duża (najwyżej ok. 600 znaków)',rt.line);api.netSend(n,v);},
+        playerCount:()=>api.netCount(),
+        players:()=>api.netPlayers(),
+        isOnline:()=>api.netOnline(),
+        // Graphics: shadows, materials, glow, coloured lights and a gradient sky (NexusScript 1.5)
+        shadows:a=>{api.shadows(a[0]==null?true:truthy(a[0]));},
+        material:a=>{const t=str(a[1],'material',1);if(!MATERIALS.includes(t))throw new NexusError('material: dostępne to '+MATERIALS.map(x=>'"'+x+'"').join(', '),rt.line);api.material(part(a[0],'material'),t);},
+        glow:a=>{api.glow(part(a[0],'glow'),Math.max(0,Math.min(3,num(a[1],'glow',1,1))));},
+        light:a=>{const n=api.light(num(a[0],'light',0),num(a[1],'light',1),num(a[2],'light',2),a[3]==null?'#fff1c9':color(a[3],'light',3),Math.max(1,Math.min(80,num(a[4],'light',4,15))));
+          if(n==null)throw new NexusError('light: najwyżej 8 świateł naraz',rt.line);return n;},
+        lightOff:a=>{api.lightOff(str(a[0],'lightOff',0));},
+        skyGradient:a=>{api.skyGradient(color(a[0],'skyGradient',0),color(a[1],'skyGradient',1));},
         // Cameras, balls, on-screen buttons, effects and saved progress (NexusScript 1.4)
         camera:a=>{const m=str(a[0],'camera',0);if(!CAMERA_MODES.includes(m))throw new NexusError('camera: widoki to '+CAMERA_MODES.map(x=>'"'+x+'"').join(', '),rt.line);api.cameraMode(m);},
         kick:a=>{const k=(i,d)=>Math.max(-60,Math.min(60,num(a[i],'kick',i,d)));api.kick(part(a[0],'kick'),k(1,0),k(2,0),k(3,0));},
@@ -12025,7 +12092,7 @@ when win {
     const s=String(text||'');const m=s.match(/```[a-zA-Z]*[ \t]*\r?\n([\s\S]*?)```/);
     return (m?m[1]:s).replace(/\r\n/g,'\n').trim()+'\n';
   }
-  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,EVENTS,KEYWORDS,Dict,CAMERA_MODES,version:'1.4'};
+  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,EVENTS,KEYWORDS,Dict,CAMERA_MODES,MATERIALS,version:'1.5'};
 })();
 </script>
 <style id="nexus-engine-style">
@@ -12063,6 +12130,10 @@ when win {
 .nx-player canvas.nx-map{position:absolute;left:10px;top:64px;width:150px;height:150px;border-radius:50%;border:2px solid #ffffff44;background:#0b1410c8;pointer-events:none}
 @media (max-width:700px),(max-height:500px){.nx-player canvas.nx-map{width:104px;height:104px;top:58px}}
 .nx-shop .opts button:disabled{opacity:.45;cursor:not-allowed}
+.nx-chat{position:absolute;left:12px;bottom:160px;max-width:min(360px,60vw);display:flex;flex-direction:column;gap:3px;pointer-events:none;font:600 13px Inter,system-ui,sans-serif;color:#fff}
+.nx-chat div{background:#0d1117b8;padding:4px 9px;border-radius:7px;transition:opacity 1s}.nx-chat div.old{opacity:0}.nx-chat b{color:#7dd3fc}
+.nx-chatin{position:absolute;left:12px;bottom:120px;width:min(360px,70vw);padding:9px 12px;border-radius:9px;border:1px solid #ffffff40;background:#0d1117e6;color:#fff;font:600 14px Inter,system-ui,sans-serif}
+.nx-net{cursor:pointer;border:0;background:#1d4ed8cc;color:#fff}
 .nx-custom{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:52vw;z-index:3}
 .nx-custom .nx-btn{min-height:44px;padding:0 16px;font-size:14px;touch-action:none}
 .nx-talk{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);padding:8px 14px;border-radius:10px;background:#0d1117d9;color:#fff;font:700 14px Inter,system-ui,sans-serif;pointer-events:none}
@@ -12093,6 +12164,27 @@ body.nx-playing{overflow:hidden}
   const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
   function texture(draw,size=64){const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;}
   const checker=()=>texture((x,s)=>{for(let i=0;i<4;i++)for(let j=0;j<4;j++){x.fillStyle=(i+j)%2?'#111':'#fff';x.fillRect(i*s/4,j*s/4,s/4,s/4);}});
+  // Surface materials for `material(n, "metal")` etc.: lit (PBR) materials with small generated textures.
+  const surfaceTextures={};
+  function surfaceTexture(kind){
+    if(surfaceTextures[kind])return surfaceTextures[kind];
+    const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,64,64);
+    let seed=kind.length*97+13;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+    if(kind==='wood'){for(let y=0;y<64;y+=2){const v=200+Math.round(Math.sin(y*.45+rnd()*.6)*28+rnd()*18);x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(0,y,64,2);}for(let i=0;i<3;i++){x.fillStyle='rgba(0,0,0,.18)';x.beginPath();x.ellipse(rnd()*64,rnd()*64,5,2,0,0,7);x.fill();}}
+    else{const spots=kind==='stone'?90:kind==='grass'?260:200,size=kind==='stone'?6:2;for(let i=0;i<spots;i++){const v=kind==='stone'?150+rnd()*100:185+rnd()*70;x.fillStyle=`rgb(${v|0},${v|0},${v|0})`;x.fillRect(rnd()*64,rnd()*64,size+rnd()*size,size+rnd()*size);}}
+    const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;surfaceTextures[kind]=t;return t;
+  }
+  function surface(kind,color,w,d){
+    const c=new THREE.Color(color),spec={plastic:[.55,0],metal:[.35,.45],gold:[.3,.55],wood:[.8,0],stone:[.92,0],grass:[.95,0],sand:[.95,0],neon:[.4,0],glass:[.05,0],ice:[.12,0]}[kind]||[.6,0];
+    const m=new THREE.MeshStandardMaterial({color:c,roughness:spec[0],metalness:spec[1]});
+    if(['wood','stone','grass','sand'].includes(kind)){m.map=surfaceTexture(kind).clone();m.map.needsUpdate=true;m.map.repeat.set(Math.max(1,w/3),Math.max(1,d/3));}
+    if(kind==='neon'){m.emissive=c.clone();m.emissiveIntensity=1.1;}
+    // Without a reflection map metals would look black, so they get a faint glow of their own colour.
+    if(kind==='metal'||kind==='gold'){m.emissive=c.clone();m.emissiveIntensity=kind==='gold'?.22:.16;}
+    if(kind==='glass'){m.transparent=true;m.opacity=.35;}
+    if(kind==='ice'){m.transparent=true;m.opacity=.75;m.color=c.clone().lerp(new THREE.Color('#dff6ff'),.5);}
+    return m;
+  }
   function material(type,color){
     const c=new THREE.Color(color);
     if(type==='glass')return new THREE.MeshLambertMaterial({color:c,transparent:true,opacity:.45});
@@ -12112,7 +12204,9 @@ body.nx-playing{overflow:hidden}
       // A ball: a sphere with a few dark patches so its rolling is visible.
       const r=Math.max(.15,w/2);body=new THREE.Mesh(new THREE.SphereGeometry(r,20,14),new THREE.MeshLambertMaterial({color:new THREE.Color(part.color)}));
       const patch=new THREE.MeshLambertMaterial({color:0x1f2937});for(const [x,y,z] of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]){const s=new THREE.Mesh(new THREE.SphereGeometry(r*.32,8,6),patch);s.position.set(x*r*.8,y*r*.8,z*r*.8);s.scale.set(x?.35:1,y?.35:1,z?.35:1);body.add(s);}}
-    else{body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material(part.type,part.color));const map=body.material.map;if(map)map.repeat.set(Math.max(1,w/2),Math.max(1,d/2));}
+    else{body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),part.mat?surface(part.mat,part.color,w,d):material(part.type,part.color));const map=body.material.map;if(map&&!part.mat)map.repeat.set(Math.max(1,w/2),Math.max(1,d/2));}
+    // `glow(n, siła)`: the part shines in its own colour (bright parts also light up the bloom-free scene).
+    if(part.glow>0&&body.material.emissive){body.material.emissive=new THREE.Color(part.color);body.material.emissiveIntensity=Math.min(3,part.glow)*.7;}
     g.add(body);
     if(part.type==='checkpoint'){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,3,8),new THREE.MeshLambertMaterial({color:0xdddddd}));pole.position.set(-w/2+.3,h/2+1.5,0);const flag=new THREE.Mesh(new THREE.BoxGeometry(1.1,.7,.05),new THREE.MeshLambertMaterial({color:part.color}));flag.position.set(-w/2+.9,h/2+2.6,0);g.add(pole,flag);}
     if(part.type==='spring'){for(let i=0;i<3;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(Math.min(w,d)*.3,.07,6,16),new THREE.MeshLambertMaterial({color:0xffe9b0}));ring.rotation.x=Math.PI/2;ring.position.y=h/2+.12+i*.18;g.add(ring);}}
@@ -12176,7 +12270,7 @@ body.nx-playing{overflow:hidden}
     const api={spawn:(type,x,y,z,w,h,d,color,name)=>{if(parts.length>=MAX_PARTS)return null;const n=name||'part'+(parts.length+1);parts.push({type,pos:[x,y,z],size:[w,h,d],color:color||DEFAULT_COLOR[type],name:n});return n;},
       exists:n=>parts.some(p=>p.name===n),getPos:n=>(parts.find(p=>p.name===n)||{pos:[0,0,0]}).pos,
       move(){},color(n,c){const p=parts.find(q=>q.name===n);if(p)p.color=c;},resize(){},spin(){},visible(){},remove(n){const i=parts.findIndex(p=>p.name===n);if(i>=0)parts.splice(i,1);},
-      cameraMode(){},kick(){},kickTarget(){},button(){},particles(){},save:()=>true,load:()=>null,drivePath(){},walkPath(){},carSpeed(){},team(){},waypoint(){},minimap(){},money(){},shop(){},dayCycle(){},regen(){},enterCar(){},exitCar(){},
+      shadows(){},material(){},glow(){},light:()=>'light1',lightOff(){},skyGradient(){},netSend(){},netCount:()=>1,netPlayers:()=>[],netOnline:()=>false,cameraMode(){},kick(){},kickTarget(){},button(){},particles(){},save:()=>true,load:()=>null,drivePath(){},walkPath(){},carSpeed(){},team(){},waypoint(){},minimap(){},money(){},shop(){},dayCycle(){},regen(){},enterCar(){},exitCar(){},
       buildCity(x,z,size){for(const q of cityParts(x,z,size))if(parts.length<MAX_PARTS)parts.push({...q});},buildArena(x,z,size){for(const q of arenaParts(x,z,size))if(parts.length<MAX_PARTS)parts.push({...q});},
       dialog(){},ask(){},item:()=>true,itemCount:()=>0,itemList:()=>[],lighting(){},fog(){},shake(){},rotate(){},
       weapon(){},ammo(){},enemy(){},enemyGet:()=>100,timer(){},getTimer:()=>0,count:t=>parts.filter(p=>p.type===t).length,nearest:t=>(parts.find(p=>p.type===t)||{}).name||null,distance:()=>0,label(){},explode(){},firstPerson(){},
@@ -12190,6 +12284,8 @@ body.nx-playing{overflow:hidden}
     if(typeof THREE==='undefined')throw Error('Brak WebGL – nie można uruchomić gry 3D.');
     const root=el('div','nx-player');root.setAttribute('role','dialog');root.setAttribute('aria-label',project.name||'Gra 3D');
     const renderer=new THREE.WebGLRenderer({antialias:!window.isMobileDevice});
+    // Shadows on computers; phones keep the lighter look unless a script turns them on.
+    const strongDevice=!window.isMobileDevice;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,window.isMobileDevice?1.25:1.75));
     root.append(renderer.domElement);
     const top=el('div','nx-top'),exit=el('button','nx-btn','✕ Wyjdź'),restartBtn=el('button','nx-btn','Restart'),title=el('div','nx-title',project.name||'Gra 3D');
@@ -12219,7 +12315,8 @@ body.nx-playing{overflow:hidden}
     }
     document.body.append(root);document.body.classList.add('nx-playing');
     const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(70,1,.1,600);
-    const hemi=new THREE.HemisphereLight(0xffffff,0x667788,.85);scene.add(hemi);const sun=new THREE.DirectionalLight(0xfff2dd,.7);sun.position.set(-30,60,20);scene.add(sun);
+    const hemi=new THREE.HemisphereLight(0xffffff,0x667788,.85);scene.add(hemi);const sun=new THREE.DirectionalLight(0xfff2dd,.7);sun.position.set(-30,60,20);scene.add(sun,sun.target);
+    sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:45,bottom:-45,near:1,far:160});sun.shadow.bias=-.0006;
     // A lamp that follows the player, used at night.
     const lamp=new THREE.PointLight(0xfff1c9,0,30);scene.add(lamp);
     // Player
@@ -12227,7 +12324,7 @@ body.nx-playing{overflow:hidden}
     try{if(typeof createCharacterRig3D==='function'){rig=createCharacterRig3D(typeof avatarData==='object'?avatarData:{});rig.group.scale.setScalar(.56);}}catch{rig=null;}
     const playerObj=rig?rig.group:new THREE.Mesh(new THREE.BoxGeometry(PW*2,PH,PW*2),new THREE.MeshLambertMaterial({color:0xf5c542}));
     if(!rig)playerObj.geometry.translate(0,PH/2,0);
-    playerObj.rotation.y=Math.PI;scene.add(playerObj);
+    playerObj.rotation.y=Math.PI;scene.add(playerObj);shade(playerObj);
     const input={keys:new Set(),jump:false,fire:false,firePressed:false};
     // Weapon held by the player (third person) and the first-person view model.
     let gunModel=null,viewGun=null;const effects=[],projectiles=[];const ray=new THREE.Raycaster(),tmpQ=new THREE.Quaternion();
@@ -12239,7 +12336,7 @@ body.nx-playing{overflow:hidden}
       if(part.type==='enemy')Object.assign(part,{hp:100,maxHp:100,mode:'chase',speed:4,damage:25,fireCd:1+Math.random(),team:'enemy'});
       if(part.type==='car')Object.assign(part,{heading:(part.rot||0)*Math.PI/180,speed:0,maxSpeed:24});
       if(part.type==='ball')Object.assign(part,{vel:[0,0,0],inside:new Set()});
-      part.mesh=buildMesh(part);scene.add(part.mesh);parts.push(part);byName.set(name,part);minY=Math.min(minY,part.pos[1]-part.size[1]/2);
+      part.mesh=buildMesh(part);shade(part.mesh);scene.add(part.mesh);parts.push(part);byName.set(name,part);minY=Math.min(minY,part.pos[1]-part.size[1]/2);
       return name;
     }
     function textSprite(text){
@@ -12279,7 +12376,7 @@ body.nx-playing{overflow:hidden}
       setScore(v){state.score=v;state.scoreShown=true;},getScore:()=>state.score,
       print(t){errors.push({message:t,line:0,info:true});if(opts.showErrors)showErrors();try{opts.onPrint?.(t);}catch{}},
       sound,
-      playerGet(k){if(k==='hp')return state.hp;if(k==='coins')return state.coins;if(k==='ammo')return state.ammo;if(k==='weapon')return state.weapon;if(k==='kills')return state.kills;if(k==='money')return state.money;if(k==='driving')return state.driving?state.driving.name:null;return Math.round(state.pos['xyz'.indexOf(k)]*100)/100;},
+      playerGet(k){if(k==='hp')return state.hp;if(k==='coins')return state.coins;if(k==='ammo')return state.ammo;if(k==='weapon')return state.weapon;if(k==='kills')return state.kills;if(k==='money')return state.money;if(k==='driving')return state.driving?state.driving.name:null;if(k==='name')return playerName();return Math.round(state.pos['xyz'.indexOf(k)]*100)/100;},
       weapon(k){state.weapon=k==='none'?null:k;state.ammo=state.weapon?WEAPONS[state.weapon].ammo:0;equip();},
       ammo(v,add){state.ammo=add?(state.ammo<0?-1:Math.max(0,state.ammo+v)):v;},
       enemy(n,key,v){const p=byName.get(n);if(!p)return;if(p.type!=='enemy')Object.assign(p,{hp:100,maxHp:100,mode:'guard',speed:0,damage:0,fireCd:1});if(key==='mode'&&v==='ball'){p.damage=0;if(p.speed<6)p.speed=6;}if(key==='hp'){p.hp=v;p.maxHp=Math.max(p.maxHp,v);if(p.bar)enemyBar(p);if(v<=0)killEnemy(p);}else p[key]=v;},
@@ -12337,8 +12434,55 @@ body.nx-playing{overflow:hidden}
       particles(x,y,z,c,n){const col=new THREE.Color(c),geo=new THREE.BoxGeometry(.22,.22,.22);for(let i=0;i<n;i++){const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:1}));m.position.set(x,y,z);scene.add(m);
         const a=Math.random()*Math.PI*2,sp=3+Math.random()*6;effects.push({obj:m,until:(runtime?.time||0)+.7+Math.random()*.5,vel:[Math.cos(a)*sp,4+Math.random()*7,Math.sin(a)*sp]});}},
       save(k,v){try{const key=saveKey(),all=JSON.parse(localStorage.getItem(key)||'{}');all[k]=v;const text=JSON.stringify(all);if(text.length>20000)return false;localStorage.setItem(key,text);}catch{}return true;},
-      load(k){try{const v=JSON.parse(localStorage.getItem(saveKey())||'{}')[k];return typeof v==='string'?v:null;}catch{return null;}}
+      load(k){try{const v=JSON.parse(localStorage.getItem(saveKey())||'{}')[k];return typeof v==='string'?v:null;}catch{return null;}},
+      shadows(on){state.shadowsSet=true;setShadows(on);},
+      material(n,kind){const p=byName.get(n);if(p){p.mat=kind;rebuildMesh(p);}},
+      glow(n,k){const p=byName.get(n);if(p){p.glow=k;rebuildMesh(p);}},
+      light(x,y,z,c,range){if(lights.size>=8)return null;const l=new THREE.PointLight(new THREE.Color(c),1.6,range,1.6);l.position.set(x,y,z);scene.add(l);const n='light'+(++lightSerial);lights.set(n,l);return n;},
+      lightOff(n){const l=lights.get(n);if(l){scene.remove(l);lights.delete(n);}},
+      skyGradient(top,bottom){const c=document.createElement('canvas');c.width=2;c.height=256;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,top);g.addColorStop(1,bottom);x.fillStyle=g;x.fillRect(0,0,2,256);
+        if(scene.background?.isTexture)scene.background.dispose();scene.background=new THREE.CanvasTexture(c);scene.fog.color=new THREE.Color(bottom);},
+      netSend(name,value){online?.send(name,value);},
+      netCount:()=>online?others.size+1:1,
+      netPlayers:()=>[playerName(),...[...others.values()].map(o=>o.name)],
+      netOnline:()=>!!online
     };
+    const lights=new Map();let lightSerial=0;
+    const playerName=()=>online?.name||(typeof username==='string'&&username)||'Gracz';
+    // ---------- Online play (Studio games): other players, chat and script messages ----------
+    const online=opts.online||null,others=new Map();let lastEvent=-1,lastChat=-1,netAt=0;
+    const chatBox=el('div','nx-chat'),chatIn=el('input','nx-chatin'),netPill=el('button','nx-pill nx-net');
+    chatBox.hidden=netPill.hidden=!online;chatIn.hidden=true;chatIn.maxLength=200;chatIn.placeholder='Napisz i naciśnij Enter';chatIn.setAttribute('aria-label','Wiadomość czatu');
+    root.append(chatBox,chatIn);stats.prepend(netPill);
+    if(online){const chatBtn=el('button','nx-btn','Czat');chatBtn.onclick=()=>openChat();top.insertBefore(chatBtn,title);}
+    function chatLine(who,text){const d=el('div');d.append(el('b',null,who+': '),document.createTextNode(text));chatBox.append(d);while(chatBox.childElementCount>6)chatBox.firstChild.remove();setTimeout(()=>d.classList.add('old'),9000);}
+    function openChat(){if(!online)return;chatIn.hidden=false;chatIn.focus();input.keys.clear();}
+    chatIn.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){const t=chatIn.value.trim();if(t)online.chat(t);chatIn.value='';chatIn.hidden=true;chatIn.blur();}if(e.key==='Escape'){chatIn.hidden=true;chatIn.blur();}});
+    netPill.onclick=async()=>{try{await navigator.clipboard.writeText(online.code);message('Kod pokoju skopiowany: '+online.code,2);}catch{message('Kod pokoju: '+online.code,3);}};
+    function netState(room){
+      const seen=new Set();
+      for(const pl of room.players){
+        if(pl.id===online.id)continue;seen.add(pl.id);let o=others.get(pl.id);
+        if(!o){let r=null;try{r=createCharacterRig3D(pl.avatar||{},pl.name);r.group.scale.setScalar(.56);}catch{r=null;}
+          const group=r?r.group:new THREE.Mesh(new THREE.BoxGeometry(PW*2,PH,PW*2),new THREE.MeshLambertMaterial({color:0x60a5fa}));if(!r)group.geometry.translate(0,PH/2,0);
+          group.position.set(pl.x,pl.y,pl.z);scene.add(group);o={name:pl.name||'Gracz',rig:r,group,target:[pl.x,pl.y,pl.z],rot:0,moving:false,walk:0};others.set(pl.id,o);
+          if(lastEvent>=0)chatLine('BloxWeb',o.name+' dołącza do gry');runtime?.fire('playerJoin',o.name);}
+        o.target=[pl.x,pl.y,pl.z];o.rot=pl.rotY||0;o.moving=!!pl.moving;
+      }
+      for(const [id,o] of others)if(!seen.has(id)){scene.remove(o.group);disposeTree(o.group);others.delete(id);chatLine('BloxWeb',o.name+' wychodzi');runtime?.fire('playerLeave',o.name);}
+      const events=room.events||[],chat=room.chat||[];
+      if(lastEvent<0){lastEvent=events.reduce((m,e)=>Math.max(m,e.id),0);lastChat=chat.reduce((m,c)=>Math.max(m,c.id),0);}
+      else{for(const e of events)if(e.id>lastEvent){lastEvent=e.id;runtime?.message(e.name,e.value,room.players.find(q=>q.id===e.sender)?.name||'Gracz');}
+        for(const c of chat)if(c.id>lastChat){lastChat=c.id;chatLine(c.name,c.text);}}
+      netPill.textContent='Pokój '+online.code+' · '+(others.size+1)+(others.size?' graczy':' gracz');
+    }
+    function netFrame(){
+      for(const o of others.values()){const g=o.group.position;g.x+=(o.target[0]-g.x)*.25;g.y+=(o.target[1]-g.y)*.25;g.z+=(o.target[2]-g.z)*.25;o.group.rotation.y=o.rot;
+        if(o.rig?.lLegPiv){o.walk+=o.moving?.25:0;const k=o.moving?Math.sin(o.walk)*.7:0;o.rig.lLegPiv.rotation.x=k;o.rig.rLegPiv.rotation.x=-k;o.rig.lArmPiv&&(o.rig.lArmPiv.rotation.x=-k);o.rig.rArmPiv&&(o.rig.rArmPiv.rotation.x=k);}}
+      const now=performance.now();if(now-netAt>100&&state?.pos){netAt=now;const moving=input.keys.size>0||Math.abs(joyVec.x)+Math.abs(joyVec.y)>.1;
+        online.position({x:+state.pos[0].toFixed(2),y:+state.pos[1].toFixed(2),z:+state.pos[2].toFixed(2),rotY:+playerObj.rotation.y.toFixed(3),moving});}
+    }
+    if(online)online.listen(netState);
     // Saved progress lives in this browser, separately for every game.
     const saveKey=()=>'nx-save:'+String(opts.saveKey||project.id||project.name||'gra').slice(0,80);
     const customBar=el('div','nx-custom'),customButtons=new Map();customBar.hidden=true;root.append(customBar);
@@ -12383,14 +12527,17 @@ body.nx-playing{overflow:hidden}
       const sky=m==='day'?(project.settings?.sky||L[0]):L[0];scene.background=new THREE.Color(sky);scene.fog.color=new THREE.Color(sky);
       hemi.intensity=L[1];sun.intensity=L[2];sun.color.setHex(m==='sunset'?0xffb070:0xfff2dd);lamp.intensity=L[3];state.lighting=m;
     }
-    function rebuildMesh(p){const text=p.label?p.labelText:'';scene.remove(p.mesh);disposeTree(p.mesh);p.label=p.bar=p.barFill=null;p.mesh=buildMesh(p);p.mesh.visible=p.visible;scene.add(p.mesh);if(text){setLabel(p,text);p.labelText=text;}}
+    function shade(obj){obj.traverse(o=>{if(o.isMesh&&!o.material?.transparent){o.castShadow=true;o.receiveShadow=true;}});}
+    function setShadows(on){on=!!on;if(renderer.shadowMap.enabled===on)return;renderer.shadowMap.enabled=on;sun.castShadow=on;scene.traverse(o=>{if(o.material)for(const m of [].concat(o.material))m.needsUpdate=true;});}
+    function rebuildMesh(p){const text=p.label?p.labelText:'';scene.remove(p.mesh);disposeTree(p.mesh);p.label=p.bar=p.barFill=null;p.mesh=buildMesh(p);shade(p.mesh);p.mesh.visible=p.visible;scene.add(p.mesh);if(text){setLabel(p,text);p.labelText=text;}}
     function setPos(p,pos){p.delta=[p.delta[0]+pos[0]-p.pos[0],p.delta[1]+pos[1]-p.pos[1],p.delta[2]+pos[2]-p.pos[2]];p.pos=pos;p.mesh.position.set(...pos);}
     function reset(){
       if(parts)for(const p of parts.slice())removePart(p);
       parts=[];byName=new Map();serial=0;minY=0;touching=new Set();errors=[];result?.remove();result=null;hint.hidden=true;say.style.opacity='0';
       const sky=project.settings?.sky||'#8fd3ff';scene.background=new THREE.Color(sky);scene.fog=new THREE.Fog(sky,120,420);
       for(const p of normalizeParts(project.parts))addPart(p);
-      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false,items:new Map(),asking:false,shake:0,lighting:'day',nearNpc:null,driving:null,nearCar:null,money:0,moneyShown:false,waypoint:null,dayCycle:0,dayT:0,regen:0,cam:'third',face:[0,-1]};
+      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false,items:new Map(),asking:false,shake:0,lighting:'day',nearNpc:null,driving:null,nearCar:null,money:0,moneyShown:false,waypoint:null,dayCycle:0,dayT:0,regen:0,cam:'third',face:[0,-1],shadowsSet:false};
+      for(const l of lights.values())scene.remove(l);lights.clear();setShadows(strongDevice);
       customButtons.forEach(b=>b.remove());customButtons.clear();customBar.hidden=true;
       projectiles.splice(0).forEach(q=>{scene.remove(q.mesh);disposeTree(q.mesh);});if(waypointBeam){scene.remove(waypointBeam);disposeTree(waypointBeam);waypointBeam=null;}mapCanvas.hidden=true;
       askBox?.remove();askBox=null;hemi.intensity=.85;sun.intensity=.7;sun.color.setHex(0xfff2dd);lamp.intensity=0;
@@ -12398,6 +12545,7 @@ body.nx-playing{overflow:hidden}
       try{runtime=new NexusScript.Runtime(project.script||'',api,{onError:e=>{errors.push(e);showErrors();try{opts.onError?.(e);}catch{}}});runtime.start();runtime.update(0);}
       catch(e){runtime=null;errors.push({message:e.message,line:e.line||0});showErrors();try{opts.onError?.({message:e.message,line:e.line||0});}catch{}}
       state.pos=spawnPoint();state.respawn=null;showErrors();
+      if(!state.shadowsSet&&parts.length>900)setShadows(false);
     }
     function hurt(v){if(state.over||state.deadUntil)return;state.hp=clamp(state.hp-v,0,100);sound('hit');flash.style.transition='none';flash.style.opacity='.35';requestAnimationFrame(()=>{flash.style.transition='opacity .35s';flash.style.opacity='0';});if(state.hp<=0)die();}
     function die(){
@@ -12500,6 +12648,7 @@ body.nx-playing{overflow:hidden}
       const down=e.type==='keydown',code=e.code;
       if(code==='KeyF'){e.preventDefault();input.fire=down;if(down&&!e.repeat)input.firePressed=true;}
       if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(code)){e.preventDefault();e.stopPropagation();if(code==='Space')input.jump=down;else if(down)input.keys.add(code);else input.keys.delete(code);}
+      if(down&&online&&code==='Enter'&&!state.asking){e.preventDefault();openChat();return;}
       if(down&&!e.repeat){if(code==='Escape'){e.preventDefault();stop();return;}if(code==='Space')keyEvent('SPACE');else if(/^Key[A-Z]$/.test(code))keyEvent(code.slice(3));else if(/^Digit\d$/.test(code))keyEvent(code.slice(5));}
     };
     addEventListener('keydown',onKey,true);addEventListener('keyup',onKey,true);
@@ -12737,6 +12886,8 @@ body.nx-playing{overflow:hidden}
       }else{const tx=p[0],ty=p[1]+PH*.75,tz=p[2];camera.position.set(tx+Math.sin(yaw)*Math.cos(pitch)*dist,ty+Math.sin(pitch)*dist,tz+Math.cos(yaw)*Math.cos(pitch)*dist);camera.lookAt(tx,ty,tz);}
       if(state.shake>0){camera.position.x+=(Math.random()-.5)*state.shake*.6;camera.position.y+=(Math.random()-.5)*state.shake*.6;state.shake=Math.max(0,state.shake-.05);}
       lamp.position.set(p[0],p[1]+4,p[2]);
+      sun.position.set(p[0]-30,p[1]+60,p[2]+20);sun.target.position.set(p[0],p[1],p[2]);
+      if(online)netFrame();
       const wp=waypointPos();if(waypointBeam&&wp)waypointBeam.position.set(wp[0],wp[1]+28,wp[2]);
       goalPill.hidden=!wp;if(wp)goalPill.textContent='Cel: '+Math.round(Math.hypot(wp[0]-p[0],wp[2]-p[2]))+' m';
       moneyPill.hidden=!state.moneyShown;moneyPill.textContent='$ '+state.money;
@@ -12760,11 +12911,12 @@ body.nx-playing{overflow:hidden}
     }
     function stop(){
       if(stopped)return;stopped=true;cancelAnimationFrame(frame);removeEventListener('keydown',onKey,true);removeEventListener('keyup',onKey,true);if(document.pointerLockElement)document.exitPointerLock?.();
-      for(const p of parts.slice())removePart(p);disposeTree(playerObj);renderer.dispose();root.remove();document.body.classList.remove('nx-playing');
+      for(const p of parts.slice())removePart(p);for(const o of others.values())disposeTree(o.group);others.clear();try{online?.close();}catch{}
+      disposeTree(playerObj);renderer.dispose();root.remove();document.body.classList.remove('nx-playing');
       try{opts.onExit?.();}catch{}
     }
     // advance(n) runs n fixed steps and a render even when the page is hidden (used by tests).
-    const controller={stop,restart:reset,fire:fireWeapon,advance(n=1){for(let i=0;i<n;i++)step(STEP);render();},get camera(){return camera;},get errors(){return errors.slice();},get state(){return state;},get runtime(){return runtime;},get parts(){return parts;}};
+    const controller={stop,restart:reset,fire:fireWeapon,advance(n=1){for(let i=0;i<n;i++)step(STEP);render();},get camera(){return camera;},get errors(){return errors.slice();},get state(){return state;},get runtime(){return runtime;},get parts(){return parts;},get others(){return others;},get shadows(){return renderer.shadowMap.enabled;},get lights(){return lights;}};
     reset();frame=requestAnimationFrame(loop);
     return controller;
   }
@@ -13596,7 +13748,7 @@ body.nx-playing{overflow:hidden}
     card.append(el('strong',null,g.title),el('small',null,'autor: '+(window.bloxRoleTag?.(g.authorRole)||'')+g.author+' · zagrano '+g.plays+'× · '+g.id+(g.revision>1?' · wersja '+g.revision:'')));
     if(g.description)card.append(el('p',null,g.description));
     if(own&&g.hidden===1)card.append(el('span','nx-tag warn','Ukryta po zgłoszeniach – czeka na sprawdzenie'));
-    const row=el('div','nx-row');row.append(btn('▶ Graj',()=>playPublished(g.id),'v11-primary'));
+    const row=el('div','nx-row');row.append(btn('▶ Graj',()=>playPublished(g.id),'v11-primary'),btn('Graj online',()=>playPublished(g.id,{online:true})));
     if(own)row.append(btn('Edytuj / aktualizuj',()=>editPublished(g)));
     if(own)row.append(btn('Usuń z katalogu',()=>confirmDialog('Usunąć grę z katalogu?','„'+g.title+'” zniknie z katalogu i z ekranu głównego. Projekt zostaje u Ciebie w Studio, więc możesz go opublikować ponownie.','Usuń z katalogu',async()=>{try{await api('games_unpublish',{id:g.id});for(const p of projects)if(p.publishedId===g.id)delete p.publishedId;persist();loadCatalog();}catch(e){alertDialog('Błąd',e.message);}})));
     else row.append(btn('Zgłoś',()=>reportDialog(g)));
@@ -13617,16 +13769,47 @@ body.nx-playing{overflow:hidden}
     const m=el('div','nx-msg');const r=el('div','nx-row');r.append(btn('Anuluj',d.close),btn('Zgłoś',async()=>{try{await api('games_report',{id:g.id,reason:s.value});m.textContent='Dziękujemy. Zgłoszenie zapisane.';m.classList.remove('error');setTimeout(d.close,1200);}catch(e){m.textContent=e.message;m.classList.add('error');}},'v11-primary'));
     d.box.append(el('p','v11-muted','Gra zgłoszona przez 3 różne osoby zostanie ukryta do sprawdzenia.'),s,m,r);
   }
-  async function playPublished(id){
+  // Online room for a Studio game: a WebSocket that streams this player's position and actions
+  // (chat, script messages) and hands every room update to the game.
+  function netConnect(room){
+    const o=online(),me=o.me?.id||o.state.id,listeners=new Set();
+    let latest=room,seq=room.players.find(p=>p.id===me)?.sequence||0,pending=[],ws=null,closed=false,pos=null,sentAt=0;
+    const url=o.socketUrl?.(),token=o.token;
+    function open(){
+      if(closed||!url||!token||typeof WebSocket==='undefined')return;
+      const socket=ws=new WebSocket(url);socket.onopen=()=>socket.send(JSON.stringify({token}));
+      socket.onmessage=ev=>{let d;try{d=JSON.parse(ev.data);}catch{return;}
+        if(d.type==='notice'){window.showToast?.(d.text);return;}
+        if(d.type!=='room'||d.room?.code!==room.code)return;
+        if(d.me){pending=pending.filter(a=>a.seq>d.me.sequence);for(const ack of d.me.acknowledgements||[])if(ack.error&&ack.seq>seq-30)window.showToast?.(ack.error);}
+        latest=d.room;for(const f of listeners)f(latest);};
+      socket.onclose=()=>{if(ws===socket)ws=null;if(!closed)setTimeout(open,1500);};
+    }
+    function flush(force){const t=performance.now();if(!ws||ws.readyState!==1||(!force&&!pending.length&&t-sentAt<95))return;sentAt=t;
+      try{ws.send(JSON.stringify({type:'in',tab:o.tab,position:pos,actions:pending.slice(0,30)}));}catch{}}
+    const timer=setInterval(()=>flush(false),100);open();
+    const queue=a=>{if(pending.length<40){pending.push({seq:++seq,...a});flush(true);}};
+    return {id:me,name:o.me?.name||'Gracz',code:room.code,
+      listen(f){listeners.add(f);f(latest);},position(p){pos=p;},
+      send(name,value){queue({kind:'msg',name,value});},chat(text){queue({kind:'chat',text});},
+      close(){if(closed)return;closed=true;clearInterval(timer);try{ws?.close();}catch{}api('room',{action:'leave'}).catch(()=>{});}};
+  }
+  // mode: null (solo), {online:true} (new public room) or {room} (a room joined by code).
+  async function playPublished(id,mode=null){
     const msg=$('nxCatalogMsg');msg.textContent='Wczytuję grę '+id+'…';msg.classList.remove('error');
+    let net=null;
     try{
       if(typeof currentPlayingGame!=='undefined'&&currentPlayingGame)throw Error('Najpierw wyjdź z uruchomionej gry.');
-      const res=await api('games_get',{id});msg.textContent='';editor.stop();
-      NexusGame.play({...res.game,name:res.card.title},{saveKey:'pub:'+id,buttons:res.card.authorId===online()?.state.id?[]:[{label:'Zgłoś',onClick:()=>reportDialog(res.card)}],onExit:()=>{if(current)editor.start();}});
-    }catch(e){msg.textContent=e.message;msg.classList.add('error');}
+      const res=await api('games_get',{id});
+      if(mode){const room=mode.room||(await api('room',{action:'create',game:'nexus:'+id,public:true,tab:online().tab})).room;net=netConnect(room);}
+      msg.textContent='';editor.stop();
+      NexusGame.play({...res.game,name:res.card.title},{saveKey:'pub:'+id,online:net,buttons:res.card.authorId===online()?.state.id?[]:[{label:'Zgłoś',onClick:()=>reportDialog(res.card)}],onExit:()=>{if(current)editor.start();}});
+      if(net)window.showToast?.('Pokój online '+net.code+' – znajomi dołączą tym kodem.');
+    }catch(e){net?.close();msg.textContent=e.message;msg.classList.add('error');window.showToast?.(e.message);}
   }
+  const playRoom=room=>playPublished(String(room.game).slice(6),{room});
   renderLibrary();
-  window.NexusStudio={pullCloud,flushCloud,open:openProject,create:createProject,loadCatalog,playPublished,promptText,reportDialog,editPublished,api,dialog,get current(){return current;},get projects(){return projects;}};
+  window.NexusStudio={pullCloud,flushCloud,open:openProject,create:createProject,loadCatalog,playPublished,playRoom,promptText,reportDialog,editPublished,api,dialog,get current(){return current;},get projects(){return projects;}};
 })();
 </script>
 <style id="nexus-home-style">
@@ -13665,7 +13848,7 @@ body.nx-playing{overflow:hidden}
     const desc=document.createElement('p');desc.textContent=g.description||'Gra stworzona w BloxWeb Studio 3D (NexusScript).';
     const row=document.createElement('div');row.className='nx-row';
     const b=(t,fn,cls='v11-button')=>{const x=document.createElement('button');x.type='button';x.className=cls;x.textContent=t;x.onclick=fn;return x;};
-    row.append(b('▶ Graj',()=>{close();NexusStudio.playPublished(g.id);},'v11-primary'));
+    row.append(b('▶ Graj',()=>{close();NexusStudio.playPublished(g.id);},'v11-primary'),b('Graj online',()=>{close();NexusStudio.playPublished(g.id,{online:true});}));
     if(g.authorId!==window.bloxOnline?.state.id)row.append(b('Zgłoś',()=>{close();NexusStudio.reportDialog(g);}));
     else row.append(b('Edytuj / aktualizuj',()=>{close();switchTab('studio');NexusStudio.editPublished(g);}),b('Usuń z katalogu',async()=>{if(!confirm('Usunąć „'+g.title+'” z katalogu? Projekt zostaje w Studio.'))return;try{await NexusStudio.api('games_unpublish',{id:g.id});close();refresh();}catch(e){alert(e.message);}}));
     row.append(b('Zamknij',close));box.append(meta,desc,row);

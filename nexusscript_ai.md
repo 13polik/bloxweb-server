@@ -1,4 +1,4 @@
-# NexusScript 1.4 – ściąga dla AI (gry 3D BloxWeb)
+# NexusScript 1.5 – ściąga dla AI (gry 3D BloxWeb)
 
 Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. To nie jest JavaScript ani Lua.
 
@@ -18,7 +18,7 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - Gotowe światy: `buildCity(x, z, rozmiar)` (ulice na x/z = …, -38, 0, 38, …), `buildArena(x, z, rozmiar)` (mur, osłony, bazy "BazaNiebieska" z − i "BazaCzerwona" z +).
 
 ## Gracz
-- `player.x y z hp coins ammo weapon kills money driving`.
+- `player.x y z hp coins ammo weapon kills money driving name`.
 - `teleport(x, y, z)`, `damage(n)`, `heal(n)`, `setRegen(n)`, `checkpoint(x, y, z)`, `setSpeed(n)`, `setJump(n)`, `setGravity(n)`, `win("tekst")`, `lose("tekst")`.
 - Broń: `giveWeapon("pistol"|"rifle"|"shotgun"|"sniper"|"sword"|"grenade"|"none")`, `setAmmo(n)`, `addAmmo(n)`, `firstPerson(true)`. Gracz strzela myszką/F/przyciskiem.
 
@@ -40,6 +40,10 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - `button("Tekst")` / `button("Tekst", false)` – własny przycisk na ekranie; `when button "Tekst" { }`.
 - `particles(x, y, z, "#kolor", ile)` – iskry. `save("klucz", wartość)`, `load("klucz", domyślna)` – zapis postępu (rekordy, poziomy).
 
+## Online i grafika
+- Gra online (przycisk Graj online, do 6 graczy): `send("nazwa", wartość)` do wszystkich (też do siebie), `when message "nazwa" { }` ze zmiennymi `value` i `sender`, `when playerJoin` / `when playerLeave` (`target` = nick), `playerCount()`, `players()`, `isOnline()`, `player.name`.
+- `material(n, "plastic"|"metal"|"gold"|"wood"|"stone"|"grass"|"sand"|"neon"|"glass"|"ice")`, `glow(n, 0-3)`, `var l = light(x, y, z, "#kolor", zasięg)` (max 8), `lightOff(l)`, `skyGradient("#góra", "#dół")`, `shadows(true/false)`.
+
 ## Ekran, czas, dźwięk
 - `say("tekst", s)`, `hint("tekst")`, `label(n, "tekst")`, `setScore(n)`, `addScore(n)`, `getScore()`, `print(…)`.
 - `setTimer(s)`, `getTimer()`, `wait(s)`, `time()`.
@@ -50,7 +54,7 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - Listy: `push pop pick shuffle sort indexOf insert removeAt contains`. Teksty: `upper lower trim split join replace slice`. Słowniki: `keys hasKey removeKey`.
 
 ## Zdarzenia (`when`)
-`start`, `every 2`, `tick` (zmienna `dt`), `touch "Nazwa"`, `collect`, `key "E"`, `win`, `die`, `shoot`, `hit` / `hit "Nazwa"`, `kill` / `kill "Nazwa"` (zmienna `target`), `timeup`, `talk "Imię"`, `enter` / `exit` (auto), `arrive` (dotarcie do znacznika), `bump "Nazwa"` (piłka wpadła do klocka/strefy), `button "Tekst"`.
+`start`, `every 2`, `tick` (zmienna `dt`), `touch "Nazwa"`, `collect`, `key "E"`, `win`, `die`, `shoot`, `hit` / `hit "Nazwa"`, `kill` / `kill "Nazwa"` (zmienna `target`), `timeup`, `talk "Imię"`, `enter` / `exit` (auto), `arrive` (dotarcie do znacznika), `bump "Nazwa"` (piłka wpadła do klocka/strefy), `button "Tekst"`, `message "nazwa"`, `playerJoin`, `playerLeave`.
 
 ## Przykład: strzelanka z falami
 ```nexus
@@ -103,5 +107,5 @@ when arrive {
 
 ## Zasady
 - Odpowiadaj jednym blokiem ```nexus z całym programem. Używaj tylko funkcji z tej ściągi.
-- Strzelanka: broń w `when start`, wrogowie `"enemy"` + `enemyMode`, wygrana gdy `count("enemy") == 0` (bez mety). Jak GTA: `buildCity`, auta, misje ze znacznikiem, minimapa. Jak CS: `buildArena`, sojusznicy, `shop`, pieniądze, rundy. Przygoda: NPC + `when talk` + plecak. Quiz: `ask`. Piłka nożna: "ball", bramki "zone" + `when bump`, boty "ball". Platformówka 2D: `camera("side")`. Widok z góry: `camera("top")`.
+- Strzelanka: broń w `when start`, wrogowie `"enemy"` + `enemyMode`, wygrana gdy `count("enemy") == 0` (bez mety). Jak GTA: `buildCity`, auta, misje ze znacznikiem, minimapa. Jak CS: `buildArena`, sojusznicy, `shop`, pieniądze, rundy. Przygoda: NPC + `when talk` + plecak. Quiz: `ask`. Piłka nożna: "ball", bramki "zone" + `when bump`, boty "ball". Platformówka 2D: `camera("side")`. Widok z góry: `camera("top")`. Gra dla kilku osób: `send` + `when message`. Ładny świat: `material`, `glow`, `light`, `skyGradient`.
 - Platformy do skoku: odstęp do 6 w poziomie i 2 w pionie. Teksty dla gracza po polsku, odpowiednie dla dzieci.
