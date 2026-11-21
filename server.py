@@ -1623,8 +1623,10 @@ async def api(operation: str, request: Request):
 if __name__ == "__main__":
     import uvicorn
     logging.basicConfig(level=logging.WARNING)
-    # Render's proxy is the only route in, so its X-Forwarded-For carries the
-    # real player address that the per-IP rate limits need.
-    behind_proxy = os.environ.get("RENDER") == "true"
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8093")), log_level="warning",
-                proxy_headers=behind_proxy, forwarded_allow_ips="*" if behind_proxy else "127.0.0.1")
+    # Behind Render's proxy or a local reverse proxy (Caddy on the VPS) the
+    # X-Forwarded-For header carries the real player address that the per-IP
+    # rate limits need. On the VPS the server listens on localhost only.
+    on_render = os.environ.get("RENDER") == "true"
+    behind_proxy = on_render or os.environ.get("BEHIND_PROXY") == "1"
+    uvicorn.run(app, host=os.environ.get("HOST", "0.0.0.0"), port=int(os.environ.get("PORT", "8093")), log_level="warning",
+                proxy_headers=behind_proxy, forwarded_allow_ips="*" if on_render else "127.0.0.1")

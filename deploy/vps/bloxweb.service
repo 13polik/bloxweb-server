@@ -1,0 +1,24 @@
+[Unit]
+Description=BloxWeb game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=bloxweb
+Group=bloxweb
+WorkingDirectory=/opt/bloxweb/app
+# Settings and secrets (DATABASE_URL, BLOX_AI_KEY …) live outside the code, readable by root and bloxweb only.
+EnvironmentFile=/etc/bloxweb/env
+ExecStart=/opt/bloxweb/venv/bin/python -u server.py
+Restart=always
+RestartSec=3
+# Keep BloxWeb in its own corner of the machine.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/bloxweb/data
+MemoryMax=900M
+
+[Install]
+WantedBy=multi-user.target
