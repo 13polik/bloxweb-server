@@ -54,6 +54,7 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 
 ## Mechaniki Fortnite (2.2)
 - `useMagazines(true)`, `reload()`, `player.mag`, `player.reloading`; bronie `"smg"`, `"rocket"`; `aim(true)` (też prawy przycisk), headshot ×2.
+- Gra jest na pełnym ekranie, klik blokuje mysz (Esc zwalnia); `mouseLock(false)` gdy gra potrzebuje kursora.
 - `sprint(true)` (Shift), `fallDamage(true)`. `channel("Bandaż", 3.5)` zwraca true po czasie albo false gdy przerwane.
 - `buildMode("wall"|"floor"|"ramp"|"roof", "wood")`, `buildMode(null)`, `when build`; `materials(d, k, m)`, `addMaterial("wood", n)`, `getMaterial("wood")`, `setHarvest(n, "wood", 12)`.
 - `editWall(n, "door"|"window"|"none")`, `aimedPart()`, `stormNext(x, z, r)`, `feed("tekst", "#kolor")`, `enemyMode(w, "royale")`.

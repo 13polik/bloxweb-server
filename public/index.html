@@ -11301,6 +11301,7 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - **Magazynki:** `useMagazines(true)` – broń ma magazynek (pistolet 16, pistolet maszynowy 30, karabin 30, shotgun 5, snajperka 1, wyrzutnia 1) i zapas amunicji; pusty magazynek przeładowuje się sam, `reload()` przeładowuje na żądanie. `player.mag`, `player.reloading`.
 - **Nowe bronie:** `"smg"` (pistolet maszynowy) i `"rocket"` (wyrzutnia rakiet – rakieta leci prosto i niszczy budowle).
 - **Celowanie i trafienia:** prawy przycisk myszy przybliża (snajperka – luneta), `aim(true/false)` dla przycisków na telefonie. Rozrzut rośnie w ruchu i w powietrzu. Trafienie w głowę zadaje podwójne obrażenia; nad celem pokazują się liczby obrażeń.
+- **Pełny ekran i mysz:** gra (także test w Studio) włącza się na pełnym ekranie. Na komputerze pierwsze kliknięcie chowa i blokuje kursor – mysz obraca kamerę, a lewy przycisk tylko strzela lub buduje. Esc zwalnia mysz, drugie Esc wychodzi z gry. Okna `ask`, `shop` i `locker` same zwalniają mysz. `mouseLock(false)` wyłącza blokadę (np. w grach klikanych myszą), `mouseLock(true)` włącza ją z powrotem; kamera `"top"` nie blokuje myszy.
 - **Bieg i upadek:** `sprint(true)` – bieg z Shift (na telefonie: joystick wychylony do końca), `fallDamage(true)` – obrażenia od upadku z wysokości.
 - **Tryb budowania:** `buildMode("wall" | "floor" | "ramp" | "roof", materiał)` pokazuje podgląd elementu (niebieski = można, czerwony = nie); kliknięcie stawia, przytrzymanie buduje szybko. `buildMode(null)` kończy tryb.
 - **Materiały liczy gra:** `materials(drewno, kamień, metal)`, `addMaterial("wood", 30)`, `getMaterial("stone")` – pasek u góry ekranu; każdy element w trybie budowania kosztuje 10. `setHarvest(nazwa, "wood", 12)` – kilof daje materiał przy każdym uderzeniu.
@@ -11869,7 +11870,7 @@ when playerJoin {
   const MATERIALS=['plastic','metal','gold','wood','stone','grass','sand','neon','glass','ice'];
   // Values travelling between players and saves: numbers, text, true/false, null, lists and dictionaries.
   const fromJSON=v=>{if(Array.isArray(v))return v.map(fromJSON);if(v&&typeof v==='object'){const d=new Dict();for(const [k,x] of v.__d||[])d.map.set(k,fromJSON(x));return d;}return v;};
-  const BUILTIN_NAMES=new Set(['setSkin','resetSkin','weaponSkin','gliderSkin','setPartSkin','locker','useMagazines','reload','aim','sprint','fallDamage','channel','buildMode','materials','addMaterial','getMaterial','setHarvest','aimedPart','editWall','feed','stormNext','build','buildAt','setPartHealth','getPartHealth','setShield','addShield','storm','stormShrink','stormDamage','inStorm','glide','hotbar','map','filter','find','reduce','forEach','sortBy','any','all','typeOf','atan2','pow','clamp','lerp','sign','tan','send','playerCount','players','isOnline','shadows','material','glow','light','lightOff','skyGradient','camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
+  const BUILTIN_NAMES=new Set(['mouseLock','setSkin','resetSkin','weaponSkin','gliderSkin','setPartSkin','locker','useMagazines','reload','aim','sprint','fallDamage','channel','buildMode','materials','addMaterial','getMaterial','setHarvest','aimedPart','editWall','feed','stormNext','build','buildAt','setPartHealth','getPartHealth','setShield','addShield','storm','stormShrink','stormDamage','inStorm','glide','hotbar','map','filter','find','reduce','forEach','sortBy','any','all','typeOf','atan2','pow','clamp','lerp','sign','tan','send','playerCount','players','isOnline','shadows','material','glow','light','lightOff','skyGradient','camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
 
   class Runtime{
     constructor(source,api,options={}){
@@ -12293,6 +12294,7 @@ when playerJoin {
         keys:a=>{if(!(a[0] instanceof Dict))throw new NexusError('keys: wymaga słownika',rt.line);return [...a[0].map.keys()];},
         hasKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('hasKey: wymaga słownika',rt.line);return a[0].map.has(show(a[1]));},
         removeKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('removeKey: wymaga słownika',rt.line);return a[0].map.delete(show(a[1]));},
+        mouseLock:a=>{api.mouseLock(a[0]==null?true:truthy(a[0]));},
         // NexusScript 2.3: skins – outfits for the player, bots and NPCs, weapon wraps, glider skins and a locker
         setSkin:a=>{if(a[0]==null){api.skin(null);return;}api.skin(skinOf(a[0],'setSkin'));},
         resetSkin:()=>{api.skin(null);},
@@ -12447,6 +12449,8 @@ when playerJoin {
 .nx-chat div{background:#0d1117b8;padding:4px 9px;border-radius:7px;transition:opacity 1s}.nx-chat div.old{opacity:0}.nx-chat b{color:#7dd3fc}
 .nx-chatin{position:absolute;left:12px;bottom:120px;width:min(360px,70vw);padding:9px 12px;border-radius:9px;border:1px solid #ffffff40;background:#0d1117e6;color:#fff;font:600 14px Inter,system-ui,sans-serif}
 .nx-net{cursor:pointer;border:0;background:#1d4ed8cc;color:#fff}
+.nx-lockhint{position:absolute;left:50%;top:38%;transform:translateX(-50%);padding:10px 18px;border-radius:12px;background:#0d1117d9;color:#fff;font:800 16px Inter,system-ui,sans-serif;pointer-events:none;z-index:4;box-shadow:0 6px 24px #0008}
+.nx-player:fullscreen{width:100vw;height:100vh}
 .nx-feed{position:absolute;right:12px;top:150px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;font:700 12px Inter,system-ui,sans-serif}
 .nx-feed div{background:#0d1117c4;padding:4px 9px;border-radius:7px;transition:opacity .8s}.nx-feed div.old{opacity:0}
 .nx-channel{position:absolute;left:50%;top:58%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none;color:#fff;font:800 14px Inter,system-ui,sans-serif;text-shadow:0 2px 4px #000}
@@ -12623,7 +12627,7 @@ body.nx-playing{overflow:hidden}
     const api={spawn:(type,x,y,z,w,h,d,color,name)=>{if(parts.length>=MAX_PARTS)return null;const n=name||'part'+(parts.length+1);parts.push({type,pos:[x,y,z],size:[w,h,d],color:color||DEFAULT_COLOR[type],name:n});return n;},
       exists:n=>parts.some(p=>p.name===n),getPos:n=>(parts.find(p=>p.name===n)||{pos:[0,0,0]}).pos,
       move(){},color(n,c){const p=parts.find(q=>q.name===n);if(p)p.color=c;},resize(){},spin(){},visible(){},remove(n){const i=parts.findIndex(p=>p.name===n);if(i>=0)parts.splice(i,1);},
-      skinItems:()=>({hat:[],back:[],face:[],tshirt:[],pants:[]}),skin(){},weaponSkin(){},gliderSkin(){},partSkin(){},locker(t,i,done){done(null);},magazines(){},reload(){},aim(){},sprint(){},fallDamage(){},channel(l,s,done){done(true);},buildMode(){},materials(){},addMaterial(){},getMaterial:()=>0,harvest(){},aimedPart:()=>null,editWall:()=>false,feed(){},stormNext(){},
+      mouseLock(){},skinItems:()=>({hat:[],back:[],face:[],tshirt:[],pants:[]}),skin(){},weaponSkin(){},gliderSkin(){},partSkin(){},locker(t,i,done){done(null);},magazines(){},reload(){},aim(){},sprint(){},fallDamage(){},channel(l,s,done){done(true);},buildMode(){},materials(){},addMaterial(){},getMaterial:()=>0,harvest(){},aimedPart:()=>null,editWall:()=>false,feed(){},stormNext(){},
       build:()=>null,buildAt:()=>null,partHealth(){},getPartHealth:()=>0,shield(){},storm(){},stormShrink(){},stormDamage(){},inStorm:()=>false,glide(){},hotbar(){},shadows(){},material(){},glow(){},light:()=>'light1',lightOff(){},skyGradient(){},netSend(){},netCount:()=>1,netPlayers:()=>[],netOnline:()=>false,cameraMode(){},kick(){},kickTarget(){},button(){},particles(){},save:()=>true,load:()=>null,drivePath(){},walkPath(){},carSpeed(){},team(){},waypoint(){},minimap(){},money(){},shop(){},dayCycle(){},regen(){},enterCar(){},exitCar(){},
       buildCity(x,z,size){for(const q of cityParts(x,z,size))if(parts.length<MAX_PARTS)parts.push({...q});},buildArena(x,z,size){for(const q of arenaParts(x,z,size))if(parts.length<MAX_PARTS)parts.push({...q});},
       dialog(){},ask(){},item:()=>true,itemCount:()=>0,itemList:()=>[],lighting(){},fog(){},shake(){},rotate(){},
@@ -12672,6 +12676,16 @@ body.nx-playing{overflow:hidden}
       act.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();keyEvent('E');});
     }
     document.body.append(root);document.body.classList.add('nx-playing');
+    // Games play in fullscreen; on a computer a click also hides and locks the mouse (it then turns the camera,
+    // and the left button only shoots or builds). Esc releases the mouse, a second Esc leaves the game.
+    const lockHint=el('div','nx-lockhint','Kliknij, aby grać · Esc – wyjście z gry');lockHint.hidden=true;root.append(lockHint);
+    let lastUnlock=0,lockBroken=false;
+    const lockMouse=()=>{try{const r=renderer.domElement.requestPointerLock?.();r?.catch?.(()=>{lockBroken=true;});}catch{lockBroken=true;}};
+    const onLockError=()=>{lockBroken=true;};document.addEventListener('pointerlockerror',onLockError);
+    const goFullscreen=()=>{try{if(!document.fullscreenElement&&root.requestFullscreen)root.requestFullscreen({navigationUI:'hide'}).catch(()=>{});}catch{}};
+    const onLockChange=()=>{if(document.pointerLockElement!==renderer.domElement)lastUnlock=performance.now();};
+    document.addEventListener('pointerlockchange',onLockChange);
+    goFullscreen();
     const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(70,1,.1,600);
     const hemi=new THREE.HemisphereLight(0xffffff,0x667788,.85);scene.add(hemi);const sun=new THREE.DirectionalLight(0xfff2dd,.7);sun.position.set(-30,60,20);scene.add(sun,sun.target);
     sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:45,bottom:-45,near:1,far:160});sun.shadow.bias=-.0006;
@@ -12760,7 +12774,7 @@ body.nx-playing{overflow:hidden}
       firstPerson(on){state.firstPerson=!!on;state.cam=on?'first':'third';playerObj.visible=!on;equip();},
       dialog(n,text,secs){const p=byName.get(n);if(!p)return;setLabel(p,text);p.labelText=text;p.dialogUntil=(runtime?.time||0)+secs;sound('click');},
       ask(q,opts,done){
-        askBox?.remove();state.asking=true;input.keys.clear();input.jump=false;input.fire=false;
+        if(document.pointerLockElement)document.exitPointerLock?.();askBox?.remove();state.asking=true;input.keys.clear();input.jump=false;input.fire=false;
         askBox=el('div','nx-ask');const box=el('section');box.append(el('h3',null,q));const list=el('div','opts');
         const choose=v=>{askBox?.remove();askBox=null;state.asking=false;sound('click');done(v);};
         opts.forEach((o,i)=>{const b=el('button',null,(i+1)+'. '+o);b.onclick=()=>choose(o);list.append(b);});
@@ -12782,7 +12796,7 @@ body.nx-playing{overflow:hidden}
       minimap(on){mapCanvas.hidden=!on;},
       money(v,add){state.money=Math.max(0,Math.round(add?state.money+v:v));state.moneyShown=true;},
       shop(title,list,done){
-        askBox?.remove();state.asking=true;input.keys.clear();input.jump=false;input.fire=false;state.moneyShown=true;
+        if(document.pointerLockElement)document.exitPointerLock?.();askBox?.remove();state.asking=true;input.keys.clear();input.jump=false;input.fire=false;state.moneyShown=true;
         askBox=el('div','nx-ask nx-shop');const box=el('section');box.append(el('h3',null,title+'\nMasz: $'+state.money));const opts=el('div','opts');
         const close=v=>{askBox?.remove();askBox=null;state.asking=false;done(v);};
         list.forEach(([label,price],i)=>{const b=el('button',null,(i+1)+'. '+label+' – $'+price);b.disabled=state.money<price;b.onclick=()=>{if(state.money<price)return;state.money-=price;sound('powerup');close(label);};opts.append(b);});
@@ -12806,6 +12820,7 @@ body.nx-playing{overflow:hidden}
       inStorm:()=>!!state.storm&&Math.hypot(state.pos[0]-state.storm.x,state.pos[2]-state.storm.z)>state.storm.r,
       glide(on){state.glide=!!on;if(on)cancelChannel();},
       magazines(on){state.mags=!!on;},
+      mouseLock(on){state.mouseLockOn=!!on;if(!on&&document.pointerLockElement)document.exitPointerLock?.();},
       skinItems(){const ids=c=>typeof c!=='undefined'&&Array.isArray(c)?c.map(i=>i.id):['none'];
         return {hat:ids(typeof hatsCatalog!=='undefined'?hatsCatalog:undefined),back:ids(typeof backCatalog!=='undefined'?backCatalog:undefined),face:ids(typeof facesCatalog!=='undefined'?facesCatalog:undefined),tshirt:ids(typeof shirtsCatalog!=='undefined'?shirtsCatalog:undefined),pants:ids(typeof pantsCatalog!=='undefined'?pantsCatalog:undefined)};},
       skin(sk){applySkin(sk);try{online?.send('__skin',sk||{});}catch{}},
@@ -12813,7 +12828,7 @@ body.nx-playing{overflow:hidden}
       gliderSkin(p){glider.material.dispose?.();glider.material=p?patternMaterial(p):new THREE.MeshLambertMaterial({color:0x38bdf8});},
       partSkin(n,sk){const p=byName.get(n);if(p){p.skin=sk;rebuildMesh(p);}},
       locker(title,items,done){
-        askBox?.remove();state.asking=true;input.keys.clear();input.jump=false;input.fire=false;
+        if(document.pointerLockElement)document.exitPointerLock?.();askBox?.remove();state.asking=true;input.keys.clear();input.jump=false;input.fire=false;
         askBox=el('div','nx-ask nx-shop');const box=el('section');box.append(el('h3',null,title));const opts=el('div','opts');
         const close=v=>{askBox?.remove();askBox=null;state.asking=false;sound('click');done(v);};
         items.forEach(([label,c],i)=>{const b=el('button',null,(i+1)+'. '+label);b.style.borderLeft='6px solid '+c;b.onclick=()=>close(label);opts.append(b);});
@@ -13025,6 +13040,7 @@ body.nx-playing{overflow:hidden}
       const sky=m==='day'?(project.settings?.sky||L[0]):L[0];scene.background=new THREE.Color(sky);scene.fog.color=new THREE.Color(sky);
       hemi.intensity=L[1];sun.intensity=L[2];sun.color.setHex(m==='sunset'?0xffb070:0xfff2dd);lamp.intensity=L[3];state.lighting=m;
     }
+    function wantLock(){return !touch&&!lockBroken&&state&&state.mouseLockOn!==false&&state.cam!=='top'&&!askBox&&!state.over&&!stopped;}
     function shade(obj){obj.traverse(o=>{if(o.isMesh&&!o.material?.transparent){o.castShadow=true;o.receiveShadow=true;}});}
     function setShadows(on){on=!!on;if(renderer.shadowMap.enabled===on)return;renderer.shadowMap.enabled=on;sun.castShadow=on;scene.traverse(o=>{if(o.material)for(const m of [].concat(o.material))m.needsUpdate=true;});}
     function rebuildMesh(p){const text=p.label?p.labelText:'';scene.remove(p.mesh);disposeTree(p.mesh);p.label=p.bar=p.barFill=null;p.mesh=buildMesh(p);shade(p.mesh);p.mesh.visible=p.visible;scene.add(p.mesh);if(text){setLabel(p,text);p.labelText=text;}}
@@ -13034,7 +13050,7 @@ body.nx-playing{overflow:hidden}
       parts=[];byName=new Map();serial=0;minY=0;touching=new Set();errors=[];result?.remove();result=null;hint.hidden=true;say.style.opacity='0';
       const sky=project.settings?.sky||'#8fd3ff';scene.background=new THREE.Color(sky);scene.fog=new THREE.Fog(sky,120,420);
       for(const p of normalizeParts(project.parts))addPart(p);
-      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false,items:new Map(),asking:false,shake:0,lighting:'day',nearNpc:null,driving:null,nearCar:null,money:0,moneyShown:false,waypoint:null,dayCycle:0,dayT:0,regen:0,cam:'third',face:[0,-1],shadowsSet:false,shield:0,shieldShown:false,rarity:0,storm:null,glide:false,mags:false,mag:0,reloadUntil:0,ads:false,sprintOn:false,fallDmg:false,channel:null,buildMode:null,mats:null,stormNext:null,skin:state?.skin||null,weaponSkin:null};
+      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false,items:new Map(),asking:false,shake:0,lighting:'day',nearNpc:null,driving:null,nearCar:null,money:0,moneyShown:false,waypoint:null,dayCycle:0,dayT:0,regen:0,cam:'third',face:[0,-1],shadowsSet:false,shield:0,shieldShown:false,rarity:0,storm:null,glide:false,mags:false,mag:0,reloadUntil:0,ads:false,sprintOn:false,fallDmg:false,channel:null,buildMode:null,mats:null,stormNext:null,skin:state?.skin||null,weaponSkin:null,mouseLockOn:true};
       if(state.skin)applySkin(null);api.gliderSkin(null);
       channelEl.hidden=true;feedEl.replaceChildren();if(ghost)ghost.visible=false;camera.fov=70;camera.updateProjectionMatrix();
       built.clear();if(stormMesh){scene.remove(stormMesh);disposeTree(stormMesh);stormMesh=null;}root.classList.remove('nx-instorm');hotbarEl.hidden=true;hotbarEl.replaceChildren();
@@ -13188,7 +13204,7 @@ body.nx-playing{overflow:hidden}
       if(code==='ShiftLeft'||code==='ShiftRight')input.sprint=down;
       if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(code)){e.preventDefault();e.stopPropagation();if(code==='Space')input.jump=down;else if(down)input.keys.add(code);else input.keys.delete(code);}
       if(down&&online&&code==='Enter'&&!state.asking){e.preventDefault();openChat();return;}
-      if(down&&!e.repeat){if(code==='Escape'){e.preventDefault();stop();return;}if(code==='Space')keyEvent('SPACE');else if(/^Key[A-Z]$/.test(code))keyEvent(code.slice(3));else if(/^Digit\d$/.test(code))keyEvent(code.slice(5));}
+      if(down&&!e.repeat){if(code==='Escape'){e.preventDefault();if(document.pointerLockElement===renderer.domElement||performance.now()-lastUnlock<600)return;stop();return;}if(code==='Space')keyEvent('SPACE');else if(/^Key[A-Z]$/.test(code))keyEvent(code.slice(3));else if(/^Digit\d$/.test(code))keyEvent(code.slice(5));}
     };
     addEventListener('keydown',onKey,true);addEventListener('keyup',onKey,true);
     // Camera: drag on the scene to look around, wheel to zoom.
@@ -13198,7 +13214,9 @@ body.nx-playing{overflow:hidden}
     renderer.domElement.addEventListener('pointerdown',e=>{
       drag={id:e.pointerId,x:e.clientX,y:e.clientY};try{renderer.domElement.setPointerCapture(e.pointerId);}catch{}
       if(e.pointerType==='mouse'&&e.button===2&&state.weapon){state.ads=true;return;}
-      if(e.pointerType==='mouse'&&e.button===0&&(state.weapon||state.buildMode)){input.fire=true;input.firePressed=true;if(state.firstPerson&&document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock?.();}
+      // The first click locks the mouse (and returns to fullscreen); it does not shoot yet.
+      if(e.pointerType==='mouse'&&e.button===0&&wantLock()&&document.pointerLockElement!==renderer.domElement){goFullscreen();lockMouse();drag=null;return;}
+      if(e.pointerType==='mouse'&&e.button===0&&(state.weapon||state.buildMode)){input.fire=true;input.firePressed=true;if(state.firstPerson&&!lockBroken&&document.pointerLockElement!==renderer.domElement)lockMouse();}
     });
     renderer.domElement.addEventListener('pointermove',e=>{
       if(document.pointerLockElement===renderer.domElement){look(e.movementX,e.movementY);return;}
@@ -13476,6 +13494,7 @@ body.nx-playing{overflow:hidden}
       goalPill.hidden=!wp;if(wp)goalPill.textContent='Cel: '+Math.round(Math.hypot(wp[0]-p[0],wp[2]-p[2]))+' m';
       moneyPill.hidden=!state.moneyShown;moneyPill.textContent='$ '+state.money;
       if(!mapCanvas.hidden&&(++mapTick%3===0))drawMap();
+      lockHint.hidden=!(wantLock()&&document.pointerLockElement!==renderer.domElement&&!state.deadUntil);
       const now=runtime?.time||0;
       for(let i=effects.length-1;i>=0;i--){const fx=effects[i];if(fx.rise){fx.obj.position.y+=.035;fx.obj.material.opacity=Math.max(0,(fx.until-now)/.8);}else if(fx.vel){fx.vel[1]-=22/60;fx.obj.position.x+=fx.vel[0]/60;fx.obj.position.y+=fx.vel[1]/60;fx.obj.position.z+=fx.vel[2]/60;fx.obj.rotation.x+=.2;fx.obj.material.opacity=Math.max(0,(fx.until-now)/.6);}else if(fx.grow)fx.obj.scale.setScalar(Math.min(fx.grow,fx.obj.scale.x+fx.grow*.15));if(fx.obj.material&&!fx.vel&&!fx.rise)fx.obj.material.opacity*=.9;if(now>=fx.until){scene.remove(fx.obj);disposeTree(fx.obj);effects.splice(i,1);}}
       for(const q of parts)if(q.bar){q.mesh.getWorldQuaternion(tmpQ).invert();q.bar.quaternion.copy(tmpQ).multiply(camera.quaternion);}
@@ -13499,7 +13518,7 @@ body.nx-playing{overflow:hidden}
       render();
     }
     function stop(){
-      if(stopped)return;stopped=true;cancelAnimationFrame(frame);removeEventListener('keydown',onKey,true);removeEventListener('keyup',onKey,true);removeEventListener('resize',placeHotbar);if(document.pointerLockElement)document.exitPointerLock?.();
+      if(stopped)return;stopped=true;cancelAnimationFrame(frame);document.removeEventListener('pointerlockchange',onLockChange);document.removeEventListener('pointerlockerror',onLockError);try{if(document.fullscreenElement===root)document.exitFullscreen?.();}catch{}removeEventListener('keydown',onKey,true);removeEventListener('keyup',onKey,true);removeEventListener('resize',placeHotbar);if(document.pointerLockElement)document.exitPointerLock?.();
       for(const p of parts.slice())removePart(p);for(const o of others.values())disposeTree(o.group);others.clear();try{online?.close();}catch{}
       disposeTree(playerObj);renderer.dispose();root.remove();document.body.classList.remove('nx-playing');
       try{opts.onExit?.();}catch{}
