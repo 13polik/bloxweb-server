@@ -41,6 +41,11 @@ ENV
 fi
 chown root:bloxweb /etc/bloxweb/env && chmod 640 /etc/bloxweb/env
 
+install -d -o bloxweb -g bloxweb -m 750 /opt/bloxweb/backups
+# Daily database copy at 04:30 (SQLite only; a PostgreSQL DATABASE_URL has its own backups).
+echo '30 4 * * * bloxweb /opt/bloxweb/venv/bin/python /opt/bloxweb/app/deploy/vps/backup.py >/dev/null 2>&1' > /etc/cron.d/bloxweb-backup
+chmod 644 /etc/cron.d/bloxweb-backup
+
 install -m 644 /opt/bloxweb/app/deploy/vps/bloxweb.service /etc/systemd/system/bloxweb.service
 systemctl daemon-reload
 systemctl enable --now bloxweb >/dev/null
