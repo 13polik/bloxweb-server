@@ -1,4 +1,4 @@
-# NexusScript 2.1 – ściąga dla AI (gry 3D BloxWeb)
+# NexusScript 2.2 – ściąga dla AI (gry 3D BloxWeb)
 
 Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. To nie jest JavaScript ani Lua.
 
@@ -24,12 +24,12 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - Gotowe światy: `buildCity(x, z, rozmiar)` (ulice na x/z = …, -38, 0, 38, …), `buildArena(x, z, rozmiar)` (mur, osłony, bazy "BazaNiebieska" z − i "BazaCzerwona" z +).
 
 ## Gracz
-- `player.x y z hp coins ammo weapon kills money driving name shield rarity`.
+- `player.x y z hp coins ammo weapon kills money driving name shield rarity mag reloading`.
 - `teleport(x, y, z)`, `damage(n)`, `heal(n)`, `setRegen(n)`, `checkpoint(x, y, z)`, `setSpeed(n)`, `setJump(n)`, `setGravity(n)`, `win("tekst")`, `lose("tekst")`.
 - Broń: `giveWeapon("pistol"|"rifle"|"shotgun"|"sniper"|"sword"|"grenade"|"none")`, `setAmmo(n)`, `addAmmo(n)`, `firstPerson(true)`. Gracz strzela myszką/F/przyciskiem.
 
 ## Wrogowie, sojusznicy, NPC
-- Wróg: `var w = spawn("enemy", x, 1.5, z, 2, 3, 2)` i `enemyMode(w, "chase"|"guard"|"patrol"|"shooter"|"ball")`, `setHealth(w, n)`, `getHealth(w)`, `setEnemySpeed(w, n)`, `setEnemyDamage(w, n)`.
+- Wróg: `var w = spawn("enemy", x, 1.5, z, 2, 3, 2)` i `enemyMode(w, "chase"|"guard"|"patrol"|"shooter"|"ball"|"royale")`, `setHealth(w, n)`, `getHealth(w)`, `setEnemySpeed(w, n)`, `setEnemyDamage(w, n)`.
 - Sojusznik: `setTeam(w, "ally")` (idzie za graczem, strzela do wrogów). `count("enemy")` liczy wrogów, `count("ally")` sojuszników.
 - NPC: `spawn("npc", …, "Ola")`, `when talk "Ola" { dialog("Ola", "Cześć!") }`, `walkPath("Ola", [[0,0],[10,0]], 3)`.
 - `var odp = ask("Pytanie?", "A", "B", "C")` – czeka na wybór gracza i zwraca tekst.
@@ -51,6 +51,12 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - Typ klocka "ramp" (wchodzi się po nim). `setPartHealth(n, hp)`, `getPartHealth(n)`, `when destroy` / `when destroy "Nazwa"`.
 - `giveWeapon("pickaxe")` (kilof: `when hit` na klocku = zbieranie), `giveWeapon("rifle", 0-4)` rzadkość, `player.rarity`.
 - `setShield(n)`, `addShield(n)`, `player.shield`. `storm(x, z, r)`, `stormShrink(x, z, r, s)`, `stormDamage(n)`, `inStorm()`. `glide(true)` + `when land`. `hotbar(["Kilof", ["Karabin", "#a855f7"]], wybrany)`.
+
+## Mechaniki Fortnite (2.2)
+- `useMagazines(true)`, `reload()`, `player.mag`, `player.reloading`; bronie `"smg"`, `"rocket"`; `aim(true)` (też prawy przycisk), headshot ×2.
+- `sprint(true)` (Shift), `fallDamage(true)`. `channel("Bandaż", 3.5)` zwraca true po czasie albo false gdy przerwane.
+- `buildMode("wall"|"floor"|"ramp"|"roof", "wood")`, `buildMode(null)`, `when build`; `materials(d, k, m)`, `addMaterial("wood", n)`, `getMaterial("wood")`, `setHarvest(n, "wood", 12)`.
+- `editWall(n, "door"|"window"|"none")`, `aimedPart()`, `stormNext(x, z, r)`, `feed("tekst", "#kolor")`, `enemyMode(w, "royale")`.
 
 ## Online i grafika
 - Gra online (przycisk Graj online, do 6 graczy): `send("nazwa", wartość)` do wszystkich (też do siebie), `when message "nazwa" { }` ze zmiennymi `value` i `sender`, `when playerJoin` / `when playerLeave` (`target` = nick), `playerCount()`, `players()`, `isOnline()`, `player.name`.

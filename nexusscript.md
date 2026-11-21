@@ -1,4 +1,4 @@
-# NexusScript 2.1 – język gier 3D w BloxWeb Studio
+# NexusScript 2.2 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -109,6 +109,7 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when message "nazwa" { ... }` – gdy ktoś w pokoju online wyśle `send("nazwa", wartość)`. Zmienne: `value` (wysłana wartość) i `sender` (nick nadawcy).
 - `when destroy { ... }` lub `when destroy "Nazwa" { ... }` – gdy zniszczalny klocek (z `setPartHealth` albo zbudowany przez `build`) się rozpadnie (`target` to jego nazwa).
 - `when land { ... }` – gdy gracz wyląduje po locie na lotni (`glide`).
+- `when build { ... }` lub `when build "wall" { ... }` – gdy gracz postawi element w trybie budowania (`target` to rodzaj).
 - `when playerJoin { ... }` / `when playerLeave { ... }` – gdy inny gracz wchodzi do pokoju online lub z niego wychodzi (`target` to jego nick).
 
 ## Broń i walka
@@ -149,6 +150,18 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - **Burza:** `storm(x, z, promień)` – bezpieczny krąg (fioletowa ściana i krąg na minimapie), `stormShrink(x, z, promień, sekundy)` – płynne zmniejszanie, `stormDamage(ile)` – obrażenia na sekundę poza kręgiem (tarcza nie chroni), `inStorm()`.
 - **Lotnia:** `glide(true)` – powolne opadanie i szybszy lot, kończy się po wylądowaniu (`when land`).
 - **Pasek slotów:** `hotbar(["Kilof", ["Karabin", "#a855f7"]], wybrany)` – sloty na dole ekranu (tekst lub [tekst, kolor]); `hotbar([])` chowa pasek.
+### Mechaniki jak w Fortnite (NexusScript 2.2)
+- **Magazynki:** `useMagazines(true)` – broń ma magazynek (pistolet 16, pistolet maszynowy 30, karabin 30, shotgun 5, snajperka 1, wyrzutnia 1) i zapas amunicji; pusty magazynek przeładowuje się sam, `reload()` przeładowuje na żądanie. `player.mag`, `player.reloading`.
+- **Nowe bronie:** `"smg"` (pistolet maszynowy) i `"rocket"` (wyrzutnia rakiet – rakieta leci prosto i niszczy budowle).
+- **Celowanie i trafienia:** prawy przycisk myszy przybliża (snajperka – luneta), `aim(true/false)` dla przycisków na telefonie. Rozrzut rośnie w ruchu i w powietrzu. Trafienie w głowę zadaje podwójne obrażenia; nad celem pokazują się liczby obrażeń.
+- **Bieg i upadek:** `sprint(true)` – bieg z Shift (na telefonie: joystick wychylony do końca), `fallDamage(true)` – obrażenia od upadku z wysokości.
+- **Tryb budowania:** `buildMode("wall" | "floor" | "ramp" | "roof", materiał)` pokazuje podgląd elementu (niebieski = można, czerwony = nie); kliknięcie stawia, przytrzymanie buduje szybko. `buildMode(null)` kończy tryb.
+- **Materiały liczy gra:** `materials(drewno, kamień, metal)`, `addMaterial("wood", 30)`, `getMaterial("stone")` – pasek u góry ekranu; każdy element w trybie budowania kosztuje 10. `setHarvest(nazwa, "wood", 12)` – kilof daje materiał przy każdym uderzeniu.
+- **Edycja ścian:** `editWall(nazwa, "door" | "window" | "none")` wycina drzwi lub okno w zbudowanej ścianie; `aimedPart()` zwraca nazwę klocka na celowniku.
+- **Leczenie z czasem:** `if channel("Bandaż", 3.5) { heal(15) }` – pasek postępu, gracz idzie wolniej, strzał lub budowanie przerywa (wtedy `channel` zwraca `false`).
+- **Burza:** `stormNext(x, z, promień)` pokazuje na minimapie następny krąg (przerywana linia), zanim burza się ruszy.
+- **Boty Battle Royale:** `enemyMode(w, "royale")` – idą do bezpiecznej strefy, walczą, gdy zobaczą gracza, a ostrzelane stawiają ścianę.
+- **Kill feed:** `feed("Wyeliminowałeś Bot3", "#facc15")` – komunikaty w prawym górnym rogu.
 - Gotowa gra: poproś asystenta o „grę jak Fortnite” – dostaniesz autobus bojowy, lotnię, łup z rzadkościami, budowanie, zbieranie materiałów, tarcze, burzę i 15 botów.
 
 ## Gra online (multiplayer)
@@ -173,7 +186,7 @@ Każdą opublikowaną grę można uruchomić przyciskiem **Graj online**. Powsta
 
 ## Wrogowie
 - Wroga tworzysz przez `var w = spawn("enemy", x, y, z, 2, 3, 2)`, czyli typem `"enemy"`. Kolor czerwony jest domyślny.
-- `enemyMode(nazwa, "chase" | "guard" | "patrol" | "shooter" | "ball")`:
+- `enemyMode(nazwa, "chase" | "guard" | "patrol" | "shooter" | "ball" | "royale")`:
   - `"chase"` goni gracza,
   - `"guard"` stoi w miejscu i patrzy na gracza,
   - `"patrol"` chodzi w tę i z powrotem,
@@ -464,7 +477,7 @@ when playerJoin {
 ```
 
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Battle Royale = `build`, `giveWeapon(broń, rzadkość)`, `setShield`, `storm`/`stormShrink`, `glide`, `hotbar`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Battle Royale = `buildMode` + `materials` + `setHarvest`, `useMagazines`, `giveWeapon(broń, rzadkość)`, `setShield`, `channel`, `storm`/`stormNext`/`stormShrink`, `glide`, `hotbar`, boty `"royale"`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
