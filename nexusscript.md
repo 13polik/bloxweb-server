@@ -1,4 +1,4 @@
-# NexusScript 1.5 – język gier 3D w BloxWeb Studio
+# NexusScript 2.0 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -37,6 +37,55 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - Pętle: `while warunek { ... }`, `repeat 5 { ... }`, `for i in range(0, 10) { ... }`, `for el in lista { ... }`, `break`, `continue`.
 - Funkcje: `func nazwa(a, b) { return a + b }`. Wywołanie: `nazwa(1, 2)`.
 - Klamry `{ }` są obowiązkowe. Nie ma średników na końcu bloków ani słowa `end`.
+- Tekst ze zmiennymi: `"Punkty: {pkt}, życie: {player.hp}"` (w nawiasach dowolne wyrażenie; `\{` to zwykła klamra; tekst w środku pisz w cudzysłowie innego rodzaju, np. `"Nick: {upper('ala')}"`).
+- Warunek w jednej linii: `var opis = hp > 50 ? "zdrowy" : "ranny"`. Potęga: `2 ** 8`. Reszta z dzielenia z przypisaniem: `x %= 10`.
+- `for i, x in lista { }` daje indeks i element, `for klucz, wartość in słownik { }` – klucz i wartość.
+
+## Programowanie zaawansowane (NexusScript 2.0)
+**Funkcje jako wartości.** Funkcję można zapisać w zmiennej, przekazać i zwrócić:
+```
+var podwój = func(x) { return x * 2 }
+print(podwój(4))                      // 8
+func licznik() {
+  var n = 0
+  return func() {                     // domknięcie: pamięta swoje n
+    n += 1
+    return n
+  }
+}
+```
+Funkcje zdefiniowane wewnątrz bloku (`func pomocnik() { }` w `when` lub w innej funkcji) są lokalne.
+
+**Listy z funkcjami:** `map(lista, f)`, `filter(lista, f)`, `find(lista, f)` (pierwszy pasujący albo `null`), `reduce(lista, f, start)`, `forEach(lista, f)`, `sortBy(lista, f)` (sortuje po wyniku f), `any(lista, f)`, `all(lista, f)`. Funkcja dostaje element i jego indeks.
+
+**Metody na wartościach:** zamiast `push(lista, 3)` można pisać `lista.push(3)`; tak samo `tekst.upper()`, `lista.filter(func(x) { return x > 2 })`, `d.keys()`.
+
+**Klasy i obiekty:**
+```
+class Wróg {
+  var hp = 100
+  func init(nazwa) {
+    this.nazwa = nazwa
+  }
+  func trafiony(ile) {
+    this.hp -= ile
+  }
+}
+class Boss extends Wróg {
+  func init(nazwa) {
+    super.init(nazwa)
+    this.hp = 500
+  }
+}
+var b = new Boss("Smok")              // albo Boss("Smok")
+b.trafiony(50)
+print("{b.nazwa}: {b.hp}")            // Smok: 450
+```
+Pola (`var`) dostaje każdy nowy obiekt, `init` uruchamia się przy tworzeniu, `this` to bieżący obiekt, `super.metoda()` woła wersję z klasy bazowej. `typeOf(x)` zwraca typ (`"liczba"`, `"tekst"`, `"lista"`, `"słownik"`, `"funkcja"` albo nazwę klasy).
+
+**Błędy:** `try { … } catch błąd { … }` łapie błąd (w `błąd` jest opis), `throw wartość` zgłasza własny błąd.
+
+**Matematyka:** `PI`, `pow(a, b)`, `atan2(y, x)`, `tan(x)`, `sign(x)`, `clamp(x, min, max)`, `lerp(a, b, t)`.
 
 ## Zdarzenia (`when`)
 Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależnie, a `wait()` wstrzymuje tylko je.
@@ -401,7 +450,7 @@ when playerJoin {
 ```
 
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`.
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).

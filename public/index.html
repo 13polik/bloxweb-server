@@ -11145,7 +11145,7 @@ body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);
 })();
 </script>
 <script type="text/plain" id="nexusReference">
-# NexusScript 1.5 – język gier 3D w BloxWeb Studio
+# NexusScript 2.0 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -11184,6 +11184,55 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - Pętle: `while warunek { ... }`, `repeat 5 { ... }`, `for i in range(0, 10) { ... }`, `for el in lista { ... }`, `break`, `continue`.
 - Funkcje: `func nazwa(a, b) { return a + b }`. Wywołanie: `nazwa(1, 2)`.
 - Klamry `{ }` są obowiązkowe. Nie ma średników na końcu bloków ani słowa `end`.
+- Tekst ze zmiennymi: `"Punkty: {pkt}, życie: {player.hp}"` (w nawiasach dowolne wyrażenie; `\{` to zwykła klamra; tekst w środku pisz w cudzysłowie innego rodzaju, np. `"Nick: {upper('ala')}"`).
+- Warunek w jednej linii: `var opis = hp > 50 ? "zdrowy" : "ranny"`. Potęga: `2 ** 8`. Reszta z dzielenia z przypisaniem: `x %= 10`.
+- `for i, x in lista { }` daje indeks i element, `for klucz, wartość in słownik { }` – klucz i wartość.
+
+## Programowanie zaawansowane (NexusScript 2.0)
+**Funkcje jako wartości.** Funkcję można zapisać w zmiennej, przekazać i zwrócić:
+```
+var podwój = func(x) { return x * 2 }
+print(podwój(4))                      // 8
+func licznik() {
+  var n = 0
+  return func() {                     // domknięcie: pamięta swoje n
+    n += 1
+    return n
+  }
+}
+```
+Funkcje zdefiniowane wewnątrz bloku (`func pomocnik() { }` w `when` lub w innej funkcji) są lokalne.
+
+**Listy z funkcjami:** `map(lista, f)`, `filter(lista, f)`, `find(lista, f)` (pierwszy pasujący albo `null`), `reduce(lista, f, start)`, `forEach(lista, f)`, `sortBy(lista, f)` (sortuje po wyniku f), `any(lista, f)`, `all(lista, f)`. Funkcja dostaje element i jego indeks.
+
+**Metody na wartościach:** zamiast `push(lista, 3)` można pisać `lista.push(3)`; tak samo `tekst.upper()`, `lista.filter(func(x) { return x > 2 })`, `d.keys()`.
+
+**Klasy i obiekty:**
+```
+class Wróg {
+  var hp = 100
+  func init(nazwa) {
+    this.nazwa = nazwa
+  }
+  func trafiony(ile) {
+    this.hp -= ile
+  }
+}
+class Boss extends Wróg {
+  func init(nazwa) {
+    super.init(nazwa)
+    this.hp = 500
+  }
+}
+var b = new Boss("Smok")              // albo Boss("Smok")
+b.trafiony(50)
+print("{b.nazwa}: {b.hp}")            // Smok: 450
+```
+Pola (`var`) dostaje każdy nowy obiekt, `init` uruchamia się przy tworzeniu, `this` to bieżący obiekt, `super.metoda()` woła wersję z klasy bazowej. `typeOf(x)` zwraca typ (`"liczba"`, `"tekst"`, `"lista"`, `"słownik"`, `"funkcja"` albo nazwę klasy).
+
+**Błędy:** `try { … } catch błąd { … }` łapie błąd (w `błąd` jest opis), `throw wartość` zgłasza własny błąd.
+
+**Matematyka:** `PI`, `pow(a, b)`, `atan2(y, x)`, `tan(x)`, `sign(x)`, `clamp(x, min, max)`, `lerp(a, b, t)`.
 
 ## Zdarzenia (`when`)
 Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależnie, a `wait()` wstrzymuje tylko je.
@@ -11548,7 +11597,7 @@ when playerJoin {
 ```
 
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`.
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
@@ -11563,15 +11612,15 @@ when playerJoin {
 (() => {
   'use strict';
   class NexusError extends Error{constructor(message,line){super(message);this.line=line||0;}}
-  const KEYWORDS=new Set(['var','func','return','if','else','while','repeat','for','in','break','continue','when','and','or','not','true','false','null']);
+  const KEYWORDS=new Set(['var','func','return','if','else','while','repeat','for','in','break','continue','when','and','or','not','true','false','null','class','extends','new','this','super','try','catch','throw']);
   const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die','shoot','hit','kill','timeup','talk','enter','exit','arrive','bump','button','message','playerJoin','playerLeave']);
   const ARG_EVENTS=new Set(['every','touch','key','button']);
   // These take an optional name: `when kill { }` reacts to every enemy, `when kill "Boss" { }` to one.
   const OPTIONAL_ARG=new Set(['hit','kill','talk','enter','exit','bump','message','playerJoin','playerLeave']);
   const MAX_SOURCE=20000,MAX_LIST=10000,MAX_TEXT=10000,MAX_DEPTH=150,MAX_THREADS=64,SLICE=3000,FRAME_BUDGET=30000;
 
-  function lex(src){
-    const out=[],n=src.length;let i=0,line=1;
+  function lex(src,firstLine=1){
+    const out=[],n=src.length;let i=0,line=firstLine;
     const push=(type,value)=>out.push({type,value,line});
     while(i<n){
       const c=src[i];
@@ -11580,23 +11629,36 @@ when playerJoin {
       if(c==='/'&&src[i+1]==='/'){while(i<n&&src[i]!=='\n')i++;continue;}
       if(c==='/'&&src[i+1]==='*'){const start=line;i+=2;while(i<n&&!(src[i]==='*'&&src[i+1]==='/')){if(src[i]==='\n')line++;i++;}if(i>=n)throw new NexusError('Niezamknięty komentarz /* … */',start);i+=2;continue;}
       if(/[0-9]/.test(c)||(c==='.'&&/[0-9]/.test(src[i+1]||''))){let j=i;while(j<n&&/[0-9.]/.test(src[j]))j++;const t=src.slice(i,j);if((t.match(/\./g)||[]).length>1)throw new NexusError('Nieprawidłowa liczba „'+t+'”',line);push('num',parseFloat(t));i=j;continue;}
-      if(c==='"'||c==="'"){let j=i+1,s='';while(j<n&&src[j]!==c){if(src[j]==='\n')throw new NexusError('Niezamknięty tekst – brakuje '+c,line);if(src[j]==='\\'&&j+1<n){const e=src[j+1];s+=e==='n'?'\n':e==='t'?'\t':e;j+=2;continue;}s+=src[j++];}if(j>=n)throw new NexusError('Niezamknięty tekst – brakuje '+c,line);push('str',s);i=j+1;continue;}
+      if(c==='"'||c==="'"){
+        // Text may hold {expressions}: "Punkty: {pkt}". \{ writes a plain brace.
+        let j=i+1,s='';const parts=[];
+        while(j<n&&src[j]!==c){
+          if(src[j]==='\n')throw new NexusError('Niezamknięty tekst – brakuje '+c,line);
+          if(src[j]==='\\'&&j+1<n){const e=src[j+1];s+=e==='n'?'\n':e==='t'?'\t':e;j+=2;continue;}
+          if(src[j]==='{'){let k=j+1,depth=1;while(k<n&&src[k]!==c&&src[k]!=='\n'&&depth){if(src[k]==='{')depth++;else if(src[k]==='}')depth--;if(depth)k++;}
+            if(!depth&&k>j+1){parts.push(s,{code:src.slice(j+1,k),line});s='';j=k+1;continue;}}
+          s+=src[j++];
+        }
+        if(j>=n)throw new NexusError('Niezamknięty tekst – brakuje '+c,line);
+        if(parts.length){parts.push(s);push('tmpl',parts);}else push('str',s);i=j+1;continue;
+      }
       if(/[\p{L}_]/u.test(c)){let j=i;while(j<n&&/[\p{L}\p{N}_]/u.test(src[j]))j++;const w=src.slice(i,j);push(KEYWORDS.has(w)?w:'id',w);i=j;continue;}
       const two=src.slice(i,i+2);
       if(two==='&&'){push('and','and');i+=2;continue;}
       if(two==='||'){push('or','or');i+=2;continue;}
-      if(['==','!=','<=','>=','+=','-=','*=','/='].includes(two)){push('op',two);i+=2;continue;}
+      if(['==','!=','<=','>=','+=','-=','*=','/=','%=','**'].includes(two)){push('op',two);i+=2;continue;}
       if(c==='!'){push('not','not');i++;continue;}
-      if('+-*/%<>=(){}[],.;:'.includes(c)){push('op',c);i++;continue;}
+      if('+-*/%<>=(){}[],.;:?'.includes(c)){push('op',c);i++;continue;}
       throw new NexusError('Nieznany znak „'+c+'”',line);
     }
     push('eof');return out;
   }
 
-  function parse(src){
+  // mode 'expr' parses a single expression (used for {…} inside text).
+  function parse(src,mode,firstLine){
     src=String(src??'');
     if(src.length>MAX_SOURCE)throw new NexusError('Kod jest za długi (limit 20 000 znaków)',1);
-    const t=lex(src);let p=0;
+    const t=lex(src,firstLine||1);let p=0;
     const peek=(k=0)=>t[Math.min(p+k,t.length-1)];
     const next=()=>t[p++];
     const isOp=v=>peek().type==='op'&&peek().value===v;
@@ -11616,14 +11678,40 @@ when playerJoin {
       const k=peek(),line=k.line;
       switch(k.type){
         case 'var':{p++;const name=ident('zmiennej');let value=null;if(eat('='))value=expr();return{k:'var',name,value,line};}
-        case 'func':{p++;if(!top)throw new NexusError('Funkcje (func) definiuj poza innymi blokami',line);const name=ident('funkcji');if(BUILTIN_NAMES.has(name))throw new NexusError('„'+name+'” to wbudowana funkcja – wybierz inną nazwę',line);expect('(');const params=[];skipLines();if(!isOp(')')){do{skipLines();params.push(ident('parametru'));skipLines();}while(eat(','));}expect(')');return{k:'func',name,params,body:block(),line};}
+        case 'func':{
+          p++;if(isOp('('))throw new NexusError('Funkcja bez nazwy musi być wartością, np. var f = func(x) { … }',line);
+          const name=ident('funkcji');if(BUILTIN_NAMES.has(name))throw new NexusError('„'+name+'” to wbudowana funkcja – wybierz inną nazwę',line);
+          const params=paramList(),body=block();
+          // Inside blocks a named function is a local value (it sees the surrounding variables).
+          return top?{k:'func',name,params,body,line}:{k:'var',name,value:{k:'lambda',name,params,body,line},line};
+        }
         case 'return':{p++;const n=peek();const value=(n.type==='nl'||n.type==='eof'||isOp('}')||isOp(';'))?null:expr();return{k:'return',value,line};}
         case 'if':{p++;const cond=expr();const then=block();let other=null;const save=p;skipLines();if(peek().type==='else'){p++;other=peek().type==='if'?[statement(false)]:block();}else p=save;return{k:'if',cond,then,other,line};}
         case 'while':{p++;const cond=expr();return{k:'while',cond,body:block(),line};}
         case 'repeat':{p++;const count=expr();return{k:'repeat',count,body:block(),line};}
-        case 'for':{p++;const name=ident('zmiennej pętli');if(peek().type!=='in')throw new NexusError('Brakuje „in” w pętli for (np. for i in range(0, 5) { … })',line);p++;const list=expr();return{k:'for',name,list,body:block(),line};}
+        case 'for':{p++;let index=null,name=ident('zmiennej pętli');if(eat(',')){index=name;name=ident('zmiennej pętli');}if(peek().type!=='in')throw new NexusError('Brakuje „in” w pętli for (np. for i in range(0, 5) { … })',line);p++;const list=expr();return{k:'for',name,index,list,body:block(),line};}
         case 'break':p++;return{k:'break',line};
         case 'continue':p++;return{k:'continue',line};
+        case 'throw':{p++;return{k:'throw',value:expr(),line};}
+        case 'try':{
+          p++;const body=block();const save=p;skipLines();
+          if(peek().type!=='catch'){p=save;throw new NexusError('Po try { … } musi być catch { … } (np. catch błąd { … })',line);}
+          p++;const name=peek().type==='id'?next().value:null;return{k:'try',body,name,handler:block(),line};
+        }
+        case 'class':{
+          p++;if(!top)throw new NexusError('Klasy definiuj poza innymi blokami',line);
+          const name=ident('klasy');if(BUILTIN_NAMES.has(name))throw new NexusError('„'+name+'” to wbudowana funkcja – wybierz inną nazwę klasy',line);
+          let parent=null;if(peek().type==='extends'){p++;parent=ident('klasy bazowej');}
+          skipLines();expect('{','na początku klasy');const fields=[],methods=[];skipSep();
+          while(!isOp('}')){
+            const m=peek();if(m.type==='eof')throw new NexusError('Brakuje „}” zamykającego klasę '+name,m.line);
+            if(m.type==='var'){p++;const field=ident('pola');fields.push({name:field,value:eat('=')?expr():null});}
+            else if(m.type==='func'){p++;const method=ident('metody');methods.push({name:method,params:paramList(),body:block(),line:m.line});}
+            else throw new NexusError('W klasie mogą być tylko pola (var) i metody (func)',m.line);
+            endOf();skipSep();
+          }
+          p++;return{k:'class',name,parent,fields,methods,line};
+        }
         case 'when':{
           p++;if(!top)throw new NexusError('Zdarzenia (when) definiuj poza innymi blokami',line);
           const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die, shoot, hit, kill, timeup, talk, enter, exit, arrive, bump, button, message, playerJoin, playerLeave',line);
@@ -11632,7 +11720,7 @@ when playerJoin {
         case 'else':throw new NexusError('„else” bez pasującego „if”',line);
         default:{
           const target=expr();
-          if(peek().type==='op'&&['=','+=','-=','*=','/='].includes(peek().value)){
+          if(peek().type==='op'&&['=','+=','-=','*=','/=','%='].includes(peek().value)){
             const op=next().value;if(target.k!=='name'&&target.k!=='index'&&target.k!=='member')throw new NexusError('Tu nie można przypisać wartości',line);
             return{k:'assign',target,op,value:expr(),line};
           }
@@ -11641,14 +11729,17 @@ when playerJoin {
         }
       }
     }
-    function expr(){return or();}
+    function paramList(){expect('(');const params=[];skipLines();if(!isOp(')')){do{skipLines();params.push(ident('parametru'));skipLines();}while(eat(','));}expect(')');return params;}
+    // a ? b : c
+    function expr(){const c=or();if(!isOp('?'))return c;const line=next().line;skipLines();const a=expr();skipLines();expect(':','w wyrażeniu warunek ? tak : nie');skipLines();return{k:'cond',c,a,b:expr(),line};}
     function or(){let l=and();while(peek().type==='or'){const line=next().line;l={k:'or',l,r:and(),line};}return l;}
     function and(){let l=not();while(peek().type==='and'){const line=next().line;l={k:'and',l,r:not(),line};}return l;}
     function not(){if(peek().type==='not'){const line=next().line;return{k:'not',e:not(),line};}return cmp();}
     function cmp(){let l=add();while(peek().type==='op'&&['==','!=','<','>','<=','>='].includes(peek().value)){const k=next();l={k:'bin',op:k.value,l,r:add(),line:k.line};}return l;}
     function add(){let l=mul();while(isOp('+')||isOp('-')){const k=next();l={k:'bin',op:k.value,l,r:mul(),line:k.line};}return l;}
     function mul(){let l=unary();while(isOp('*')||isOp('/')||isOp('%')){const k=next();l={k:'bin',op:k.value,l,r:unary(),line:k.line};}return l;}
-    function unary(){if(isOp('-')){const line=next().line;return{k:'neg',e:unary(),line};}return postfix();}
+    function unary(){if(isOp('-')){const line=next().line;return{k:'neg',e:unary(),line};}return power();}
+    function power(){const b=postfix();if(isOp('**')){const line=next().line;return{k:'bin',op:'**',l:b,r:unary(),line};}return b;}
     function postfix(){
       let e=primary();
       for(;;){
@@ -11666,6 +11757,15 @@ when playerJoin {
         case 'false':return{k:'lit',v:false,line:k.line};
         case 'null':return{k:'lit',v:null,line:k.line};
         case 'id':return{k:'name',name:k.value,line:k.line};
+        case 'this':return{k:'this',line:k.line};
+        case 'super':return{k:'super',line:k.line};
+        case 'func':return{k:'lambda',name:null,params:paramList(),body:block(),line:k.line};
+        case 'new':{const name=ident('klasy po new');if(!isOp('('))throw new NexusError('Po new '+name+' dodaj nawiasy, np. new '+name+'()',k.line);return{k:'name',name,line:k.line,isNew:true};}
+        case 'tmpl':{
+          // Each {…} is parsed as an expression; something that is not one stays plain text.
+          const parts=k.value.map(x=>{if(typeof x==='string')return x;try{return parse(x.code,'expr',x.line);}catch{return '{'+x.code+'}';}});
+          return parts.every(x=>typeof x==='string')?{k:'lit',v:parts.join(''),line:k.line}:{k:'tmpl',parts,line:k.line};
+        }
         case 'op':
           if(k.value==='('){skipLines();const e=expr();skipLines();expect(')');return e;}
           if(k.value==='{'){
@@ -11679,6 +11779,7 @@ when playerJoin {
       }
       throw new NexusError('Nieoczekiwane: '+desc(k),k.line);
     }
+    if(mode==='expr'){skipLines();const e=expr();skipLines();if(peek().type!=='eof')throw new NexusError('To nie jest jedno wyrażenie',peek().line);return e;}
     const body=[];skipSep();
     while(peek().type!=='eof'){body.push(statement(true));endOf();skipSep();}
     return body;
@@ -11695,8 +11796,18 @@ when playerJoin {
   // Dictionaries keep string keys in a Map, so keys like "constructor" are ordinary data.
   class Dict{constructor(){this.map=new Map();}}
   class Return{constructor(value){this.value=value;}}
+  // NexusScript 2.0 values: functions (named, lambdas, methods), classes and their objects.
+  class Fn{constructor(name,params,body,scope,cls){this.name=name;this.params=params;this.body=body;this.scope=scope;this.cls=cls||null;}}
+  class ClassDef{constructor(name,parentName,fields){this.name=name;this.parentName=parentName;this.parent=null;this.fields=fields;this.methods=new Map();}}
+  class Obj extends Dict{constructor(cls){super();this.cls=cls;}}
+  class Bound{constructor(fn,self){this.fn=fn;this.self=self;}}
+  class BuiltinRef{constructor(name,self){this.name=name;this.self=self;}}
+  class SuperRef{constructor(cls,self){this.cls=cls;this.self=self;}}
+  class Throw{constructor(value,line){this.value=value;this.line=line;}}
+  const HIGHER_ORDER=new Set(['map','filter','find','reduce','forEach','sortBy','any','all']);
   const BREAK={b:1},CONTINUE={c:1},SLICED={s:1},PLAYER=Object.freeze({__player:true});
-  const typeName=v=>v===null||v===undefined?'null':Array.isArray(v)?'lista':v instanceof Dict?'słownik':v===PLAYER?'player':typeof v==='number'?'liczba':typeof v==='string'?'tekst':typeof v==='boolean'?'prawda/fałsz':'wartość';
+  const isCallable=v=>v instanceof Fn||v instanceof Bound||v instanceof BuiltinRef||v instanceof ClassDef;
+  const typeName=v=>v===null||v===undefined?'null':Array.isArray(v)?'lista':v instanceof Obj?v.cls.name:v instanceof Dict?'słownik':v===PLAYER?'player':typeof v==='number'?'liczba':typeof v==='string'?'tekst':typeof v==='boolean'?'prawda/fałsz':v instanceof ClassDef?'klasa':isCallable(v)?'funkcja':'wartość';
   const truthy=v=>!(v===false||v===null||v===undefined||v===0||v==='');
   function show(v){
     if(v===null||v===undefined)return 'null';
@@ -11704,6 +11815,11 @@ when playerJoin {
     if(typeof v==='boolean')return v?'true':'false';
     if(Array.isArray(v))return '['+v.slice(0,50).map(show).join(', ')+(v.length>50?', …':'')+']';
     if(v===PLAYER)return 'player';
+    if(v instanceof Fn)return '<funkcja '+(v.name||'bez nazwy')+'>';
+    if(v instanceof Bound)return '<metoda '+(v.fn.name||'')+'>';
+    if(v instanceof BuiltinRef)return '<funkcja '+v.name+'>';
+    if(v instanceof ClassDef)return '<klasa '+v.name+'>';
+    if(v instanceof Obj)return v.cls.name+'{'+[...v.map].slice(0,30).map(([k,x])=>k+': '+show(x)).join(', ')+'}';
     if(v instanceof Dict)return '{'+[...v.map].slice(0,30).map(([k,x])=>k+': '+show(x)).join(', ')+(v.map.size>30?', …':'')+'}';
     return String(v);
   }
@@ -11715,16 +11831,28 @@ when playerJoin {
   const MATERIALS=['plastic','metal','gold','wood','stone','grass','sand','neon','glass','ice'];
   // Values travelling between players and saves: numbers, text, true/false, null, lists and dictionaries.
   const fromJSON=v=>{if(Array.isArray(v))return v.map(fromJSON);if(v&&typeof v==='object'){const d=new Dict();for(const [k,x] of v.__d||[])d.map.set(k,fromJSON(x));return d;}return v;};
-  const BUILTIN_NAMES=new Set(['send','playerCount','players','isOnline','shadows','material','glow','light','lightOff','skyGradient','camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
+  const BUILTIN_NAMES=new Set(['map','filter','find','reduce','forEach','sortBy','any','all','typeOf','atan2','pow','clamp','lerp','sign','tan','send','playerCount','players','isOnline','shadows','material','glow','light','lightOff','skyGradient','camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
 
   class Runtime{
     constructor(source,api,options={}){
       this.api=api;this.options=options;this.errors=[];this.threads=[];this.funcs=new Map();this.handlers=[];this.time=0;this.depth=0;this.budget=0;this.frameSteps=0;
-      this.globals=new Scope(null);this.globals.vars.set('player',PLAYER);
+      this.globals=new Scope(null);this.globals.vars.set('player',PLAYER);this.globals.vars.set('PI',Math.PI);this.classes=new Map();this.classLines=new Map();
       this.ast=parse(source);
       for(const s of this.ast){
         if(s.k==='func'){if(this.funcs.has(s.name))throw new NexusError('Funkcja „'+s.name+'” jest zdefiniowana dwa razy',s.line);this.funcs.set(s.name,s);}
         if(s.k==='when')this.handlers.push({event:s.event,argNode:s.arg,body:s.body,line:s.line,arg:undefined,next:0,running:0});
+        if(s.k==='class'){
+          if(this.classes.has(s.name)||this.funcs.has(s.name))throw new NexusError('Nazwa „'+s.name+'” jest użyta dwa razy',s.line);
+          const def=new ClassDef(s.name,s.parent,s.fields);
+          for(const m of s.methods){if(def.methods.has(m.name))throw new NexusError('Metoda „'+m.name+'” jest dwa razy w klasie '+s.name,m.line);def.methods.set(m.name,new Fn(m.name,m.params,m.body,this.globals,def));}
+          this.classes.set(s.name,def);this.classLines.set(s.name,s.line);
+        }
+      }
+      for(const def of this.classes.values()){
+        if(!def.parentName)continue;
+        def.parent=this.classes.get(def.parentName)||null;
+        if(!def.parent)throw new NexusError('Nieznana klasa bazowa „'+def.parentName+'”',this.classLines.get(def.name));
+        let c=def.parent,hops=0;while(c){if(c===def||++hops>50)throw new NexusError('Klasa '+def.name+' dziedziczy sama po sobie',this.classLines.get(def.name));c=c.parent;}
       }
       this.builtins=this.makeBuiltins();
     }
@@ -11733,7 +11861,7 @@ when playerJoin {
       try{this.options.onError?.(e);}catch{}
     }
     start(){
-      this.spawn(this.execBlock(this.ast.filter(s=>s.k!=='func'&&s.k!=='when'),this.globals),'program');
+      this.spawn(this.execBlock(this.ast.filter(s=>s.k!=='func'&&s.k!=='when'&&s.k!=='class'),this.globals),'program');
       this.started=false;
     }
     spawn(gen,label,handler){
@@ -11790,6 +11918,7 @@ when playerJoin {
           if(e instanceof Return){}
           else if(e===BREAK||e===CONTINUE)this.error((e===BREAK?'break':'continue')+' poza pętlą',this.line);
           else if(e instanceof NexusError)this.error(e.message,e.line||this.line);
+          else if(e instanceof Throw)this.error('Nieobsłużony błąd (throw): '+show(e.value),e.line||this.line);
           else{this.error('Błąd wykonania: '+(e&&e.message||e),this.line);}
         }
         if(r.done){this.threads.splice(this.threads.indexOf(th),1);if(th.handler)th.handler.running--;}
@@ -11805,12 +11934,20 @@ when playerJoin {
       yield* this.tickStep(s.line);
       switch(s.k){
         case 'var':{const v=s.value?yield* this.eval(s.value,scope):null;scope.vars.set(s.name,v);return;}
-        case 'func':case 'when':return;
+        case 'func':case 'when':case 'class':return;
+        case 'throw':throw new Throw(yield* this.eval(s.value,scope),s.line);
+        case 'try':
+          try{yield* this.execBlock(s.body,new Scope(scope));}
+          catch(x){
+            let value;if(x instanceof Throw)value=x.value;else if(x instanceof NexusError)value=x.message;else throw x;
+            const inner=new Scope(scope);if(s.name)inner.vars.set(s.name,value);yield* this.execBlock(s.handler,inner);
+          }
+          return;
         case 'expr':yield* this.eval(s.expr,scope);return;
         case 'assign':{
           let v=yield* this.eval(s.value,scope);
           if(s.target.k==='name'){
-            const name=s.target.name;if(name==='player')throw new NexusError('Nie można nadpisać „player”',s.line);
+            const name=s.target.name;if(name==='player'||name==='this')throw new NexusError('Nie można nadpisać „'+name+'”',s.line);
             const owner=scope.find(name);
             if(s.op!=='='){if(!owner)throw new NexusError('Nieznana zmienna „'+name+'”',s.line);v=this.arith(s.op[0],owner.vars.get(name),v,s.line);}
             // Assigning an unknown name creates it in the nearest function or global scope.
@@ -11849,10 +11986,13 @@ when playerJoin {
         case 'for':{
           let list=yield* this.eval(s.list,scope);
           if(typeof list==='string')list=[...list];
-          if(list instanceof Dict)list=[...list.map.keys()];
+          // for k, v in słownik → klucz i wartość; for i, x in lista → indeks i element.
+          const dict=list instanceof Dict?list:null;
+          if(dict)list=[...dict.map.keys()];
           if(!Array.isArray(list))throw new NexusError('for … in wymaga listy, słownika lub range(…)',s.line);
-          for(const item of list.slice()){
-            const inner=new Scope(scope);inner.vars.set(s.name,item);
+          for(const [n,item] of list.slice().entries()){
+            const inner=new Scope(scope);
+            if(s.index){inner.vars.set(s.index,dict?item:n);inner.vars.set(s.name,dict?dict.map.get(item)??null:item);}else inner.vars.set(s.name,item);
             try{yield* this.execBlock(s.body,inner);}catch(e){if(e===BREAK)break;if(e===CONTINUE)continue;throw e;}
             yield* this.tickStep(s.line);
           }
@@ -11877,6 +12017,7 @@ when playerJoin {
       switch(op){
         case '+':return l+r;case '-':return l-r;case '*':return l*r;
         case '/':if(r===0)throw new NexusError('Dzielenie przez zero',line);return l/r;
+        case '**':{const v=l**r;if(!isFinite(v))throw new NexusError('Wynik potęgowania jest za duży',line);return v;}
         case '%':if(r===0)throw new NexusError('Dzielenie przez zero',line);return ((l%r)+r)%r;
       }
     }
@@ -11885,7 +12026,23 @@ when playerJoin {
         case 'lit':return e.v;
         case 'list':{const out=[];for(const it of e.items)out.push(yield* this.eval(it,scope));return out;}
         case 'dict':{const d=new Dict();for(const [key,node] of e.entries)d.map.set(key,yield* this.eval(node,scope));return d;}
-        case 'name':{const owner=scope.find(e.name);if(!owner){if(this.funcs.has(e.name)||BUILTIN_NAMES.has(e.name))throw new NexusError('„'+e.name+'” to funkcja – dodaj nawiasy ( )',e.line);throw new NexusError('Nieznana zmienna „'+e.name+'”',e.line);}return owner.vars.get(e.name);}
+        case 'name':{
+          const owner=scope.find(e.name);if(owner)return owner.vars.get(e.name);
+          // Functions and classes are values too: map(lista, podwój), var Klasa = Wrog.
+          if(this.funcs.has(e.name)){const f=this.funcs.get(e.name);return new Fn(f.name,f.params,f.body,this.globals);}
+          if(this.classes.has(e.name))return this.classes.get(e.name);
+          if(BUILTIN_NAMES.has(e.name))return new BuiltinRef(e.name);
+          throw new NexusError('Nieznana zmienna „'+e.name+'”',e.line);
+        }
+        case 'this':{const owner=scope.find('this');if(!owner)throw new NexusError('„this” działa tylko w metodach klasy',e.line);return owner.vars.get('this');}
+        case 'super':{
+          let sc=scope;while(sc&&!sc.cls)sc=sc.parent;
+          if(!sc||!sc.cls.parent)throw new NexusError('„super” działa tylko w metodach klasy, która dziedziczy (extends)',e.line);
+          return new SuperRef(sc.cls.parent,scope.find('this').vars.get('this'));
+        }
+        case 'lambda':return new Fn(e.name,e.params,e.body,scope);
+        case 'cond':return truthy(yield* this.eval(e.c,scope))?yield* this.eval(e.a,scope):yield* this.eval(e.b,scope);
+        case 'tmpl':{let out='';for(const x of e.parts)out+=typeof x==='string'?x:show(yield* this.eval(x,scope));if(out.length>MAX_TEXT)throw new NexusError('Tekst jest za długi',e.line);return out;}
         case 'or':{const l=yield* this.eval(e.l,scope);return truthy(l)?true:truthy(yield* this.eval(e.r,scope));}
         case 'and':{const l=yield* this.eval(e.l,scope);return truthy(l)?truthy(yield* this.eval(e.r,scope)):false;}
         case 'not':return !truthy(yield* this.eval(e.e,scope));
@@ -11911,33 +12068,88 @@ when playerJoin {
         case 'member':{
           const obj=yield* this.eval(e.obj,scope);
           if(obj===PLAYER){if(!PLAYER_FIELDS.includes(e.name))throw new NexusError('player ma pola: '+PLAYER_FIELDS.join(', '),e.line);return this.api.playerGet(e.name);}
-          if(obj instanceof Dict)return obj.map.get(e.name)??null;
-          throw new NexusError('Kropka działa z player (np. player.x) i ze słownikami (np. d.hp)',e.line);
+          if(obj instanceof SuperRef){const m=this.method(obj.cls,e.name);if(!m)throw new NexusError('Klasa '+obj.cls.name+' nie ma metody „'+e.name+'”',e.line);return new Bound(m,obj.self);}
+          if(obj instanceof Dict){
+            if(obj.map.has(e.name))return obj.map.get(e.name);
+            if(obj instanceof Obj){const m=this.method(obj.cls,e.name);if(m)return new Bound(m,obj);}
+            return BUILTIN_NAMES.has(e.name)?new BuiltinRef(e.name,obj):null;
+          }
+          // Methods on lists, text and numbers: lista.push(3), "ala".upper(), x.round().
+          if(BUILTIN_NAMES.has(e.name)&&obj!==null&&obj!==undefined&&!isCallable(obj))return new BuiltinRef(e.name,obj);
+          throw new NexusError(typeName(obj)+' nie ma pola ani metody „'+e.name+'”',e.line);
         }
         case 'call':{
-          if(e.callee.k!=='name')throw new NexusError('Można wywoływać tylko funkcje po nazwie',e.line);
-          const name=e.callee.name,args=[];
-          for(const a of e.args)args.push(yield* this.eval(a,scope));
-          if(this.funcs.has(name)){
-            const f=this.funcs.get(name);
-            if(this.depth>=MAX_DEPTH)throw new NexusError('Za głęboka rekurencja w „'+name+'”',e.line);
-            const inner=new Scope(this.globals);inner.fn=true;f.params.forEach((pn,i)=>inner.vars.set(pn,args[i]??null));
-            this.depth++;
-            try{yield* this.execBlock(f.body,inner);}
-            catch(x){if(x instanceof Return)return x.value;if(x===BREAK||x===CONTINUE)throw new NexusError((x===BREAK?'break':'continue')+' poza pętlą',e.line);throw x;}
-            finally{this.depth--;}
-            return null;
-          }
-          const fn=this.builtins[name];
-          if(!fn)throw new NexusError('Nieznana funkcja „'+name+'”',e.line);
-          this.line=e.line;
-          const result=fn(args,e.line);
-          if(result instanceof Wait){if(result.seconds>0)yield result;return null;}
-          if(result instanceof Await){while(!result.done)yield new Wait(0);return result.value;}
-          return result===undefined?null:result;
+          let callee=null;
+          if(e.callee.k==='name'){
+            const name=e.callee.name,owner=scope.find(name);
+            if(owner&&!e.callee.isNew)callee=owner.vars.get(name);
+            else if(this.classes.has(name))callee=this.classes.get(name);
+            else if(e.callee.isNew)throw new NexusError('Nieznana klasa „'+name+'”',e.line);
+            else if(this.funcs.has(name)){const f=this.funcs.get(name);callee=new Fn(f.name,f.params,f.body,this.globals);}
+            else if(BUILTIN_NAMES.has(name))callee=new BuiltinRef(name);
+            else throw new NexusError('Nieznana funkcja „'+name+'”',e.line);
+          }else callee=yield* this.eval(e.callee,scope);
+          const args=[];for(const a of e.args)args.push(yield* this.eval(a,scope));
+          return yield* this.callValue(callee,args,e.line);
         }
       }
       throw new NexusError('Nieznane wyrażenie',e.line);
+    }
+    method(cls,name){for(let c=cls;c;c=c.parent)if(c.methods.has(name))return c.methods.get(name);return null;}
+    *callValue(f,args,line){
+      if(f instanceof Fn)return yield* this.invoke(f,args,line);
+      if(f instanceof Bound)return yield* this.invoke(f.fn,args,line,f.self);
+      if(f instanceof ClassDef)return yield* this.construct(f,args,line);
+      if(f instanceof BuiltinRef)return yield* this.callBuiltin(f.name,f.self===undefined?args:[f.self,...args],line);
+      throw new NexusError('Tego nie można wywołać – to '+typeName(f),line);
+    }
+    *invoke(f,args,line,self){
+      if(this.depth>=MAX_DEPTH)throw new NexusError('Za głęboka rekurencja w „'+(f.name||'funkcji')+'”',line);
+      const inner=new Scope(f.scope);inner.fn=true;f.params.forEach((pn,i)=>inner.vars.set(pn,args[i]??null));
+      if(self!==undefined){inner.vars.set('this',self);inner.cls=f.cls;}
+      this.depth++;
+      try{yield* this.execBlock(f.body,inner);}
+      catch(x){if(x instanceof Return)return x.value;if(x===BREAK||x===CONTINUE)throw new NexusError((x===BREAK?'break':'continue')+' poza pętlą',line);throw x;}
+      finally{this.depth--;}
+      return null;
+    }
+    // new Klasa(…) or Klasa(…): fields from the base class down, then init(…).
+    *construct(cls,args,line){
+      if((this.objects=(this.objects||0)+1)>200000)throw new NexusError('Za dużo utworzonych obiektów',line);
+      const o=new Obj(cls),chain=[];for(let c=cls;c;c=c.parent)chain.unshift(c);
+      for(const c of chain)for(const f of c.fields){const sc=new Scope(this.globals);sc.vars.set('this',o);o.map.set(f.name,f.value?yield* this.eval(f.value,sc):null);}
+      const init=this.method(cls,'init');if(init)yield* this.invoke(init,args,line,o);
+      return o;
+    }
+    *callBuiltin(name,args,line){
+      if(HIGHER_ORDER.has(name))return yield* this.higherOrder(name,args,line);
+      const fn=this.builtins[name];if(!fn)throw new NexusError('Nieznana funkcja „'+name+'”',line);
+      this.line=line;
+      const result=fn(args,line);
+      if(result instanceof Wait){if(result.seconds>0)yield result;return null;}
+      if(result instanceof Await){while(!result.done)yield new Wait(0);return result.value;}
+      return result===undefined?null:result;
+    }
+    // map / filter / find / reduce / forEach / sortBy / any / all take a function (they may also wait()).
+    *higherOrder(name,args,line){
+      const list=args[0],f=args[1];
+      if(!Array.isArray(list))throw new NexusError(name+': pierwszy argument musi być listą',line);
+      if(!isCallable(f))throw new NexusError(name+': drugi argument musi być funkcją, np. func(x) { return x * 2 }',line);
+      const items=list.slice();
+      if(name==='reduce'){let acc=args[2]??null;for(const [i,x] of items.entries())acc=yield* this.callValue(f,[acc,x,i],line);return acc;}
+      if(name==='sortBy'){const keys=[];for(const [i,x] of items.entries())keys.push([yield* this.callValue(f,[x,i],line),x]);
+        if(!keys.every(k=>typeof k[0]==='number')&&!keys.every(k=>typeof k[0]==='string'))throw new NexusError('sortBy: funkcja musi zwracać same liczby albo same teksty',line);
+        return keys.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0).map(k=>k[1]);}
+      const out=[];
+      for(const [i,x] of items.entries()){
+        const v=yield* this.callValue(f,[x,i],line);
+        if(name==='map')out.push(v);
+        else if(name==='filter'){if(truthy(v))out.push(x);}
+        else if(name==='find'){if(truthy(v))return x;}
+        else if(name==='any'){if(truthy(v))return true;}
+        else if(name==='all'){if(!truthy(v))return false;}
+      }
+      return name==='map'||name==='filter'?out:name==='all'?true:name==='any'?false:null;
     }
     makeBuiltins(){
       const api=this.api,rt=this;
@@ -12028,6 +12240,14 @@ when playerJoin {
         keys:a=>{if(!(a[0] instanceof Dict))throw new NexusError('keys: wymaga słownika',rt.line);return [...a[0].map.keys()];},
         hasKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('hasKey: wymaga słownika',rt.line);return a[0].map.has(show(a[1]));},
         removeKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('removeKey: wymaga słownika',rt.line);return a[0].map.delete(show(a[1]));},
+        // NexusScript 2.0: types and more maths (map/filter/… are handled by the interpreter itself)
+        typeOf:a=>typeName(a[0]),
+        atan2:a=>Math.atan2(num(a[0],'atan2',0),num(a[1],'atan2',1)),
+        pow:a=>{const v=num(a[0],'pow',0)**num(a[1],'pow',1);if(!isFinite(v))throw new NexusError('pow: wynik jest za duży',rt.line);return v;},
+        clamp:a=>Math.max(num(a[1],'clamp',1),Math.min(num(a[2],'clamp',2),num(a[0],'clamp',0))),
+        lerp:a=>{const x=num(a[0],'lerp',0);return x+(num(a[1],'lerp',1)-x)*num(a[2],'lerp',2);},
+        sign:a=>Math.sign(num(a[0],'sign',0)),
+        tan:a=>Math.tan(num(a[0],'tan',0)),
         // Online play: script messages to every player in the room (NexusScript 1.5)
         send:a=>{const n=str(a[0],'send',0).trim().slice(0,24);if(!n)throw new NexusError('send: podaj nazwę wiadomości, np. send("punkt", 1)',rt.line);
           const v=toSaved(a[1]??null,'send');if(JSON.stringify(v).length>600)throw new NexusError('send: wiadomość jest za duża (najwyżej ok. 600 znaków)',rt.line);api.netSend(n,v);},
@@ -12092,7 +12312,7 @@ when playerJoin {
     const s=String(text||'');const m=s.match(/```[a-zA-Z]*[ \t]*\r?\n([\s\S]*?)```/);
     return (m?m[1]:s).replace(/\r\n/g,'\n').trim()+'\n';
   }
-  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,EVENTS,KEYWORDS,Dict,CAMERA_MODES,MATERIALS,version:'1.5'};
+  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,EVENTS,KEYWORDS,Dict,CAMERA_MODES,MATERIALS,version:'2.0'};
 })();
 </script>
 <style id="nexus-engine-style">

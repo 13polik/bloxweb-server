@@ -1,4 +1,4 @@
-# NexusScript 1.5 – ściąga dla AI (gry 3D BloxWeb)
+# NexusScript 2.0 – ściąga dla AI (gry 3D BloxWeb)
 
 Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. To nie jest JavaScript ani Lua.
 
@@ -8,6 +8,12 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - Operatory `+ - * / %`, `== != < > <= >=`, `and or not`. Tekst + liczba = tekst.
 - `if a > 1 { } else if a == 1 { } else { }`, `while w { }`, `repeat 5 { }`, `for i in range(0, 10) { }`, `for el in lista { }`, `break`, `continue`.
 - `func nazwa(a, b) { return a + b }` (definiuj poza blokami). `return null` kończy zdarzenie.
+
+## Programowanie (2.0)
+- Tekst ze zmiennymi `"Punkty: {pkt}"`, warunek `a > 1 ? "tak" : "nie"`, potęga `2 ** 3`, `for i, x in lista { }`, `for k, v in słownik { }`.
+- Funkcje jako wartości: `var f = func(x) { return x * 2 }`, domknięcia. `map(l, f)`, `filter(l, f)`, `find(l, f)`, `reduce(l, f, start)`, `forEach(l, f)`, `sortBy(l, f)`, `any(l, f)`, `all(l, f)`; też `l.push(1)`, `t.upper()`.
+- Klasy: `class Wróg { var hp = 100  func init(n) { this.n = n }  func trafiony(d) { this.hp -= d } }`, `class Boss extends Wróg { … super.init(n) … }`, `var w = new Wróg("A")`, `w.trafiony(5)`. `typeOf(x)`.
+- `try { } catch e { }`, `throw "opis"`. Matematyka: `PI`, `pow`, `atan2`, `tan`, `sign`, `clamp(x, min, max)`, `lerp(a, b, t)`.
 
 ## Świat
 - Oś Y w górę, Y=0 grunt. Pozycja klocka = środek. Gracz ma 3,4 wysokości, skacze 2,5 w górę i ok. 6 w dal.
