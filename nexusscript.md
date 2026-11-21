@@ -1,4 +1,4 @@
-# NexusScript 2.2 – język gier 3D w BloxWeb Studio
+# NexusScript 2.3 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -163,6 +163,14 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - **Boty Battle Royale:** `enemyMode(w, "royale")` – idą do bezpiecznej strefy, walczą, gdy zobaczą gracza, a ostrzelane stawiają ścianę.
 - **Kill feed:** `feed("Wyeliminowałeś Bot3", "#facc15")` – komunikaty w prawym górnym rogu.
 - Gotowa gra: poproś asystenta o „grę jak Fortnite” – dostaniesz autobus bojowy, lotnię, łup z rzadkościami, budowanie, zbieranie materiałów, tarcze, burzę i 15 botów.
+
+## Skiny (NexusScript 2.3)
+- **Strój gracza:** `setSkin({torso: "#9ca3af", arms: "#6b7280", legs: "#374151", hat: "valkyrie", back: "swordpack", shirt: "knight_armor", pants: "knight_greaves", face: "cool"})` – zakłada skin na własny awatar gracza (podane części zastępują jego). `head`, `torso`, `arms`, `legs` to kolory `"#rrggbb"`; `hat`, `back`, `face`, `shirt`, `pants` to przedmioty z katalogu awatarów (np. czapki: `crown`, `valkyrie`, `ninja_mask`, `halo`, `cowboy`; plecy: `swordpack`, `jetpack`, `angel_wings`, `demon_wings`, `butterfly_wings`; koszulki: `knight_armor`, `ninja`, `king_robe`, `galaxy`, `tuxedo`, `skeleton`; spodnie: `knight_greaves`, `camo`, `neon`, `lava_pants`; twarze: `cool`, `angry`, `robot`, `anime`). Zła nazwa pokazuje listę dostępnych. `resetSkin()` wraca do własnego awatara.
+- **Wzory broni i lotni:** `weaponSkin("gold" | "neon" | "camo" | "galaxy" | "lava" | "ice" | "candy")` albo kolor `"#rrggbb"`; `gliderSkin(…)` tak samo. `weaponSkin(null)` zdejmuje wzór.
+- **Skiny botów i NPC:** `setPartSkin(nazwa, {hat: "ninja_mask", shirt: "ninja"})`.
+- **Szafka:** `var wybór = locker("Szafka", ["Rycerz", ["Ninja", "#111827"]])` – okno wyboru (do 12 pozycji, opcjonalnie z kolorem); zwraca nazwę albo `null`.
+- **Online:** inni gracze w pokoju widzą Twój skin.
+- Odblokowywanie skinów robi skrypt, np. `save("staty", staty)` / `load(...)` i warunki (eliminacje, wygrane, zakup w `shop`). Gotowy przykład ma gra „jak Fortnite” z asystenta (szafka: K).
 
 ## Gra online (multiplayer)
 Każdą opublikowaną grę można uruchomić przyciskiem **Graj online**. Powstaje pokój z kodem, do którego dołączają znajomi (do 6 osób). Gracze widzą się nawzajem (postacie z nickami), mają czat (Enter lub przycisk Czat), a skrypt działa u każdego gracza osobno. Skrypty porozumiewają się wiadomościami:
@@ -477,7 +485,7 @@ when playerJoin {
 ```
 
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Battle Royale = `buildMode` + `materials` + `setHarvest`, `useMagazines`, `giveWeapon(broń, rzadkość)`, `setShield`, `channel`, `storm`/`stormNext`/`stormShrink`, `glide`, `hotbar`, boty `"royale"`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Battle Royale = `buildMode` + `materials` + `setHarvest`, `useMagazines`, `giveWeapon(broń, rzadkość)`, `setShield`, `channel`, `storm`/`stormNext`/`stormShrink`, `glide`, `hotbar`, boty `"royale"`, skiny `setSkin` / `weaponSkin` / `locker`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).

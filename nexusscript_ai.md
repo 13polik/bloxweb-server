@@ -1,4 +1,4 @@
-# NexusScript 2.2 – ściąga dla AI (gry 3D BloxWeb)
+# NexusScript 2.3 – ściąga dla AI (gry 3D BloxWeb)
 
 Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. To nie jest JavaScript ani Lua.
 
@@ -57,6 +57,10 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - `sprint(true)` (Shift), `fallDamage(true)`. `channel("Bandaż", 3.5)` zwraca true po czasie albo false gdy przerwane.
 - `buildMode("wall"|"floor"|"ramp"|"roof", "wood")`, `buildMode(null)`, `when build`; `materials(d, k, m)`, `addMaterial("wood", n)`, `getMaterial("wood")`, `setHarvest(n, "wood", 12)`.
 - `editWall(n, "door"|"window"|"none")`, `aimedPart()`, `stormNext(x, z, r)`, `feed("tekst", "#kolor")`, `enemyMode(w, "royale")`.
+
+## Skiny (2.3)
+- `setSkin({torso: "#9ca3af", arms: "#6b7280", legs: "#374151", hat: "crown", back: "angel_wings", shirt: "king_robe", pants: "suit_pants", face: "cool"})`, `resetSkin()`; kolory head/torso/arms/legs, przedmioty hat/back/face/shirt/pants z katalogu.
+- `weaponSkin("gold"|"neon"|"camo"|"galaxy"|"lava"|"ice"|"candy"|"#rrggbb")`, `gliderSkin(…)`, `setPartSkin(n, {…})` dla botów i NPC, `var w = locker("Szafka", ["Rycerz", "Ninja"])`.
 
 ## Online i grafika
 - Gra online (przycisk Graj online, do 6 graczy): `send("nazwa", wartość)` do wszystkich (też do siebie), `when message "nazwa" { }` ze zmiennymi `value` i `sender`, `when playerJoin` / `when playerLeave` (`target` = nick), `playerCount()`, `players()`, `isOnline()`, `player.name`.
