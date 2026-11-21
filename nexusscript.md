@@ -1,4 +1,4 @@
-# NexusScript 1.5 – język gier 3D w BloxWeb Studio
+# NexusScript 2.1 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -7,7 +7,7 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - Gracz ma ok. 3,4 jednostki wzrostu i skacze na ok. 2,5 jednostki w górę. Skok w dal to ok. 6–7 jednostek.
 - Pozycja klocka to jego środek. `spawn("block", 0, 0, 0, 4, 1, 4)` tworzy płytę 4×1×4, której górna powierzchnia jest na Y=0,5.
 - Pod światem nie ma podłogi: kto spadnie poniżej najniższego klocka o 30 jednostek, traci życie i wraca do ostatniego checkpointu.
-- Limit: 1500 klocków w grze.
+- Limit: 3000 klocków w grze. Kod może mieć do 500 000 znaków.
 
 ## Typy klocków
 - `"block"` – zwykły klocek, można po nim chodzić.
@@ -23,6 +23,7 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - `"health"` – apteczka (+35 zdrowia po dotknięciu).
 - `"car"` – samochód (2.4 × 1.4 × 4.4). Gracz wsiada i wysiada klawiszem E / AKCJA, jedzie W/S (gaz, hamulec, wsteczny) i A/D (skręt), spacja to ręczny hamulec. Rozjeżdża wrogów.
 - `"ball"` – piłka z fizyką (np. `spawn("ball", 0, 0.6, 0, 1.2, 1.2, 1.2, "#ffffff", "Pilka")`): toczy się, odbija, gracz kopie ją, wbiegając w nią, auta ją odbijają.
+- `"ramp"` – rampa (pochylnia), po której można wejść; wznosi się w stronę obrotu (`rotate(nazwa, 0 | 90 | 180 | 270)`, 0 = w stronę +Z).
 - `"zone"` – przezroczysta strefa, przez którą wszystko przechodzi (bramka, meta wyścigu, obszar misji). Działa z `when touch` (gracz) i `when bump` (piłka).
 - `"npc"` – postać do rozmowy (np. `spawn("npc", 4, 1, 6, 1.5, 3, 1.5, "#3b82f6", "Ola")`). Gracz rozmawia klawiszem E lub przyciskiem AKCJA.
 
@@ -37,6 +38,55 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - Pętle: `while warunek { ... }`, `repeat 5 { ... }`, `for i in range(0, 10) { ... }`, `for el in lista { ... }`, `break`, `continue`.
 - Funkcje: `func nazwa(a, b) { return a + b }`. Wywołanie: `nazwa(1, 2)`.
 - Klamry `{ }` są obowiązkowe. Nie ma średników na końcu bloków ani słowa `end`.
+- Tekst ze zmiennymi: `"Punkty: {pkt}, życie: {player.hp}"` (w nawiasach dowolne wyrażenie; `\{` to zwykła klamra; tekst w środku pisz w cudzysłowie innego rodzaju, np. `"Nick: {upper('ala')}"`).
+- Warunek w jednej linii: `var opis = hp > 50 ? "zdrowy" : "ranny"`. Potęga: `2 ** 8`. Reszta z dzielenia z przypisaniem: `x %= 10`.
+- `for i, x in lista { }` daje indeks i element, `for klucz, wartość in słownik { }` – klucz i wartość.
+
+## Programowanie zaawansowane (NexusScript 2.0)
+**Funkcje jako wartości.** Funkcję można zapisać w zmiennej, przekazać i zwrócić:
+```
+var podwój = func(x) { return x * 2 }
+print(podwój(4))                      // 8
+func licznik() {
+  var n = 0
+  return func() {                     // domknięcie: pamięta swoje n
+    n += 1
+    return n
+  }
+}
+```
+Funkcje zdefiniowane wewnątrz bloku (`func pomocnik() { }` w `when` lub w innej funkcji) są lokalne.
+
+**Listy z funkcjami:** `map(lista, f)`, `filter(lista, f)`, `find(lista, f)` (pierwszy pasujący albo `null`), `reduce(lista, f, start)`, `forEach(lista, f)`, `sortBy(lista, f)` (sortuje po wyniku f), `any(lista, f)`, `all(lista, f)`. Funkcja dostaje element i jego indeks.
+
+**Metody na wartościach:** zamiast `push(lista, 3)` można pisać `lista.push(3)`; tak samo `tekst.upper()`, `lista.filter(func(x) { return x > 2 })`, `d.keys()`.
+
+**Klasy i obiekty:**
+```
+class Wróg {
+  var hp = 100
+  func init(nazwa) {
+    this.nazwa = nazwa
+  }
+  func trafiony(ile) {
+    this.hp -= ile
+  }
+}
+class Boss extends Wróg {
+  func init(nazwa) {
+    super.init(nazwa)
+    this.hp = 500
+  }
+}
+var b = new Boss("Smok")              // albo Boss("Smok")
+b.trafiony(50)
+print("{b.nazwa}: {b.hp}")            // Smok: 450
+```
+Pola (`var`) dostaje każdy nowy obiekt, `init` uruchamia się przy tworzeniu, `this` to bieżący obiekt, `super.metoda()` woła wersję z klasy bazowej. `typeOf(x)` zwraca typ (`"liczba"`, `"tekst"`, `"lista"`, `"słownik"`, `"funkcja"` albo nazwę klasy).
+
+**Błędy:** `try { … } catch błąd { … }` łapie błąd (w `błąd` jest opis), `throw wartość` zgłasza własny błąd.
+
+**Matematyka:** `PI`, `pow(a, b)`, `atan2(y, x)`, `tan(x)`, `sign(x)`, `clamp(x, min, max)`, `lerp(a, b, t)`.
 
 ## Zdarzenia (`when`)
 Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależnie, a `wait()` wstrzymuje tylko je.
@@ -57,6 +107,8 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when bump "Nazwa" { ... }` (lub bez nazwy, wtedy `target` to nazwa) – gdy piłka wpadnie do nazwanego klocka lub strefy (np. bramki).
 - `when button "Tekst" { ... }` – gdy gracz naciśnie własny przycisk z `button("Tekst")`.
 - `when message "nazwa" { ... }` – gdy ktoś w pokoju online wyśle `send("nazwa", wartość)`. Zmienne: `value` (wysłana wartość) i `sender` (nick nadawcy).
+- `when destroy { ... }` lub `when destroy "Nazwa" { ... }` – gdy zniszczalny klocek (z `setPartHealth` albo zbudowany przez `build`) się rozpadnie (`target` to jego nazwa).
+- `when land { ... }` – gdy gracz wyląduje po locie na lotni (`glide`).
 - `when playerJoin { ... }` / `when playerLeave { ... }` – gdy inny gracz wchodzi do pokoju online lub z niego wychodzi (`target` to jego nick).
 
 ## Broń i walka
@@ -87,6 +139,17 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `button("Tekst")` – własny przycisk na ekranie (działa też na telefonie), `button("Tekst", false)` go usuwa.
 - `particles(x, y, z, "#kolor", ile)` – wybuch kolorowych iskier (np. przy golu lub zebraniu monety).
 - `save("klucz", wartość)` i `load("klucz", domyślna)` – zapis postępu w przeglądarce gracza (liczby, teksty, listy, słowniki), osobno dla każdej gry. Np. rekord, odblokowane poziomy.
+
+## Battle Royale (jak Fortnite) – NexusScript 2.1
+- **Budowanie:** `var b = build("wall" | "floor" | "ramp" | "roof", "wood" | "stone" | "metal")` stawia element na siatce 4×4 przed graczem (ściana na krawędzi pola, podłoga i rampa na polu przed graczem, dach nad graczem). Zwraca słownik `{name, kind, x, y, z, dir, material}` albo `null`, gdy w tym miejscu już coś stoi. `buildAt(rodzaj, x, y, z, kierunek, materiał)` stawia element w podanym miejscu (np. po odebraniu wiadomości od innego gracza online). Wytrzymałość: drewno 150, kamień 300, metal 500.
+- **Zniszczalne klocki:** `setPartHealth(nazwa, życie)`, `getPartHealth(nazwa)`; pociski, granaty i kilof je niszczą, potem działa `when destroy`.
+- **Kilof:** `giveWeapon("pickaxe")` – uderza w klocek przed graczem i wywołuje `when hit` (tak zbiera się materiały z drzew, skał i ścian).
+- **Rzadkość broni:** `giveWeapon("rifle", 4)` – 0 zwykła, 1 niezwykła, 2 rzadka, 3 epicka, 4 legendarna (więcej obrażeń, kolor na pasku). `player.rarity`.
+- **Tarcza:** `setShield(ile)`, `addShield(ile)`, `player.shield` – niebieski pasek, przyjmuje obrażenia przed życiem.
+- **Burza:** `storm(x, z, promień)` – bezpieczny krąg (fioletowa ściana i krąg na minimapie), `stormShrink(x, z, promień, sekundy)` – płynne zmniejszanie, `stormDamage(ile)` – obrażenia na sekundę poza kręgiem (tarcza nie chroni), `inStorm()`.
+- **Lotnia:** `glide(true)` – powolne opadanie i szybszy lot, kończy się po wylądowaniu (`when land`).
+- **Pasek slotów:** `hotbar(["Kilof", ["Karabin", "#a855f7"]], wybrany)` – sloty na dole ekranu (tekst lub [tekst, kolor]); `hotbar([])` chowa pasek.
+- Gotowa gra: poproś asystenta o „grę jak Fortnite” – dostaniesz autobus bojowy, lotnię, łup z rzadkościami, budowanie, zbieranie materiałów, tarcze, burzę i 15 botów.
 
 ## Gra online (multiplayer)
 Każdą opublikowaną grę można uruchomić przyciskiem **Graj online**. Powstaje pokój z kodem, do którego dołączają znajomi (do 6 osób). Gracze widzą się nawzajem (postacie z nickami), mają czat (Enter lub przycisk Czat), a skrypt działa u każdego gracza osobno. Skrypty porozumiewają się wiadomościami:
@@ -401,7 +464,7 @@ when playerJoin {
 ```
 
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`.
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Battle Royale = `build`, `giveWeapon(broń, rzadkość)`, `setShield`, `storm`/`stormShrink`, `glide`, `hotbar`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).

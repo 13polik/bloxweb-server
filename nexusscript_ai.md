@@ -1,4 +1,4 @@
-# NexusScript 1.5 – ściąga dla AI (gry 3D BloxWeb)
+# NexusScript 2.1 – ściąga dla AI (gry 3D BloxWeb)
 
 Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. To nie jest JavaScript ani Lua.
 
@@ -9,16 +9,22 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - `if a > 1 { } else if a == 1 { } else { }`, `while w { }`, `repeat 5 { }`, `for i in range(0, 10) { }`, `for el in lista { }`, `break`, `continue`.
 - `func nazwa(a, b) { return a + b }` (definiuj poza blokami). `return null` kończy zdarzenie.
 
+## Programowanie (2.0)
+- Tekst ze zmiennymi `"Punkty: {pkt}"`, warunek `a > 1 ? "tak" : "nie"`, potęga `2 ** 3`, `for i, x in lista { }`, `for k, v in słownik { }`.
+- Funkcje jako wartości: `var f = func(x) { return x * 2 }`, domknięcia. `map(l, f)`, `filter(l, f)`, `find(l, f)`, `reduce(l, f, start)`, `forEach(l, f)`, `sortBy(l, f)`, `any(l, f)`, `all(l, f)`; też `l.push(1)`, `t.upper()`.
+- Klasy: `class Wróg { var hp = 100  func init(n) { this.n = n }  func trafiony(d) { this.hp -= d } }`, `class Boss extends Wróg { … super.init(n) … }`, `var w = new Wróg("A")`, `w.trafiony(5)`. `typeOf(x)`.
+- `try { } catch e { }`, `throw "opis"`. Matematyka: `PI`, `pow`, `atan2`, `tan`, `sign`, `clamp(x, min, max)`, `lerp(a, b, t)`.
+
 ## Świat
 - Oś Y w górę, Y=0 grunt. Pozycja klocka = środek. Gracz ma 3,4 wysokości, skacze 2,5 w górę i ok. 6 w dal.
-- `spawn(typ, x, y, z, szer, wys, głęb, "#rrggbb", "Nazwa")` zwraca nazwę. Limit 1500 klocków.
+- `spawn(typ, x, y, z, szer, wys, głęb, "#rrggbb", "Nazwa")` zwraca nazwę. Limit 3000 klocków, kod do 500 000 znaków.
 - Typy: "block", "glass", "lava" (zabija), "coin", "spawn" (start, dokładnie jeden), "finish" (meta = wygrana), "checkpoint", "spring" (trampolina), "enemy" (wróg z życiem 100), "ammo" (+30 naboi), "health" (+35 zdrowia), "npc" (postać do rozmowy, np. 1.5×3×1.5), "car" (auto 2.4×1.4×4.4, y = 0.7 na ziemi), "ball" (piłka z fizyką, gracz kopie ją wbiegając), "zone" (przezroczysta strefa bez kolizji: bramka, obszar).
 - `move(n, x, y, z, s)`, `moveBy(n, dx, dy, dz, s)`, `color(n, "#…")`, `resize(n, w, h, d)`, `spin(n, st/s)`, `rotate(n, stopnie)`, `hide(n)`, `show(n)`, `remove(n)`, `exists(n)`, `getX(n)`, `getY(n)`, `getZ(n)`.
 - `sky("#…")`, `lighting("day"|"sunset"|"night"|"dark")`, `fog(odl)`, `dayCycle(sekundy)`, `shake(siła)`.
 - Gotowe światy: `buildCity(x, z, rozmiar)` (ulice na x/z = …, -38, 0, 38, …), `buildArena(x, z, rozmiar)` (mur, osłony, bazy "BazaNiebieska" z − i "BazaCzerwona" z +).
 
 ## Gracz
-- `player.x y z hp coins ammo weapon kills money driving name`.
+- `player.x y z hp coins ammo weapon kills money driving name shield rarity`.
 - `teleport(x, y, z)`, `damage(n)`, `heal(n)`, `setRegen(n)`, `checkpoint(x, y, z)`, `setSpeed(n)`, `setJump(n)`, `setGravity(n)`, `win("tekst")`, `lose("tekst")`.
 - Broń: `giveWeapon("pistol"|"rifle"|"shotgun"|"sniper"|"sword"|"grenade"|"none")`, `setAmmo(n)`, `addAmmo(n)`, `firstPerson(true)`. Gracz strzela myszką/F/przyciskiem.
 
@@ -39,6 +45,12 @@ Piszesz program w NexusScript: buduje świat z klocków i reaguje na zdarzenia. 
 - `kick(n, x, y, z)` – dodaje piłce prędkość. `enemyMode(w, "ball")` + `kickTarget(w, x, z)` – bot piłkarz.
 - `button("Tekst")` / `button("Tekst", false)` – własny przycisk na ekranie; `when button "Tekst" { }`.
 - `particles(x, y, z, "#kolor", ile)` – iskry. `save("klucz", wartość)`, `load("klucz", domyślna)` – zapis postępu (rekordy, poziomy).
+
+## Battle Royale (2.1)
+- `build("wall"|"floor"|"ramp"|"roof", "wood"|"stone"|"metal")` → słownik `{name, kind, x, y, z, dir, material}` lub null; `buildAt(rodzaj, x, y, z, kierunek, materiał)`.
+- Typ klocka "ramp" (wchodzi się po nim). `setPartHealth(n, hp)`, `getPartHealth(n)`, `when destroy` / `when destroy "Nazwa"`.
+- `giveWeapon("pickaxe")` (kilof: `when hit` na klocku = zbieranie), `giveWeapon("rifle", 0-4)` rzadkość, `player.rarity`.
+- `setShield(n)`, `addShield(n)`, `player.shield`. `storm(x, z, r)`, `stormShrink(x, z, r, s)`, `stormDamage(n)`, `inStorm()`. `glide(true)` + `when land`. `hotbar(["Kilof", ["Karabin", "#a855f7"]], wybrany)`.
 
 ## Online i grafika
 - Gra online (przycisk Graj online, do 6 graczy): `send("nazwa", wartość)` do wszystkich (też do siebie), `when message "nazwa" { }` ze zmiennymi `value` i `sender`, `when playerJoin` / `when playerLeave` (`target` = nick), `playerCount()`, `players()`, `isOnline()`, `player.name`.
@@ -107,5 +119,5 @@ when arrive {
 
 ## Zasady
 - Odpowiadaj jednym blokiem ```nexus z całym programem. Używaj tylko funkcji z tej ściągi.
-- Strzelanka: broń w `when start`, wrogowie `"enemy"` + `enemyMode`, wygrana gdy `count("enemy") == 0` (bez mety). Jak GTA: `buildCity`, auta, misje ze znacznikiem, minimapa. Jak CS: `buildArena`, sojusznicy, `shop`, pieniądze, rundy. Przygoda: NPC + `when talk` + plecak. Quiz: `ask`. Piłka nożna: "ball", bramki "zone" + `when bump`, boty "ball". Platformówka 2D: `camera("side")`. Widok z góry: `camera("top")`. Gra dla kilku osób: `send` + `when message`. Ładny świat: `material`, `glow`, `light`, `skyGradient`.
+- Strzelanka: broń w `when start`, wrogowie `"enemy"` + `enemyMode`, wygrana gdy `count("enemy") == 0` (bez mety). Jak GTA: `buildCity`, auta, misje ze znacznikiem, minimapa. Jak CS: `buildArena`, sojusznicy, `shop`, pieniądze, rundy. Przygoda: NPC + `when talk` + plecak. Quiz: `ask`. Jak Fortnite: `build`, `storm`, `glide`, `setShield`, `hotbar`, kilof. Piłka nożna: "ball", bramki "zone" + `when bump`, boty "ball". Platformówka 2D: `camera("side")`. Widok z góry: `camera("top")`. Gra dla kilku osób: `send` + `when message`. Ładny świat: `material`, `glow`, `light`, `skyGradient`.
 - Platformy do skoku: odstęp do 6 w poziomie i 2 w pionie. Teksty dla gracza po polsku, odpowiednie dla dzieci.

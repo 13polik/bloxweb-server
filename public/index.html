@@ -8247,7 +8247,7 @@ html,body{touch-action:pan-x pan-y;overscroll-behavior:none}
     if(kind==='export'&&!current)return;persist();
     const box=makeModal(kind==='export'?'Kod Twojej gry':'Importuj grę');
     box.append(node('p','',kind==='export'?'Skopiuj cały kod do notatki lub wyślij go znajomemu. Druga osoba może wkleić go w „Importuj kod”. Kod zawiera tylko mapę i ustawienia, bez danych konta.':'Wklej kod wyeksportowany ze Studio. Import utworzy osobny projekt, nie nadpisze istniejących gier.'));
-    const area=node('textarea');area.id='studioCode';area.setAttribute('aria-label',kind==='export'?'Kod gry':'Wklej kod gry');area.maxLength=60000;area.spellcheck=false;
+    const area=node('textarea');area.id='studioCode';area.setAttribute('aria-label',kind==='export'?'Kod gry':'Wklej kod gry');area.maxLength=1500000;area.spellcheck=false;
     if(kind==='export'){area.value=JSON.stringify(current);area.readOnly=true;}
     const status=node('p','studio-status');status.setAttribute('role','status');
     const row=node('div','studio-actions');row.append(button('Zamknij',closeModal),button(kind==='export'?'Kopiuj kod':'Importuj grę',async()=>{
@@ -11145,7 +11145,7 @@ body.device-mobile #cs16BuyMenu.v17-buy{left:50%;transform:translate(-50%,-50%);
 })();
 </script>
 <script type="text/plain" id="nexusReference">
-# NexusScript 1.5 – język gier 3D w BloxWeb Studio
+# NexusScript 2.1 – język gier 3D w BloxWeb Studio
 
 NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świat z klocków i reaguje na zdarzenia (start gry, dotknięcie klocka, zebranie monety, klawisz, upływ czasu). Kod działa w bezpiecznej piaskownicy: nie ma dostępu do internetu, plików ani strony.
 
@@ -11154,7 +11154,7 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - Gracz ma ok. 3,4 jednostki wzrostu i skacze na ok. 2,5 jednostki w górę. Skok w dal to ok. 6–7 jednostek.
 - Pozycja klocka to jego środek. `spawn("block", 0, 0, 0, 4, 1, 4)` tworzy płytę 4×1×4, której górna powierzchnia jest na Y=0,5.
 - Pod światem nie ma podłogi: kto spadnie poniżej najniższego klocka o 30 jednostek, traci życie i wraca do ostatniego checkpointu.
-- Limit: 1500 klocków w grze.
+- Limit: 3000 klocków w grze. Kod może mieć do 500 000 znaków.
 
 ## Typy klocków
 - `"block"` – zwykły klocek, można po nim chodzić.
@@ -11170,6 +11170,7 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - `"health"` – apteczka (+35 zdrowia po dotknięciu).
 - `"car"` – samochód (2.4 × 1.4 × 4.4). Gracz wsiada i wysiada klawiszem E / AKCJA, jedzie W/S (gaz, hamulec, wsteczny) i A/D (skręt), spacja to ręczny hamulec. Rozjeżdża wrogów.
 - `"ball"` – piłka z fizyką (np. `spawn("ball", 0, 0.6, 0, 1.2, 1.2, 1.2, "#ffffff", "Pilka")`): toczy się, odbija, gracz kopie ją, wbiegając w nią, auta ją odbijają.
+- `"ramp"` – rampa (pochylnia), po której można wejść; wznosi się w stronę obrotu (`rotate(nazwa, 0 | 90 | 180 | 270)`, 0 = w stronę +Z).
 - `"zone"` – przezroczysta strefa, przez którą wszystko przechodzi (bramka, meta wyścigu, obszar misji). Działa z `when touch` (gracz) i `when bump` (piłka).
 - `"npc"` – postać do rozmowy (np. `spawn("npc", 4, 1, 6, 1.5, 3, 1.5, "#3b82f6", "Ola")`). Gracz rozmawia klawiszem E lub przyciskiem AKCJA.
 
@@ -11184,6 +11185,55 @@ NexusScript to prosty język do tworzenia gier 3D w BloxWeb. Program buduje świ
 - Pętle: `while warunek { ... }`, `repeat 5 { ... }`, `for i in range(0, 10) { ... }`, `for el in lista { ... }`, `break`, `continue`.
 - Funkcje: `func nazwa(a, b) { return a + b }`. Wywołanie: `nazwa(1, 2)`.
 - Klamry `{ }` są obowiązkowe. Nie ma średników na końcu bloków ani słowa `end`.
+- Tekst ze zmiennymi: `"Punkty: {pkt}, życie: {player.hp}"` (w nawiasach dowolne wyrażenie; `\{` to zwykła klamra; tekst w środku pisz w cudzysłowie innego rodzaju, np. `"Nick: {upper('ala')}"`).
+- Warunek w jednej linii: `var opis = hp > 50 ? "zdrowy" : "ranny"`. Potęga: `2 ** 8`. Reszta z dzielenia z przypisaniem: `x %= 10`.
+- `for i, x in lista { }` daje indeks i element, `for klucz, wartość in słownik { }` – klucz i wartość.
+
+## Programowanie zaawansowane (NexusScript 2.0)
+**Funkcje jako wartości.** Funkcję można zapisać w zmiennej, przekazać i zwrócić:
+```
+var podwój = func(x) { return x * 2 }
+print(podwój(4))                      // 8
+func licznik() {
+  var n = 0
+  return func() {                     // domknięcie: pamięta swoje n
+    n += 1
+    return n
+  }
+}
+```
+Funkcje zdefiniowane wewnątrz bloku (`func pomocnik() { }` w `when` lub w innej funkcji) są lokalne.
+
+**Listy z funkcjami:** `map(lista, f)`, `filter(lista, f)`, `find(lista, f)` (pierwszy pasujący albo `null`), `reduce(lista, f, start)`, `forEach(lista, f)`, `sortBy(lista, f)` (sortuje po wyniku f), `any(lista, f)`, `all(lista, f)`. Funkcja dostaje element i jego indeks.
+
+**Metody na wartościach:** zamiast `push(lista, 3)` można pisać `lista.push(3)`; tak samo `tekst.upper()`, `lista.filter(func(x) { return x > 2 })`, `d.keys()`.
+
+**Klasy i obiekty:**
+```
+class Wróg {
+  var hp = 100
+  func init(nazwa) {
+    this.nazwa = nazwa
+  }
+  func trafiony(ile) {
+    this.hp -= ile
+  }
+}
+class Boss extends Wróg {
+  func init(nazwa) {
+    super.init(nazwa)
+    this.hp = 500
+  }
+}
+var b = new Boss("Smok")              // albo Boss("Smok")
+b.trafiony(50)
+print("{b.nazwa}: {b.hp}")            // Smok: 450
+```
+Pola (`var`) dostaje każdy nowy obiekt, `init` uruchamia się przy tworzeniu, `this` to bieżący obiekt, `super.metoda()` woła wersję z klasy bazowej. `typeOf(x)` zwraca typ (`"liczba"`, `"tekst"`, `"lista"`, `"słownik"`, `"funkcja"` albo nazwę klasy).
+
+**Błędy:** `try { … } catch błąd { … }` łapie błąd (w `błąd` jest opis), `throw wartość` zgłasza własny błąd.
+
+**Matematyka:** `PI`, `pow(a, b)`, `atan2(y, x)`, `tan(x)`, `sign(x)`, `clamp(x, min, max)`, `lerp(a, b, t)`.
 
 ## Zdarzenia (`when`)
 Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależnie, a `wait()` wstrzymuje tylko je.
@@ -11204,6 +11254,8 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `when bump "Nazwa" { ... }` (lub bez nazwy, wtedy `target` to nazwa) – gdy piłka wpadnie do nazwanego klocka lub strefy (np. bramki).
 - `when button "Tekst" { ... }` – gdy gracz naciśnie własny przycisk z `button("Tekst")`.
 - `when message "nazwa" { ... }` – gdy ktoś w pokoju online wyśle `send("nazwa", wartość)`. Zmienne: `value` (wysłana wartość) i `sender` (nick nadawcy).
+- `when destroy { ... }` lub `when destroy "Nazwa" { ... }` – gdy zniszczalny klocek (z `setPartHealth` albo zbudowany przez `build`) się rozpadnie (`target` to jego nazwa).
+- `when land { ... }` – gdy gracz wyląduje po locie na lotni (`glide`).
 - `when playerJoin { ... }` / `when playerLeave { ... }` – gdy inny gracz wchodzi do pokoju online lub z niego wychodzi (`target` to jego nick).
 
 ## Broń i walka
@@ -11234,6 +11286,17 @@ Kod w zdarzeniu uruchamia się automatycznie. Każde zdarzenie działa niezależ
 - `button("Tekst")` – własny przycisk na ekranie (działa też na telefonie), `button("Tekst", false)` go usuwa.
 - `particles(x, y, z, "#kolor", ile)` – wybuch kolorowych iskier (np. przy golu lub zebraniu monety).
 - `save("klucz", wartość)` i `load("klucz", domyślna)` – zapis postępu w przeglądarce gracza (liczby, teksty, listy, słowniki), osobno dla każdej gry. Np. rekord, odblokowane poziomy.
+
+## Battle Royale (jak Fortnite) – NexusScript 2.1
+- **Budowanie:** `var b = build("wall" | "floor" | "ramp" | "roof", "wood" | "stone" | "metal")` stawia element na siatce 4×4 przed graczem (ściana na krawędzi pola, podłoga i rampa na polu przed graczem, dach nad graczem). Zwraca słownik `{name, kind, x, y, z, dir, material}` albo `null`, gdy w tym miejscu już coś stoi. `buildAt(rodzaj, x, y, z, kierunek, materiał)` stawia element w podanym miejscu (np. po odebraniu wiadomości od innego gracza online). Wytrzymałość: drewno 150, kamień 300, metal 500.
+- **Zniszczalne klocki:** `setPartHealth(nazwa, życie)`, `getPartHealth(nazwa)`; pociski, granaty i kilof je niszczą, potem działa `when destroy`.
+- **Kilof:** `giveWeapon("pickaxe")` – uderza w klocek przed graczem i wywołuje `when hit` (tak zbiera się materiały z drzew, skał i ścian).
+- **Rzadkość broni:** `giveWeapon("rifle", 4)` – 0 zwykła, 1 niezwykła, 2 rzadka, 3 epicka, 4 legendarna (więcej obrażeń, kolor na pasku). `player.rarity`.
+- **Tarcza:** `setShield(ile)`, `addShield(ile)`, `player.shield` – niebieski pasek, przyjmuje obrażenia przed życiem.
+- **Burza:** `storm(x, z, promień)` – bezpieczny krąg (fioletowa ściana i krąg na minimapie), `stormShrink(x, z, promień, sekundy)` – płynne zmniejszanie, `stormDamage(ile)` – obrażenia na sekundę poza kręgiem (tarcza nie chroni), `inStorm()`.
+- **Lotnia:** `glide(true)` – powolne opadanie i szybszy lot, kończy się po wylądowaniu (`when land`).
+- **Pasek slotów:** `hotbar(["Kilof", ["Karabin", "#a855f7"]], wybrany)` – sloty na dole ekranu (tekst lub [tekst, kolor]); `hotbar([])` chowa pasek.
+- Gotowa gra: poproś asystenta o „grę jak Fortnite” – dostaniesz autobus bojowy, lotnię, łup z rzadkościami, budowanie, zbieranie materiałów, tarcze, burzę i 15 botów.
 
 ## Gra online (multiplayer)
 Każdą opublikowaną grę można uruchomić przyciskiem **Graj online**. Powstaje pokój z kodem, do którego dołączają znajomi (do 6 osób). Gracze widzą się nawzajem (postacie z nickami), mają czat (Enter lub przycisk Czat), a skrypt działa u każdego gracza osobno. Skrypty porozumiewają się wiadomościami:
@@ -11548,7 +11611,7 @@ when playerJoin {
 ```
 
 ## Zasady dla AI piszącego kod
-- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`.
+- Gra w mieście (jak GTA) = `buildCity`, auto, `drivePath` dla ruchu, `setWaypoint` + `when arrive` dla misji, `minimap(true)`. Strzelanka drużynowa (jak CS) = `buildArena`, sojusznicy z `setTeam(..., "ally")`, `shop` i `setMoney`. Wyścig = auta, `drivePath` dla rywali, `setWaypoint` dla kolejnych punktów toru. Piłka nożna = `"ball"`, bramki jako `"zone"` + `when bump`, boty `enemyMode(..., "ball")`. Platformówka 2D = `camera("side")`, platformy wzdłuż osi X przy z = 0. Gra z góry (top-down) = `camera("top")`. Postęp między grami = `save`/`load`. Gra dla kilku osób = `send` + `when message` (wiadomość dociera do wszystkich, także nadawcy) i `when playerJoin`. Ładniejszy świat = `material`, `glow`, `light`, `skyGradient`. Battle Royale = `build`, `giveWeapon(broń, rzadkość)`, `setShield`, `storm`/`stormShrink`, `glide`, `hotbar`. Większe gry pisz z klasami (`class`, `new`, `this`) i funkcjami (`map`, `filter`, `func(x) { }`).
 - Przygoda = NPC (`"npc"`) + `when talk` + `dialog`, przedmioty przez `giveItem`/`hasItem`. Quiz = `ask(...)` w zdarzeniu `when talk` lub `when key`.
 - Strzelanka = `giveWeapon(...)` w `when start`, wrogowie z `spawn("enemy", ...)` i `enemyMode(...)`, wygrana w `when kill`, gdy `count("enemy") == 0`. Nie używaj mety w strzelankach, chyba że gracz o nią prosi.
 - Odpowiadaj jednym blokiem kodu ```nexus ... ``` bez innych języków (to nie jest JavaScript ani Lua).
@@ -11563,15 +11626,15 @@ when playerJoin {
 (() => {
   'use strict';
   class NexusError extends Error{constructor(message,line){super(message);this.line=line||0;}}
-  const KEYWORDS=new Set(['var','func','return','if','else','while','repeat','for','in','break','continue','when','and','or','not','true','false','null']);
-  const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die','shoot','hit','kill','timeup','talk','enter','exit','arrive','bump','button','message','playerJoin','playerLeave']);
+  const KEYWORDS=new Set(['var','func','return','if','else','while','repeat','for','in','break','continue','when','and','or','not','true','false','null','class','extends','new','this','super','try','catch','throw']);
+  const EVENTS=new Set(['start','every','tick','touch','collect','key','win','die','shoot','hit','kill','timeup','talk','enter','exit','arrive','bump','button','message','playerJoin','playerLeave','destroy','land']);
   const ARG_EVENTS=new Set(['every','touch','key','button']);
   // These take an optional name: `when kill { }` reacts to every enemy, `when kill "Boss" { }` to one.
-  const OPTIONAL_ARG=new Set(['hit','kill','talk','enter','exit','bump','message','playerJoin','playerLeave']);
-  const MAX_SOURCE=20000,MAX_LIST=10000,MAX_TEXT=10000,MAX_DEPTH=150,MAX_THREADS=64,SLICE=3000,FRAME_BUDGET=30000;
+  const OPTIONAL_ARG=new Set(['hit','kill','talk','enter','exit','bump','message','playerJoin','playerLeave','destroy']);
+  const MAX_SOURCE=500000,MAX_LIST=10000,MAX_TEXT=10000,MAX_DEPTH=150,MAX_THREADS=64,SLICE=3000,FRAME_BUDGET=30000;
 
-  function lex(src){
-    const out=[],n=src.length;let i=0,line=1;
+  function lex(src,firstLine=1){
+    const out=[],n=src.length;let i=0,line=firstLine;
     const push=(type,value)=>out.push({type,value,line});
     while(i<n){
       const c=src[i];
@@ -11580,23 +11643,36 @@ when playerJoin {
       if(c==='/'&&src[i+1]==='/'){while(i<n&&src[i]!=='\n')i++;continue;}
       if(c==='/'&&src[i+1]==='*'){const start=line;i+=2;while(i<n&&!(src[i]==='*'&&src[i+1]==='/')){if(src[i]==='\n')line++;i++;}if(i>=n)throw new NexusError('Niezamknięty komentarz /* … */',start);i+=2;continue;}
       if(/[0-9]/.test(c)||(c==='.'&&/[0-9]/.test(src[i+1]||''))){let j=i;while(j<n&&/[0-9.]/.test(src[j]))j++;const t=src.slice(i,j);if((t.match(/\./g)||[]).length>1)throw new NexusError('Nieprawidłowa liczba „'+t+'”',line);push('num',parseFloat(t));i=j;continue;}
-      if(c==='"'||c==="'"){let j=i+1,s='';while(j<n&&src[j]!==c){if(src[j]==='\n')throw new NexusError('Niezamknięty tekst – brakuje '+c,line);if(src[j]==='\\'&&j+1<n){const e=src[j+1];s+=e==='n'?'\n':e==='t'?'\t':e;j+=2;continue;}s+=src[j++];}if(j>=n)throw new NexusError('Niezamknięty tekst – brakuje '+c,line);push('str',s);i=j+1;continue;}
+      if(c==='"'||c==="'"){
+        // Text may hold {expressions}: "Punkty: {pkt}". \{ writes a plain brace.
+        let j=i+1,s='';const parts=[];
+        while(j<n&&src[j]!==c){
+          if(src[j]==='\n')throw new NexusError('Niezamknięty tekst – brakuje '+c,line);
+          if(src[j]==='\\'&&j+1<n){const e=src[j+1];s+=e==='n'?'\n':e==='t'?'\t':e;j+=2;continue;}
+          if(src[j]==='{'){let k=j+1,depth=1;while(k<n&&src[k]!==c&&src[k]!=='\n'&&depth){if(src[k]==='{')depth++;else if(src[k]==='}')depth--;if(depth)k++;}
+            if(!depth&&k>j+1){parts.push(s,{code:src.slice(j+1,k),line});s='';j=k+1;continue;}}
+          s+=src[j++];
+        }
+        if(j>=n)throw new NexusError('Niezamknięty tekst – brakuje '+c,line);
+        if(parts.length){parts.push(s);push('tmpl',parts);}else push('str',s);i=j+1;continue;
+      }
       if(/[\p{L}_]/u.test(c)){let j=i;while(j<n&&/[\p{L}\p{N}_]/u.test(src[j]))j++;const w=src.slice(i,j);push(KEYWORDS.has(w)?w:'id',w);i=j;continue;}
       const two=src.slice(i,i+2);
       if(two==='&&'){push('and','and');i+=2;continue;}
       if(two==='||'){push('or','or');i+=2;continue;}
-      if(['==','!=','<=','>=','+=','-=','*=','/='].includes(two)){push('op',two);i+=2;continue;}
+      if(['==','!=','<=','>=','+=','-=','*=','/=','%=','**'].includes(two)){push('op',two);i+=2;continue;}
       if(c==='!'){push('not','not');i++;continue;}
-      if('+-*/%<>=(){}[],.;:'.includes(c)){push('op',c);i++;continue;}
+      if('+-*/%<>=(){}[],.;:?'.includes(c)){push('op',c);i++;continue;}
       throw new NexusError('Nieznany znak „'+c+'”',line);
     }
     push('eof');return out;
   }
 
-  function parse(src){
+  // mode 'expr' parses a single expression (used for {…} inside text).
+  function parse(src,mode,firstLine){
     src=String(src??'');
-    if(src.length>MAX_SOURCE)throw new NexusError('Kod jest za długi (limit 20 000 znaków)',1);
-    const t=lex(src);let p=0;
+    if(src.length>MAX_SOURCE)throw new NexusError('Kod jest za długi (limit 500 000 znaków)',1);
+    const t=lex(src,firstLine||1);let p=0;
     const peek=(k=0)=>t[Math.min(p+k,t.length-1)];
     const next=()=>t[p++];
     const isOp=v=>peek().type==='op'&&peek().value===v;
@@ -11616,23 +11692,49 @@ when playerJoin {
       const k=peek(),line=k.line;
       switch(k.type){
         case 'var':{p++;const name=ident('zmiennej');let value=null;if(eat('='))value=expr();return{k:'var',name,value,line};}
-        case 'func':{p++;if(!top)throw new NexusError('Funkcje (func) definiuj poza innymi blokami',line);const name=ident('funkcji');if(BUILTIN_NAMES.has(name))throw new NexusError('„'+name+'” to wbudowana funkcja – wybierz inną nazwę',line);expect('(');const params=[];skipLines();if(!isOp(')')){do{skipLines();params.push(ident('parametru'));skipLines();}while(eat(','));}expect(')');return{k:'func',name,params,body:block(),line};}
+        case 'func':{
+          p++;if(isOp('('))throw new NexusError('Funkcja bez nazwy musi być wartością, np. var f = func(x) { … }',line);
+          const name=ident('funkcji');if(BUILTIN_NAMES.has(name))throw new NexusError('„'+name+'” to wbudowana funkcja – wybierz inną nazwę',line);
+          const params=paramList(),body=block();
+          // Inside blocks a named function is a local value (it sees the surrounding variables).
+          return top?{k:'func',name,params,body,line}:{k:'var',name,value:{k:'lambda',name,params,body,line},line};
+        }
         case 'return':{p++;const n=peek();const value=(n.type==='nl'||n.type==='eof'||isOp('}')||isOp(';'))?null:expr();return{k:'return',value,line};}
         case 'if':{p++;const cond=expr();const then=block();let other=null;const save=p;skipLines();if(peek().type==='else'){p++;other=peek().type==='if'?[statement(false)]:block();}else p=save;return{k:'if',cond,then,other,line};}
         case 'while':{p++;const cond=expr();return{k:'while',cond,body:block(),line};}
         case 'repeat':{p++;const count=expr();return{k:'repeat',count,body:block(),line};}
-        case 'for':{p++;const name=ident('zmiennej pętli');if(peek().type!=='in')throw new NexusError('Brakuje „in” w pętli for (np. for i in range(0, 5) { … })',line);p++;const list=expr();return{k:'for',name,list,body:block(),line};}
+        case 'for':{p++;let index=null,name=ident('zmiennej pętli');if(eat(',')){index=name;name=ident('zmiennej pętli');}if(peek().type!=='in')throw new NexusError('Brakuje „in” w pętli for (np. for i in range(0, 5) { … })',line);p++;const list=expr();return{k:'for',name,index,list,body:block(),line};}
         case 'break':p++;return{k:'break',line};
         case 'continue':p++;return{k:'continue',line};
+        case 'throw':{p++;return{k:'throw',value:expr(),line};}
+        case 'try':{
+          p++;const body=block();const save=p;skipLines();
+          if(peek().type!=='catch'){p=save;throw new NexusError('Po try { … } musi być catch { … } (np. catch błąd { … })',line);}
+          p++;const name=peek().type==='id'?next().value:null;return{k:'try',body,name,handler:block(),line};
+        }
+        case 'class':{
+          p++;if(!top)throw new NexusError('Klasy definiuj poza innymi blokami',line);
+          const name=ident('klasy');if(BUILTIN_NAMES.has(name))throw new NexusError('„'+name+'” to wbudowana funkcja – wybierz inną nazwę klasy',line);
+          let parent=null;if(peek().type==='extends'){p++;parent=ident('klasy bazowej');}
+          skipLines();expect('{','na początku klasy');const fields=[],methods=[];skipSep();
+          while(!isOp('}')){
+            const m=peek();if(m.type==='eof')throw new NexusError('Brakuje „}” zamykającego klasę '+name,m.line);
+            if(m.type==='var'){p++;const field=ident('pola');fields.push({name:field,value:eat('=')?expr():null});}
+            else if(m.type==='func'){p++;const method=ident('metody');methods.push({name:method,params:paramList(),body:block(),line:m.line});}
+            else throw new NexusError('W klasie mogą być tylko pola (var) i metody (func)',m.line);
+            endOf();skipSep();
+          }
+          p++;return{k:'class',name,parent,fields,methods,line};
+        }
         case 'when':{
           p++;if(!top)throw new NexusError('Zdarzenia (when) definiuj poza innymi blokami',line);
-          const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die, shoot, hit, kill, timeup, talk, enter, exit, arrive, bump, button, message, playerJoin, playerLeave',line);
+          const n=next();if(n.type!=='id'||!EVENTS.has(n.value))throw new NexusError('Nieznane zdarzenie '+desc(n)+'. Dostępne: start, every, tick, touch, collect, key, win, die, shoot, hit, kill, timeup, talk, enter, exit, arrive, bump, button, message, playerJoin, playerLeave, destroy, land',line);
           const arg=ARG_EVENTS.has(n.value)||(OPTIONAL_ARG.has(n.value)&&!isOp('{')&&peek().type!=='nl')?expr():null;return{k:'when',event:n.value,arg,body:block(),line};
         }
         case 'else':throw new NexusError('„else” bez pasującego „if”',line);
         default:{
           const target=expr();
-          if(peek().type==='op'&&['=','+=','-=','*=','/='].includes(peek().value)){
+          if(peek().type==='op'&&['=','+=','-=','*=','/=','%='].includes(peek().value)){
             const op=next().value;if(target.k!=='name'&&target.k!=='index'&&target.k!=='member')throw new NexusError('Tu nie można przypisać wartości',line);
             return{k:'assign',target,op,value:expr(),line};
           }
@@ -11641,14 +11743,17 @@ when playerJoin {
         }
       }
     }
-    function expr(){return or();}
+    function paramList(){expect('(');const params=[];skipLines();if(!isOp(')')){do{skipLines();params.push(ident('parametru'));skipLines();}while(eat(','));}expect(')');return params;}
+    // a ? b : c
+    function expr(){const c=or();if(!isOp('?'))return c;const line=next().line;skipLines();const a=expr();skipLines();expect(':','w wyrażeniu warunek ? tak : nie');skipLines();return{k:'cond',c,a,b:expr(),line};}
     function or(){let l=and();while(peek().type==='or'){const line=next().line;l={k:'or',l,r:and(),line};}return l;}
     function and(){let l=not();while(peek().type==='and'){const line=next().line;l={k:'and',l,r:not(),line};}return l;}
     function not(){if(peek().type==='not'){const line=next().line;return{k:'not',e:not(),line};}return cmp();}
     function cmp(){let l=add();while(peek().type==='op'&&['==','!=','<','>','<=','>='].includes(peek().value)){const k=next();l={k:'bin',op:k.value,l,r:add(),line:k.line};}return l;}
     function add(){let l=mul();while(isOp('+')||isOp('-')){const k=next();l={k:'bin',op:k.value,l,r:mul(),line:k.line};}return l;}
     function mul(){let l=unary();while(isOp('*')||isOp('/')||isOp('%')){const k=next();l={k:'bin',op:k.value,l,r:unary(),line:k.line};}return l;}
-    function unary(){if(isOp('-')){const line=next().line;return{k:'neg',e:unary(),line};}return postfix();}
+    function unary(){if(isOp('-')){const line=next().line;return{k:'neg',e:unary(),line};}return power();}
+    function power(){const b=postfix();if(isOp('**')){const line=next().line;return{k:'bin',op:'**',l:b,r:unary(),line};}return b;}
     function postfix(){
       let e=primary();
       for(;;){
@@ -11666,6 +11771,15 @@ when playerJoin {
         case 'false':return{k:'lit',v:false,line:k.line};
         case 'null':return{k:'lit',v:null,line:k.line};
         case 'id':return{k:'name',name:k.value,line:k.line};
+        case 'this':return{k:'this',line:k.line};
+        case 'super':return{k:'super',line:k.line};
+        case 'func':return{k:'lambda',name:null,params:paramList(),body:block(),line:k.line};
+        case 'new':{const name=ident('klasy po new');if(!isOp('('))throw new NexusError('Po new '+name+' dodaj nawiasy, np. new '+name+'()',k.line);return{k:'name',name,line:k.line,isNew:true};}
+        case 'tmpl':{
+          // Each {…} is parsed as an expression; something that is not one stays plain text.
+          const parts=k.value.map(x=>{if(typeof x==='string')return x;try{return parse(x.code,'expr',x.line);}catch{return '{'+x.code+'}';}});
+          return parts.every(x=>typeof x==='string')?{k:'lit',v:parts.join(''),line:k.line}:{k:'tmpl',parts,line:k.line};
+        }
         case 'op':
           if(k.value==='('){skipLines();const e=expr();skipLines();expect(')');return e;}
           if(k.value==='{'){
@@ -11679,6 +11793,7 @@ when playerJoin {
       }
       throw new NexusError('Nieoczekiwane: '+desc(k),k.line);
     }
+    if(mode==='expr'){skipLines();const e=expr();skipLines();if(peek().type!=='eof')throw new NexusError('To nie jest jedno wyrażenie',peek().line);return e;}
     const body=[];skipSep();
     while(peek().type!=='eof'){body.push(statement(true));endOf();skipSep();}
     return body;
@@ -11695,8 +11810,18 @@ when playerJoin {
   // Dictionaries keep string keys in a Map, so keys like "constructor" are ordinary data.
   class Dict{constructor(){this.map=new Map();}}
   class Return{constructor(value){this.value=value;}}
+  // NexusScript 2.0 values: functions (named, lambdas, methods), classes and their objects.
+  class Fn{constructor(name,params,body,scope,cls){this.name=name;this.params=params;this.body=body;this.scope=scope;this.cls=cls||null;}}
+  class ClassDef{constructor(name,parentName,fields){this.name=name;this.parentName=parentName;this.parent=null;this.fields=fields;this.methods=new Map();}}
+  class Obj extends Dict{constructor(cls){super();this.cls=cls;}}
+  class Bound{constructor(fn,self){this.fn=fn;this.self=self;}}
+  class BuiltinRef{constructor(name,self){this.name=name;this.self=self;}}
+  class SuperRef{constructor(cls,self){this.cls=cls;this.self=self;}}
+  class Throw{constructor(value,line){this.value=value;this.line=line;}}
+  const HIGHER_ORDER=new Set(['map','filter','find','reduce','forEach','sortBy','any','all']);
   const BREAK={b:1},CONTINUE={c:1},SLICED={s:1},PLAYER=Object.freeze({__player:true});
-  const typeName=v=>v===null||v===undefined?'null':Array.isArray(v)?'lista':v instanceof Dict?'słownik':v===PLAYER?'player':typeof v==='number'?'liczba':typeof v==='string'?'tekst':typeof v==='boolean'?'prawda/fałsz':'wartość';
+  const isCallable=v=>v instanceof Fn||v instanceof Bound||v instanceof BuiltinRef||v instanceof ClassDef;
+  const typeName=v=>v===null||v===undefined?'null':Array.isArray(v)?'lista':v instanceof Obj?v.cls.name:v instanceof Dict?'słownik':v===PLAYER?'player':typeof v==='number'?'liczba':typeof v==='string'?'tekst':typeof v==='boolean'?'prawda/fałsz':v instanceof ClassDef?'klasa':isCallable(v)?'funkcja':'wartość';
   const truthy=v=>!(v===false||v===null||v===undefined||v===0||v==='');
   function show(v){
     if(v===null||v===undefined)return 'null';
@@ -11704,27 +11829,45 @@ when playerJoin {
     if(typeof v==='boolean')return v?'true':'false';
     if(Array.isArray(v))return '['+v.slice(0,50).map(show).join(', ')+(v.length>50?', …':'')+']';
     if(v===PLAYER)return 'player';
+    if(v instanceof Fn)return '<funkcja '+(v.name||'bez nazwy')+'>';
+    if(v instanceof Bound)return '<metoda '+(v.fn.name||'')+'>';
+    if(v instanceof BuiltinRef)return '<funkcja '+v.name+'>';
+    if(v instanceof ClassDef)return '<klasa '+v.name+'>';
+    if(v instanceof Obj)return v.cls.name+'{'+[...v.map].slice(0,30).map(([k,x])=>k+': '+show(x)).join(', ')+'}';
     if(v instanceof Dict)return '{'+[...v.map].slice(0,30).map(([k,x])=>k+': '+show(x)).join(', ')+(v.map.size>30?', …':'')+'}';
     return String(v);
   }
-  const PART_TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health','npc','car','ball','zone'];
-  const PLAYER_FIELDS=['x','y','z','hp','coins','ammo','weapon','kills','money','driving','name'];
-  const WEAPON_KINDS=['pistol','rifle','shotgun','sniper','sword','grenade','none'];
+  const PART_TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health','npc','car','ball','zone','ramp'];
+  const PLAYER_FIELDS=['x','y','z','hp','coins','ammo','weapon','kills','money','driving','name','shield','rarity'];
+  const WEAPON_KINDS=['pistol','rifle','shotgun','sniper','sword','grenade','pickaxe','none'];
+  const BUILD_KINDS=['wall','floor','ramp','roof'],BUILD_MATERIALS=['wood','stone','metal'];
   const ENEMY_MODES=['chase','guard','patrol','shooter','ball'];
   const CAMERA_MODES=['third','first','top','side'];
   const MATERIALS=['plastic','metal','gold','wood','stone','grass','sand','neon','glass','ice'];
   // Values travelling between players and saves: numbers, text, true/false, null, lists and dictionaries.
   const fromJSON=v=>{if(Array.isArray(v))return v.map(fromJSON);if(v&&typeof v==='object'){const d=new Dict();for(const [k,x] of v.__d||[])d.map.set(k,fromJSON(x));return d;}return v;};
-  const BUILTIN_NAMES=new Set(['send','playerCount','players','isOnline','shadows','material','glow','light','lightOff','skyGradient','camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
+  const BUILTIN_NAMES=new Set(['build','buildAt','setPartHealth','getPartHealth','setShield','addShield','storm','stormShrink','stormDamage','inStorm','glide','hotbar','map','filter','find','reduce','forEach','sortBy','any','all','typeOf','atan2','pow','clamp','lerp','sign','tan','send','playerCount','players','isOnline','shadows','material','glow','light','lightOff','skyGradient','camera','kick','kickTarget','button','particles','save','load','drivePath','walkPath','setCarSpeed','enterCar','exitCar','setTeam','setWaypoint','clearWaypoint','minimap','setMoney','addMoney','shop','buildCity','buildArena','dayCycle','setRegen','upper','lower','trim','split','join','replace','slice','pick','shuffle','sort','indexOf','insert','removeAt','keys','hasKey','removeKey','randomColor','dialog','ask','giveItem','takeItem','hasItem','items','lighting','fog','shake','rotate','giveWeapon','setAmmo','addAmmo','setHealth','getHealth','enemyMode','setEnemySpeed','setEnemyDamage','setTimer','getTimer','count','nearest','distance','label','explode','firstPerson','spawn','move','moveBy','color','resize','spin','hide','show','remove','exists','getX','getY','getZ','sky','teleport','damage','heal','checkpoint','setSpeed','setJump','setGravity','win','lose','say','hint','setScore','addScore','getScore','print','sound','wait','time','random','round','floor','ceil','abs','min','max','sqrt','sin','cos','text','number','len','push','pop','contains','range']);
 
   class Runtime{
     constructor(source,api,options={}){
       this.api=api;this.options=options;this.errors=[];this.threads=[];this.funcs=new Map();this.handlers=[];this.time=0;this.depth=0;this.budget=0;this.frameSteps=0;
-      this.globals=new Scope(null);this.globals.vars.set('player',PLAYER);
+      this.globals=new Scope(null);this.globals.vars.set('player',PLAYER);this.globals.vars.set('PI',Math.PI);this.classes=new Map();this.classLines=new Map();
       this.ast=parse(source);
       for(const s of this.ast){
         if(s.k==='func'){if(this.funcs.has(s.name))throw new NexusError('Funkcja „'+s.name+'” jest zdefiniowana dwa razy',s.line);this.funcs.set(s.name,s);}
         if(s.k==='when')this.handlers.push({event:s.event,argNode:s.arg,body:s.body,line:s.line,arg:undefined,next:0,running:0});
+        if(s.k==='class'){
+          if(this.classes.has(s.name)||this.funcs.has(s.name))throw new NexusError('Nazwa „'+s.name+'” jest użyta dwa razy',s.line);
+          const def=new ClassDef(s.name,s.parent,s.fields);
+          for(const m of s.methods){if(def.methods.has(m.name))throw new NexusError('Metoda „'+m.name+'” jest dwa razy w klasie '+s.name,m.line);def.methods.set(m.name,new Fn(m.name,m.params,m.body,this.globals,def));}
+          this.classes.set(s.name,def);this.classLines.set(s.name,s.line);
+        }
+      }
+      for(const def of this.classes.values()){
+        if(!def.parentName)continue;
+        def.parent=this.classes.get(def.parentName)||null;
+        if(!def.parent)throw new NexusError('Nieznana klasa bazowa „'+def.parentName+'”',this.classLines.get(def.name));
+        let c=def.parent,hops=0;while(c){if(c===def||++hops>50)throw new NexusError('Klasa '+def.name+' dziedziczy sama po sobie',this.classLines.get(def.name));c=c.parent;}
       }
       this.builtins=this.makeBuiltins();
     }
@@ -11733,7 +11876,7 @@ when playerJoin {
       try{this.options.onError?.(e);}catch{}
     }
     start(){
-      this.spawn(this.execBlock(this.ast.filter(s=>s.k!=='func'&&s.k!=='when'),this.globals),'program');
+      this.spawn(this.execBlock(this.ast.filter(s=>s.k!=='func'&&s.k!=='when'&&s.k!=='class'),this.globals),'program');
       this.started=false;
     }
     spawn(gen,label,handler){
@@ -11775,7 +11918,8 @@ when playerJoin {
     update(dt){
       this.time+=dt;this.frameSteps=0;
       if(!this.started&&this.threads.every(t=>t.label!=='program')){this.started=true;this.fire('start');}
-      for(const h of this.handlers)if(h.event==='every'&&!h.broken){this.argOf(h);if(!h.broken&&this.time>=h.next){h.next=Math.max(h.next+h.arg,this.time);this.fire('every');}}
+      // Each `when every N` block runs on its own clock (only that block, not every "every" block).
+      for(const h of this.handlers)if(h.event==='every'&&!h.broken){this.argOf(h);if(!h.broken&&this.time>=h.next){h.next=Math.max(h.next+h.arg,this.time);if(h.running===0)this.spawn(this.execBlock(h.body,new Scope(this.globals)),'every',h);}}
       if(this.handlers.some(h=>h.event==='tick'))this.fire('tick',dt);
       const list=this.threads.slice();
       for(const th of list){
@@ -11790,6 +11934,7 @@ when playerJoin {
           if(e instanceof Return){}
           else if(e===BREAK||e===CONTINUE)this.error((e===BREAK?'break':'continue')+' poza pętlą',this.line);
           else if(e instanceof NexusError)this.error(e.message,e.line||this.line);
+          else if(e instanceof Throw)this.error('Nieobsłużony błąd (throw): '+show(e.value),e.line||this.line);
           else{this.error('Błąd wykonania: '+(e&&e.message||e),this.line);}
         }
         if(r.done){this.threads.splice(this.threads.indexOf(th),1);if(th.handler)th.handler.running--;}
@@ -11805,12 +11950,20 @@ when playerJoin {
       yield* this.tickStep(s.line);
       switch(s.k){
         case 'var':{const v=s.value?yield* this.eval(s.value,scope):null;scope.vars.set(s.name,v);return;}
-        case 'func':case 'when':return;
+        case 'func':case 'when':case 'class':return;
+        case 'throw':throw new Throw(yield* this.eval(s.value,scope),s.line);
+        case 'try':
+          try{yield* this.execBlock(s.body,new Scope(scope));}
+          catch(x){
+            let value;if(x instanceof Throw)value=x.value;else if(x instanceof NexusError)value=x.message;else throw x;
+            const inner=new Scope(scope);if(s.name)inner.vars.set(s.name,value);yield* this.execBlock(s.handler,inner);
+          }
+          return;
         case 'expr':yield* this.eval(s.expr,scope);return;
         case 'assign':{
           let v=yield* this.eval(s.value,scope);
           if(s.target.k==='name'){
-            const name=s.target.name;if(name==='player')throw new NexusError('Nie można nadpisać „player”',s.line);
+            const name=s.target.name;if(name==='player'||name==='this')throw new NexusError('Nie można nadpisać „'+name+'”',s.line);
             const owner=scope.find(name);
             if(s.op!=='='){if(!owner)throw new NexusError('Nieznana zmienna „'+name+'”',s.line);v=this.arith(s.op[0],owner.vars.get(name),v,s.line);}
             // Assigning an unknown name creates it in the nearest function or global scope.
@@ -11849,10 +12002,13 @@ when playerJoin {
         case 'for':{
           let list=yield* this.eval(s.list,scope);
           if(typeof list==='string')list=[...list];
-          if(list instanceof Dict)list=[...list.map.keys()];
+          // for k, v in słownik → klucz i wartość; for i, x in lista → indeks i element.
+          const dict=list instanceof Dict?list:null;
+          if(dict)list=[...dict.map.keys()];
           if(!Array.isArray(list))throw new NexusError('for … in wymaga listy, słownika lub range(…)',s.line);
-          for(const item of list.slice()){
-            const inner=new Scope(scope);inner.vars.set(s.name,item);
+          for(const [n,item] of list.slice().entries()){
+            const inner=new Scope(scope);
+            if(s.index){inner.vars.set(s.index,dict?item:n);inner.vars.set(s.name,dict?dict.map.get(item)??null:item);}else inner.vars.set(s.name,item);
             try{yield* this.execBlock(s.body,inner);}catch(e){if(e===BREAK)break;if(e===CONTINUE)continue;throw e;}
             yield* this.tickStep(s.line);
           }
@@ -11877,6 +12033,7 @@ when playerJoin {
       switch(op){
         case '+':return l+r;case '-':return l-r;case '*':return l*r;
         case '/':if(r===0)throw new NexusError('Dzielenie przez zero',line);return l/r;
+        case '**':{const v=l**r;if(!isFinite(v))throw new NexusError('Wynik potęgowania jest za duży',line);return v;}
         case '%':if(r===0)throw new NexusError('Dzielenie przez zero',line);return ((l%r)+r)%r;
       }
     }
@@ -11885,7 +12042,23 @@ when playerJoin {
         case 'lit':return e.v;
         case 'list':{const out=[];for(const it of e.items)out.push(yield* this.eval(it,scope));return out;}
         case 'dict':{const d=new Dict();for(const [key,node] of e.entries)d.map.set(key,yield* this.eval(node,scope));return d;}
-        case 'name':{const owner=scope.find(e.name);if(!owner){if(this.funcs.has(e.name)||BUILTIN_NAMES.has(e.name))throw new NexusError('„'+e.name+'” to funkcja – dodaj nawiasy ( )',e.line);throw new NexusError('Nieznana zmienna „'+e.name+'”',e.line);}return owner.vars.get(e.name);}
+        case 'name':{
+          const owner=scope.find(e.name);if(owner)return owner.vars.get(e.name);
+          // Functions and classes are values too: map(lista, podwój), var Klasa = Wrog.
+          if(this.funcs.has(e.name)){const f=this.funcs.get(e.name);return new Fn(f.name,f.params,f.body,this.globals);}
+          if(this.classes.has(e.name))return this.classes.get(e.name);
+          if(BUILTIN_NAMES.has(e.name))return new BuiltinRef(e.name);
+          throw new NexusError('Nieznana zmienna „'+e.name+'”',e.line);
+        }
+        case 'this':{const owner=scope.find('this');if(!owner)throw new NexusError('„this” działa tylko w metodach klasy',e.line);return owner.vars.get('this');}
+        case 'super':{
+          let sc=scope;while(sc&&!sc.cls)sc=sc.parent;
+          if(!sc||!sc.cls.parent)throw new NexusError('„super” działa tylko w metodach klasy, która dziedziczy (extends)',e.line);
+          return new SuperRef(sc.cls.parent,scope.find('this').vars.get('this'));
+        }
+        case 'lambda':return new Fn(e.name,e.params,e.body,scope);
+        case 'cond':return truthy(yield* this.eval(e.c,scope))?yield* this.eval(e.a,scope):yield* this.eval(e.b,scope);
+        case 'tmpl':{let out='';for(const x of e.parts)out+=typeof x==='string'?x:show(yield* this.eval(x,scope));if(out.length>MAX_TEXT)throw new NexusError('Tekst jest za długi',e.line);return out;}
         case 'or':{const l=yield* this.eval(e.l,scope);return truthy(l)?true:truthy(yield* this.eval(e.r,scope));}
         case 'and':{const l=yield* this.eval(e.l,scope);return truthy(l)?truthy(yield* this.eval(e.r,scope)):false;}
         case 'not':return !truthy(yield* this.eval(e.e,scope));
@@ -11911,33 +12084,88 @@ when playerJoin {
         case 'member':{
           const obj=yield* this.eval(e.obj,scope);
           if(obj===PLAYER){if(!PLAYER_FIELDS.includes(e.name))throw new NexusError('player ma pola: '+PLAYER_FIELDS.join(', '),e.line);return this.api.playerGet(e.name);}
-          if(obj instanceof Dict)return obj.map.get(e.name)??null;
-          throw new NexusError('Kropka działa z player (np. player.x) i ze słownikami (np. d.hp)',e.line);
+          if(obj instanceof SuperRef){const m=this.method(obj.cls,e.name);if(!m)throw new NexusError('Klasa '+obj.cls.name+' nie ma metody „'+e.name+'”',e.line);return new Bound(m,obj.self);}
+          if(obj instanceof Dict){
+            if(obj.map.has(e.name))return obj.map.get(e.name);
+            if(obj instanceof Obj){const m=this.method(obj.cls,e.name);if(m)return new Bound(m,obj);}
+            return BUILTIN_NAMES.has(e.name)?new BuiltinRef(e.name,obj):null;
+          }
+          // Methods on lists, text and numbers: lista.push(3), "ala".upper(), x.round().
+          if(BUILTIN_NAMES.has(e.name)&&obj!==null&&obj!==undefined&&!isCallable(obj))return new BuiltinRef(e.name,obj);
+          throw new NexusError(typeName(obj)+' nie ma pola ani metody „'+e.name+'”',e.line);
         }
         case 'call':{
-          if(e.callee.k!=='name')throw new NexusError('Można wywoływać tylko funkcje po nazwie',e.line);
-          const name=e.callee.name,args=[];
-          for(const a of e.args)args.push(yield* this.eval(a,scope));
-          if(this.funcs.has(name)){
-            const f=this.funcs.get(name);
-            if(this.depth>=MAX_DEPTH)throw new NexusError('Za głęboka rekurencja w „'+name+'”',e.line);
-            const inner=new Scope(this.globals);inner.fn=true;f.params.forEach((pn,i)=>inner.vars.set(pn,args[i]??null));
-            this.depth++;
-            try{yield* this.execBlock(f.body,inner);}
-            catch(x){if(x instanceof Return)return x.value;if(x===BREAK||x===CONTINUE)throw new NexusError((x===BREAK?'break':'continue')+' poza pętlą',e.line);throw x;}
-            finally{this.depth--;}
-            return null;
-          }
-          const fn=this.builtins[name];
-          if(!fn)throw new NexusError('Nieznana funkcja „'+name+'”',e.line);
-          this.line=e.line;
-          const result=fn(args,e.line);
-          if(result instanceof Wait){if(result.seconds>0)yield result;return null;}
-          if(result instanceof Await){while(!result.done)yield new Wait(0);return result.value;}
-          return result===undefined?null:result;
+          let callee=null;
+          if(e.callee.k==='name'){
+            const name=e.callee.name,owner=scope.find(name);
+            if(owner&&!e.callee.isNew)callee=owner.vars.get(name);
+            else if(this.classes.has(name))callee=this.classes.get(name);
+            else if(e.callee.isNew)throw new NexusError('Nieznana klasa „'+name+'”',e.line);
+            else if(this.funcs.has(name)){const f=this.funcs.get(name);callee=new Fn(f.name,f.params,f.body,this.globals);}
+            else if(BUILTIN_NAMES.has(name))callee=new BuiltinRef(name);
+            else throw new NexusError('Nieznana funkcja „'+name+'”',e.line);
+          }else callee=yield* this.eval(e.callee,scope);
+          const args=[];for(const a of e.args)args.push(yield* this.eval(a,scope));
+          return yield* this.callValue(callee,args,e.line);
         }
       }
       throw new NexusError('Nieznane wyrażenie',e.line);
+    }
+    method(cls,name){for(let c=cls;c;c=c.parent)if(c.methods.has(name))return c.methods.get(name);return null;}
+    *callValue(f,args,line){
+      if(f instanceof Fn)return yield* this.invoke(f,args,line);
+      if(f instanceof Bound)return yield* this.invoke(f.fn,args,line,f.self);
+      if(f instanceof ClassDef)return yield* this.construct(f,args,line);
+      if(f instanceof BuiltinRef)return yield* this.callBuiltin(f.name,f.self===undefined?args:[f.self,...args],line);
+      throw new NexusError('Tego nie można wywołać – to '+typeName(f),line);
+    }
+    *invoke(f,args,line,self){
+      if(this.depth>=MAX_DEPTH)throw new NexusError('Za głęboka rekurencja w „'+(f.name||'funkcji')+'”',line);
+      const inner=new Scope(f.scope);inner.fn=true;f.params.forEach((pn,i)=>inner.vars.set(pn,args[i]??null));
+      if(self!==undefined){inner.vars.set('this',self);inner.cls=f.cls;}
+      this.depth++;
+      try{yield* this.execBlock(f.body,inner);}
+      catch(x){if(x instanceof Return)return x.value;if(x===BREAK||x===CONTINUE)throw new NexusError((x===BREAK?'break':'continue')+' poza pętlą',line);throw x;}
+      finally{this.depth--;}
+      return null;
+    }
+    // new Klasa(…) or Klasa(…): fields from the base class down, then init(…).
+    *construct(cls,args,line){
+      if((this.objects=(this.objects||0)+1)>200000)throw new NexusError('Za dużo utworzonych obiektów',line);
+      const o=new Obj(cls),chain=[];for(let c=cls;c;c=c.parent)chain.unshift(c);
+      for(const c of chain)for(const f of c.fields){const sc=new Scope(this.globals);sc.vars.set('this',o);o.map.set(f.name,f.value?yield* this.eval(f.value,sc):null);}
+      const init=this.method(cls,'init');if(init)yield* this.invoke(init,args,line,o);
+      return o;
+    }
+    *callBuiltin(name,args,line){
+      if(HIGHER_ORDER.has(name))return yield* this.higherOrder(name,args,line);
+      const fn=this.builtins[name];if(!fn)throw new NexusError('Nieznana funkcja „'+name+'”',line);
+      this.line=line;
+      const result=fn(args,line);
+      if(result instanceof Wait){if(result.seconds>0)yield result;return null;}
+      if(result instanceof Await){while(!result.done)yield new Wait(0);return result.value;}
+      return result===undefined?null:result;
+    }
+    // map / filter / find / reduce / forEach / sortBy / any / all take a function (they may also wait()).
+    *higherOrder(name,args,line){
+      const list=args[0],f=args[1];
+      if(!Array.isArray(list))throw new NexusError(name+': pierwszy argument musi być listą',line);
+      if(!isCallable(f))throw new NexusError(name+': drugi argument musi być funkcją, np. func(x) { return x * 2 }',line);
+      const items=list.slice();
+      if(name==='reduce'){let acc=args[2]??null;for(const [i,x] of items.entries())acc=yield* this.callValue(f,[acc,x,i],line);return acc;}
+      if(name==='sortBy'){const keys=[];for(const [i,x] of items.entries())keys.push([yield* this.callValue(f,[x,i],line),x]);
+        if(!keys.every(k=>typeof k[0]==='number')&&!keys.every(k=>typeof k[0]==='string'))throw new NexusError('sortBy: funkcja musi zwracać same liczby albo same teksty',line);
+        return keys.sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0).map(k=>k[1]);}
+      const out=[];
+      for(const [i,x] of items.entries()){
+        const v=yield* this.callValue(f,[x,i],line);
+        if(name==='map')out.push(v);
+        else if(name==='filter'){if(truthy(v))out.push(x);}
+        else if(name==='find'){if(truthy(v))return x;}
+        else if(name==='any'){if(truthy(v))return true;}
+        else if(name==='all'){if(!truthy(v))return false;}
+      }
+      return name==='map'||name==='filter'?out:name==='all'?true:name==='any'?false:null;
     }
     makeBuiltins(){
       const api=this.api,rt=this;
@@ -11950,13 +12178,14 @@ when playerJoin {
       const toSaved=(v,fn,depth=0)=>{if(depth>8)throw new NexusError(fn+': zbyt zagnieżdżona wartość',rt.line);if(v===null||v===undefined||typeof v==='number'||typeof v==='string'||typeof v==='boolean')return v??null;
         if(Array.isArray(v))return v.map(x=>toSaved(x,fn,depth+1));if(v instanceof Dict)return {__d:[...v.map].map(([k,x])=>[k,toSaved(x,fn,depth+1)])};throw new NexusError(fn+': nie można zapisać wartości typu '+typeName(v),rt.line);};
       const fromSaved=fromJSON;
+      const toDict=o=>{if(!o)return null;const d=new Dict();for(const k in o)d.map.set(k,o[k]);return d;};
       // A path is a list of [x, z] points, e.g. [[0, 0], [20, 0], [20, 20]].
       const points=(v,fn)=>{if(!Array.isArray(v)||v.length<2||!v.every(q=>Array.isArray(q)&&q.length>=2&&typeof q[0]==='number'&&typeof q[1]==='number'))throw new NexusError(fn+': trasa to lista punktów [x, z], np. [[0, 0], [20, 0], [20, 20]]',rt.line);return v.slice(0,100).map(q=>[q[0],q[1]]);};
       return {
         spawn:a=>{const type=str(a[0],'spawn',0);if(!PART_TYPES.includes(type))throw new NexusError('spawn: nieznany typ „'+type+'”. Dostępne: '+PART_TYPES.join(', '),rt.line);
           const name=a[8]==null?null:str(a[8],'spawn',8);
           const r=api.spawn(type,num(a[1],'spawn',1,0),num(a[2],'spawn',2,0),num(a[3],'spawn',3,0),num(a[4],'spawn',4,type==='coin'?1:4),num(a[5],'spawn',5,1),num(a[6],'spawn',6,type==='coin'?1:4),color(a[7],'spawn',7,''),name);
-          if(r==null)throw new NexusError('spawn: osiągnięto limit 1500 klocków',rt.line);return r;},
+          if(r==null)throw new NexusError('spawn: osiągnięto limit 3000 klocków',rt.line);return r;},
         move:a=>{const n=part(a[0],'move');const s=Math.max(0,num(a[4],'move',4,0));api.move(n,num(a[1],'move',1),num(a[2],'move',2),num(a[3],'move',3),s);return new Wait(s);},
         moveBy:a=>{const n=part(a[0],'moveBy');const pos=api.getPos(n),s=Math.max(0,num(a[4],'moveBy',4,0));api.move(n,pos[0]+num(a[1],'moveBy',1),pos[1]+num(a[2],'moveBy',2),pos[2]+num(a[3],'moveBy',3),s);return new Wait(s);},
         color:a=>{api.color(part(a[0],'color'),color(a[1],'color',1));},
@@ -11967,7 +12196,7 @@ when playerJoin {
         remove:a=>{api.remove(part(a[0],'remove'));},
         exists:a=>api.exists(str(a[0],'exists',0)),
         // Combat (NexusScript 1.1)
-        giveWeapon:a=>{const k=str(a[0],'giveWeapon',0).toLowerCase();if(!WEAPON_KINDS.includes(k))throw new NexusError('giveWeapon: dostępne bronie: '+WEAPON_KINDS.join(', '),rt.line);api.weapon(k);},
+        giveWeapon:a=>{const k=str(a[0],'giveWeapon',0).toLowerCase();if(!WEAPON_KINDS.includes(k))throw new NexusError('giveWeapon: dostępne bronie: '+WEAPON_KINDS.join(', '),rt.line);api.weapon(k,Math.max(0,Math.min(4,Math.round(num(a[1],'giveWeapon',1,0)))));},
         setAmmo:a=>{api.ammo(Math.max(-1,Math.round(num(a[0],'setAmmo',0))),false);},
         addAmmo:a=>{api.ammo(Math.round(num(a[0],'addAmmo',0)),true);},
         setHealth:a=>{api.enemy(part(a[0],'setHealth'),'hp',Math.max(0,num(a[1],'setHealth',1)));},
@@ -12028,6 +12257,29 @@ when playerJoin {
         keys:a=>{if(!(a[0] instanceof Dict))throw new NexusError('keys: wymaga słownika',rt.line);return [...a[0].map.keys()];},
         hasKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('hasKey: wymaga słownika',rt.line);return a[0].map.has(show(a[1]));},
         removeKey:a=>{if(!(a[0] instanceof Dict))throw new NexusError('removeKey: wymaga słownika',rt.line);return a[0].map.delete(show(a[1]));},
+        // NexusScript 2.1: building, destructible parts, shield, storm, glider and a hotbar (Battle Royale games)
+        build:a=>{const k=str(a[0],'build',0),m=str(a[1],'build',1,'wood');if(!BUILD_KINDS.includes(k))throw new NexusError('build: rodzaje to "wall", "floor", "ramp", "roof"',rt.line);if(!BUILD_MATERIALS.includes(m))throw new NexusError('build: materiały to "wood", "stone", "metal"',rt.line);return toDict(api.build(k,m));},
+        buildAt:a=>{const k=str(a[0],'buildAt',0),m=str(a[5],'buildAt',5,'wood');if(!BUILD_KINDS.includes(k)||!BUILD_MATERIALS.includes(m))throw new NexusError('buildAt(rodzaj, x, y, z, kierunek 0-3, materiał)',rt.line);
+          return toDict(api.buildAt(k,num(a[1],'buildAt',1),num(a[2],'buildAt',2),num(a[3],'buildAt',3),((Math.round(num(a[4],'buildAt',4,0))%4)+4)%4,m));},
+        setPartHealth:a=>{api.partHealth(part(a[0],'setPartHealth'),Math.max(1,Math.min(100000,num(a[1],'setPartHealth',1))));},
+        getPartHealth:a=>api.getPartHealth(part(a[0],'getPartHealth')),
+        setShield:a=>{api.shield(num(a[0],'setShield',0),false);},
+        addShield:a=>{api.shield(num(a[0],'addShield',0),true);},
+        storm:a=>{api.storm(num(a[0],'storm',0),num(a[1],'storm',1),Math.max(1,num(a[2],'storm',2)));},
+        stormShrink:a=>{api.stormShrink(num(a[0],'stormShrink',0),num(a[1],'stormShrink',1),Math.max(1,num(a[2],'stormShrink',2)),Math.max(.1,num(a[3],'stormShrink',3,30)));},
+        stormDamage:a=>{api.stormDamage(Math.max(0,Math.min(100,num(a[0],'stormDamage',0))));},
+        inStorm:()=>api.inStorm(),
+        glide:a=>{api.glide(a[0]==null?true:truthy(a[0]));},
+        hotbar:a=>{const items=a[0]==null?[]:list(a[0],'hotbar').slice(0,10).map(x=>Array.isArray(x)?[show(x[0]),typeof x[1]==='string'&&/^#[0-9a-fA-F]{6}$/.test(x[1])?x[1]:'#e5e7eb']:[show(x),'#e5e7eb']);
+          api.hotbar(items,a[1]==null?-1:num(a[1],'hotbar',1));},
+        // NexusScript 2.0: types and more maths (map/filter/… are handled by the interpreter itself)
+        typeOf:a=>typeName(a[0]),
+        atan2:a=>Math.atan2(num(a[0],'atan2',0),num(a[1],'atan2',1)),
+        pow:a=>{const v=num(a[0],'pow',0)**num(a[1],'pow',1);if(!isFinite(v))throw new NexusError('pow: wynik jest za duży',rt.line);return v;},
+        clamp:a=>Math.max(num(a[1],'clamp',1),Math.min(num(a[2],'clamp',2),num(a[0],'clamp',0))),
+        lerp:a=>{const x=num(a[0],'lerp',0);return x+(num(a[1],'lerp',1)-x)*num(a[2],'lerp',2);},
+        sign:a=>Math.sign(num(a[0],'sign',0)),
+        tan:a=>Math.tan(num(a[0],'tan',0)),
         // Online play: script messages to every player in the room (NexusScript 1.5)
         send:a=>{const n=str(a[0],'send',0).trim().slice(0,24);if(!n)throw new NexusError('send: podaj nazwę wiadomości, np. send("punkt", 1)',rt.line);
           const v=toSaved(a[1]??null,'send');if(JSON.stringify(v).length>600)throw new NexusError('send: wiadomość jest za duża (najwyżej ok. 600 znaków)',rt.line);api.netSend(n,v);},
@@ -12092,7 +12344,7 @@ when playerJoin {
     const s=String(text||'');const m=s.match(/```[a-zA-Z]*[ \t]*\r?\n([\s\S]*?)```/);
     return (m?m[1]:s).replace(/\r\n/g,'\n').trim()+'\n';
   }
-  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,EVENTS,KEYWORDS,Dict,CAMERA_MODES,MATERIALS,version:'1.5'};
+  window.NexusScript={parse,Runtime,NexusError,extract,show,BUILTIN_NAMES,PART_TYPES,WEAPON_KINDS,EVENTS,KEYWORDS,Dict,CAMERA_MODES,MATERIALS,BUILD_KINDS,version:'2.1'};
 })();
 </script>
 <style id="nexus-engine-style">
@@ -12134,6 +12386,12 @@ when playerJoin {
 .nx-chat div{background:#0d1117b8;padding:4px 9px;border-radius:7px;transition:opacity 1s}.nx-chat div.old{opacity:0}.nx-chat b{color:#7dd3fc}
 .nx-chatin{position:absolute;left:12px;bottom:120px;width:min(360px,70vw);padding:9px 12px;border-radius:9px;border:1px solid #ffffff40;background:#0d1117e6;color:#fff;font:600 14px Inter,system-ui,sans-serif}
 .nx-net{cursor:pointer;border:0;background:#1d4ed8cc;color:#fff}
+.nx-shieldbar>i{background:linear-gradient(90deg,#38bdf8,#2563eb)!important}
+.nx-hotbar{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);display:flex;gap:6px;pointer-events:none;z-index:2}
+.nx-hotbar b{min-width:64px;max-width:120px;padding:7px 9px;border-radius:9px;background:#0d1117c9;color:#fff;font:700 12px Inter,system-ui,sans-serif;border:2px solid #ffffff30;border-bottom-width:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nx-hotbar b.on{transform:translateY(-4px);border-color:#fff;background:#111827f0}
+.nx-player.nx-instorm::after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 120px 40px #9333ea88}
+@media (max-width:700px){.nx-hotbar{bottom:150px}.nx-hotbar b{min-width:44px;font-size:10px;padding:5px}}
 .nx-custom{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:52vw;z-index:3}
 .nx-custom .nx-btn{min-height:44px;padding:0 16px;font-size:14px;touch-action:none}
 .nx-talk{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);padding:8px 14px;border-radius:10px;background:#0d1117d9;color:#fff;font:700 14px Inter,system-ui,sans-serif;pointer-events:none}
@@ -12151,15 +12409,19 @@ body.nx-playing{overflow:hidden}
 // NexusGame: plays a Studio 3D project (parts + NexusScript) in its own renderer overlay.
 (() => {
   'use strict';
-  const TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health','npc','car','ball','zone'];
-  const DEFAULT_COLOR={block:'#4eae79',glass:'#9fd8ff',lava:'#ff5a2a',coin:'#f5c542',spawn:'#4a9eff',finish:'#ffffff',checkpoint:'#b47cff',spring:'#ff9d3c',enemy:'#e0383b',ammo:'#6b7d3a',health:'#f4f4f4',npc:'#3b82f6',car:'#2563eb',ball:'#f8fafc',zone:'#facc15'};
+  const TYPES=['block','glass','lava','coin','spawn','finish','checkpoint','spring','enemy','ammo','health','npc','car','ball','zone','ramp'];
+  const DEFAULT_COLOR={block:'#4eae79',glass:'#9fd8ff',lava:'#ff5a2a',coin:'#f5c542',spawn:'#4a9eff',finish:'#ffffff',checkpoint:'#b47cff',spring:'#ff9d3c',enemy:'#e0383b',ammo:'#6b7d3a',health:'#f4f4f4',npc:'#3b82f6',car:'#2563eb',ball:'#f8fafc',zone:'#facc15',ramp:'#a16207'};
   // Player weapons: damage per hit, seconds between shots, range, spread and pellets per shot.
   const WEAPONS={pistol:{name:'Pistolet',dmg:25,rate:.3,range:70,spread:.012,pellets:1,auto:false,ammo:60},rifle:{name:'Karabin',dmg:16,rate:.1,range:90,spread:.03,pellets:1,auto:true,ammo:150},
     shotgun:{name:'Strzelba',dmg:12,rate:.8,range:28,spread:.1,pellets:7,auto:false,ammo:40},sniper:{name:'Snajperka',dmg:100,rate:1.1,range:160,spread:0,pellets:1,auto:false,ammo:20},
     sword:{name:'Miecz',dmg:40,rate:.45,range:4,spread:0,pellets:1,auto:false,melee:true,ammo:-1},
-    grenade:{name:'Granaty',dmg:90,rate:.9,range:0,spread:0,pellets:1,auto:false,thrown:true,ammo:5}};
+    grenade:{name:'Granaty',dmg:90,rate:.9,range:0,spread:0,pellets:1,auto:false,thrown:true,ammo:5},
+    pickaxe:{name:'Kilof',dmg:20,partDmg:34,rate:.42,range:4.5,spread:0,pellets:1,auto:true,melee:true,ammo:-1}};
+  // Weapon rarity (0 common … 4 legendary): names, colours and a damage bonus.
+  const RARITY=[['Zwykły','#9ca3af',1],['Niezwykły','#22c55e',1.1],['Rzadki','#3b82f6',1.2],['Epicki','#a855f7',1.32],['Legendarny','#f59e0b',1.45]];
+  const BUILD_HP={wood:150,stone:300,metal:500},BUILD_COLOR={wood:'#b7793e',stone:'#9ca3af',metal:'#64748b'};
   const SOLID=new Set(['block','glass','lava','spawn','finish','checkpoint','spring','car']);
-  const MAX_PARTS=1500,STEP=1/60,PW=.8,PH=3.4;
+  const MAX_PARTS=3000,STEP=1/60,PW=.8,PH=3.4;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
   function texture(draw,size=64){const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;}
@@ -12199,7 +12461,9 @@ body.nx-playing{overflow:hidden}
   function buildMesh(part){
     const [w,h,d]=part.size,g=new THREE.Group();
     let body;
-    if(part.type==='coin'){body=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(.2,w/2),Math.max(.2,w/2),.18,20),material('coin',part.color));body.rotation.x=Math.PI/2;}
+    // A ramp is a sloped plank rising toward its direction (rot 0 = +z, 90 = +x …); players walk up it.
+    if(part.type==='ramp'){body=new THREE.Mesh(new THREE.BoxGeometry(w,.35,Math.hypot(d,h)),part.mat?surface(part.mat,part.color,w,d):material('block',part.color));body.rotation.x=-Math.atan2(h,d);g.rotation.y=(part.rot||0)*Math.PI/180;}
+    else if(part.type==='coin'){body=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(.2,w/2),Math.max(.2,w/2),.18,20),material('coin',part.color));body.rotation.x=Math.PI/2;}
     else if(part.type==='ball'){
       // A ball: a sphere with a few dark patches so its rolling is visible.
       const r=Math.max(.15,w/2);body=new THREE.Mesh(new THREE.SphereGeometry(r,20,14),new THREE.MeshLambertMaterial({color:new THREE.Color(part.color)}));
@@ -12270,7 +12534,7 @@ body.nx-playing{overflow:hidden}
     const api={spawn:(type,x,y,z,w,h,d,color,name)=>{if(parts.length>=MAX_PARTS)return null;const n=name||'part'+(parts.length+1);parts.push({type,pos:[x,y,z],size:[w,h,d],color:color||DEFAULT_COLOR[type],name:n});return n;},
       exists:n=>parts.some(p=>p.name===n),getPos:n=>(parts.find(p=>p.name===n)||{pos:[0,0,0]}).pos,
       move(){},color(n,c){const p=parts.find(q=>q.name===n);if(p)p.color=c;},resize(){},spin(){},visible(){},remove(n){const i=parts.findIndex(p=>p.name===n);if(i>=0)parts.splice(i,1);},
-      shadows(){},material(){},glow(){},light:()=>'light1',lightOff(){},skyGradient(){},netSend(){},netCount:()=>1,netPlayers:()=>[],netOnline:()=>false,cameraMode(){},kick(){},kickTarget(){},button(){},particles(){},save:()=>true,load:()=>null,drivePath(){},walkPath(){},carSpeed(){},team(){},waypoint(){},minimap(){},money(){},shop(){},dayCycle(){},regen(){},enterCar(){},exitCar(){},
+      build:()=>null,buildAt:()=>null,partHealth(){},getPartHealth:()=>0,shield(){},storm(){},stormShrink(){},stormDamage(){},inStorm:()=>false,glide(){},hotbar(){},shadows(){},material(){},glow(){},light:()=>'light1',lightOff(){},skyGradient(){},netSend(){},netCount:()=>1,netPlayers:()=>[],netOnline:()=>false,cameraMode(){},kick(){},kickTarget(){},button(){},particles(){},save:()=>true,load:()=>null,drivePath(){},walkPath(){},carSpeed(){},team(){},waypoint(){},minimap(){},money(){},shop(){},dayCycle(){},regen(){},enterCar(){},exitCar(){},
       buildCity(x,z,size){for(const q of cityParts(x,z,size))if(parts.length<MAX_PARTS)parts.push({...q});},buildArena(x,z,size){for(const q of arenaParts(x,z,size))if(parts.length<MAX_PARTS)parts.push({...q});},
       dialog(){},ask(){},item:()=>true,itemCount:()=>0,itemList:()=>[],lighting(){},fog(){},shake(){},rotate(){},
       weapon(){},ammo(){},enemy(){},enemyGet:()=>100,timer(){},getTimer:()=>0,count:t=>parts.filter(p=>p.type===t).length,nearest:t=>(parts.find(p=>p.type===t)||{}).name||null,distance:()=>0,label(){},explode(){},firstPerson(){},
@@ -12290,7 +12554,9 @@ body.nx-playing{overflow:hidden}
     root.append(renderer.domElement);
     const top=el('div','nx-top'),exit=el('button','nx-btn','✕ Wyjdź'),restartBtn=el('button','nx-btn','Restart'),title=el('div','nx-title',project.name||'Gra 3D');
     const stats=el('div','nx-stats'),hpBox=el('div','nx-hp'),hpBar=el('i'),coinsPill=el('div','nx-pill'),scorePill=el('div','nx-pill');
-    hpBox.append(hpBar);stats.append(hpBox,coinsPill,scorePill);top.append(exit,restartBtn);
+    const shieldBox=el('div','nx-hp nx-shieldbar'),shieldBar=el('i');shieldBox.append(shieldBar);shieldBox.hidden=true;
+    const hotbarEl=el('div','nx-hotbar');hotbarEl.hidden=true;
+    hpBox.append(hpBar);stats.append(hpBox,shieldBox,coinsPill,scorePill);top.append(exit,restartBtn);
     for(const b of opts.buttons||[]){const x=el('button','nx-btn',b.label);x.onclick=()=>b.onClick(controller);top.append(x);}
     top.append(title,stats);
     const hint=el('div','nx-hint'),say=el('div','nx-say'),consoleBox=el('div','nx-console');hint.hidden=true;consoleBox.hidden=true;
@@ -12325,6 +12591,8 @@ body.nx-playing{overflow:hidden}
     const playerObj=rig?rig.group:new THREE.Mesh(new THREE.BoxGeometry(PW*2,PH,PW*2),new THREE.MeshLambertMaterial({color:0xf5c542}));
     if(!rig)playerObj.geometry.translate(0,PH/2,0);
     playerObj.rotation.y=Math.PI;scene.add(playerObj);shade(playerObj);
+    // A simple glider above the player, shown while gliding.
+    const glider=new THREE.Mesh(new THREE.ConeGeometry(4.2,1.2,3),new THREE.MeshLambertMaterial({color:0x38bdf8}));glider.rotation.x=Math.PI;glider.scale.set(1,1,.45);glider.position.y=8;glider.visible=false;playerObj.add(glider);
     const input={keys:new Set(),jump:false,fire:false,firePressed:false};
     // Weapon held by the player (third person) and the first-person view model.
     let gunModel=null,viewGun=null;const effects=[],projectiles=[];const ray=new THREE.Raycaster(),tmpQ=new THREE.Quaternion();
@@ -12376,8 +12644,8 @@ body.nx-playing{overflow:hidden}
       setScore(v){state.score=v;state.scoreShown=true;},getScore:()=>state.score,
       print(t){errors.push({message:t,line:0,info:true});if(opts.showErrors)showErrors();try{opts.onPrint?.(t);}catch{}},
       sound,
-      playerGet(k){if(k==='hp')return state.hp;if(k==='coins')return state.coins;if(k==='ammo')return state.ammo;if(k==='weapon')return state.weapon;if(k==='kills')return state.kills;if(k==='money')return state.money;if(k==='driving')return state.driving?state.driving.name:null;if(k==='name')return playerName();return Math.round(state.pos['xyz'.indexOf(k)]*100)/100;},
-      weapon(k){state.weapon=k==='none'?null:k;state.ammo=state.weapon?WEAPONS[state.weapon].ammo:0;equip();},
+      playerGet(k){if(k==='hp')return state.hp;if(k==='coins')return state.coins;if(k==='ammo')return state.ammo;if(k==='weapon')return state.weapon;if(k==='kills')return state.kills;if(k==='money')return state.money;if(k==='driving')return state.driving?state.driving.name:null;if(k==='name')return playerName();if(k==='shield')return Math.round(state.shield);if(k==='rarity')return state.rarity;return Math.round(state.pos['xyz'.indexOf(k)]*100)/100;},
+      weapon(k,r){state.weapon=k==='none'?null:k;state.rarity=r||0;state.ammo=state.weapon?WEAPONS[state.weapon].ammo:0;equip();},
       ammo(v,add){state.ammo=add?(state.ammo<0?-1:Math.max(0,state.ammo+v)):v;},
       enemy(n,key,v){const p=byName.get(n);if(!p)return;if(p.type!=='enemy')Object.assign(p,{hp:100,maxHp:100,mode:'guard',speed:0,damage:0,fireCd:1});if(key==='mode'&&v==='ball'){p.damage=0;if(p.speed<6)p.speed=6;}if(key==='hp'){p.hp=v;p.maxHp=Math.max(p.maxHp,v);if(p.bar)enemyBar(p);if(v<=0)killEnemy(p);}else p[key]=v;},
       enemyGet(n,key){const p=byName.get(n);return p&&p.hp!=null?Math.round(p[key]):0;},
@@ -12426,6 +12694,24 @@ body.nx-playing{overflow:hidden}
       exitCar(){if(state.driving)exitCar();},
       buildCity(x,z,size){for(const q of cityParts(x,z,size))addPart(q);},
       buildArena(x,z,size){for(const q of arenaParts(x,z,size))addPart(q);},
+      build(kind,mat){
+        // Snap to a 4-unit grid in front of the player, facing the nearest of four directions.
+        const flat=state.cam==='top'||state.cam==='side',fx=flat?state.face[0]:-Math.sin(yaw),fz=flat?state.face[1]:-Math.cos(yaw);
+        const dir=Math.abs(fz)>=Math.abs(fx)?(fz>0?0:2):(fx>0?1:3),[dx,dz]=[[0,1],[1,0],[0,-1],[-1,0]][dir];
+        const cx=Math.floor(state.pos[0]/4)*4+2,cz=Math.floor(state.pos[2]/4)*4+2,L=Math.round(state.pos[1]/4)*4;
+        const at={wall:[cx+dx*2,L+2,cz+dz*2],floor:[cx+dx*4,L-.15,cz+dz*4],ramp:[cx+dx*4,L+2,cz+dz*4],roof:[cx,L+4.15,cz]}[kind];
+        return placeBuild(kind,at[0],at[1],at[2],dir,mat);
+      },
+      buildAt(kind,x,y,z,dir,mat){return placeBuild(kind,x,y,z,dir,mat);},
+      partHealth(n,hp){const p=byName.get(n);if(p){p.php=hp;p.phpMax=hp;}},
+      getPartHealth:n=>{const p=byName.get(n);return p&&p.php!=null?Math.max(0,Math.round(p.php)):0;},
+      shield(v,add){state.shield=clamp(add?state.shield+v:v,0,100);state.shieldShown=true;},
+      storm(x,z,r){state.storm={x,z,r,from:null,to:null,t:0,dur:0,dmg:state.storm?.dmg??1,tick:1};},
+      stormShrink(x,z,r,sec){if(!state.storm)api.storm(x,z,Math.max(r,200));const s=state.storm;s.from=[s.x,s.z,s.r];s.to=[x,z,r];s.t=0;s.dur=sec;},
+      stormDamage(v){if(!state.storm)api.storm(state.pos[0],state.pos[2],100000);state.storm.dmg=v;},
+      inStorm:()=>!!state.storm&&Math.hypot(state.pos[0]-state.storm.x,state.pos[2]-state.storm.z)>state.storm.r,
+      glide(on){state.glide=!!on;},
+      hotbar(items,sel){hotbarEl.replaceChildren(...items.map(([t,c],i)=>{const b=el('b',null,t);b.style.borderBottomColor=c;if(i===Math.round(sel))b.className='on';return b;}));hotbarEl.hidden=!items.length;},
       cameraMode(m){state.cam=m;state.firstPerson=m==='first';playerObj.visible=m!=='first';if(m==='top'||m==='side'){yaw=0;pitch=.35;}equip();},
       kick(n,x,y,z){const p=byName.get(n);if(!p)return;if(p.type!=='ball')Object.assign(p,{vel:[0,0,0],inside:new Set(),type:p.type});p.vel=[p.vel[0]+x,p.vel[1]+y,p.vel[2]+z];if(p.type!=='ball')p.kicked=true;},
       kickTarget(n,x,z){const p=byName.get(n);if(p)p.kickTo=[x,z];},
@@ -12448,6 +12734,28 @@ body.nx-playing{overflow:hidden}
       netOnline:()=>!!online
     };
     const lights=new Map();let lightSerial=0;
+    // Building pieces: one per grid slot (a destroyed piece frees its slot), with health by material.
+    const built=new Map();let stormMesh=null;root.append(hotbarEl);
+    function placeBuild(kind,x,y,z,dir,mat){
+      const key=[kind,Math.round(x*10),Math.round(y*10),Math.round(z*10),kind==='wall'?dir%2:kind==='ramp'?dir:0].join(':');
+      const old=byName.get(built.get(key));if(old&&old.visible)return null;
+      const along=dir%2===0,ramp=kind==='ramp';
+      const size=kind==='wall'?(along?[4,4,.3]:[.3,4,4]):ramp?[4,4,4]:[4,.3,4];
+      const name=addPart({type:ramp?'ramp':'block',pos:[x,y,z],size,color:BUILD_COLOR[mat],rot:ramp?dir*90:0});if(!name)return null;
+      const p=byName.get(name);p.mat=mat;p.php=p.phpMax=BUILD_HP[mat];p.build=kind;rebuildMesh(p);built.set(key,name);sound('click');
+      return {name,kind,x,y,z,dir,material:mat};
+    }
+    // Height of a ramp's surface under (x, z), or null when (x, z) is off the ramp.
+    function rampHeight(r,x,z){
+      const t=(r.rot||0)*Math.PI/180,dx=x-r.pos[0],dz=z-r.pos[2],lx=dx*Math.cos(t)-dz*Math.sin(t),lz=dx*Math.sin(t)+dz*Math.cos(t),[w,h,d]=r.size;
+      if(Math.abs(lx)>w/2+.3||Math.abs(lz)>d/2+.3)return null;
+      return r.pos[1]-h/2+h*clamp((lz+d/2)/d,0,1);
+    }
+    function damagePart(p,dmg){
+      if(!p||p.php==null||!parts.includes(p))return;p.php-=dmg;
+      p.mesh.traverse(o=>{if(o.material?.emissive){const was=o.material.emissive.getHex();o.material.emissive.setHex(0x553311);setTimeout(()=>o.material?.emissive?.setHex(was),90);}});
+      if(p.php<=0){const name=p.name;explosionPuff(p.pos);sound('hit');removePart(p);runtime?.fire('destroy',name);}
+    }
     const playerName=()=>online?.name||(typeof username==='string'&&username)||'Gracz';
     // ---------- Online play (Studio games): other players, chat and script messages ----------
     const online=opts.online||null,others=new Map();let lastEvent=-1,lastChat=-1,netAt=0;
@@ -12536,7 +12844,8 @@ body.nx-playing{overflow:hidden}
       parts=[];byName=new Map();serial=0;minY=0;touching=new Set();errors=[];result?.remove();result=null;hint.hidden=true;say.style.opacity='0';
       const sky=project.settings?.sky||'#8fd3ff';scene.background=new THREE.Color(sky);scene.fog=new THREE.Fog(sky,120,420);
       for(const p of normalizeParts(project.parts))addPart(p);
-      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false,items:new Map(),asking:false,shake:0,lighting:'day',nearNpc:null,driving:null,nearCar:null,money:0,moneyShown:false,waypoint:null,dayCycle:0,dayT:0,regen:0,cam:'third',face:[0,-1],shadowsSet:false};
+      state={pos:null,vel:[0,0,0],grounded:false,ground:null,hp:100,coins:0,score:0,scoreShown:false,speed:clamp(+project.settings?.speed||8,4,16),jump:clamp(+project.settings?.jump||12,6,22),gravity:clamp(+project.settings?.gravity||30,10,45),respawn:null,over:false,deadUntil:0,walk:0,weapon:null,ammo:0,fireCd:0,kills:0,timer:0,timerOn:false,timeupFired:false,firstPerson:false,items:new Map(),asking:false,shake:0,lighting:'day',nearNpc:null,driving:null,nearCar:null,money:0,moneyShown:false,waypoint:null,dayCycle:0,dayT:0,regen:0,cam:'third',face:[0,-1],shadowsSet:false,shield:0,shieldShown:false,rarity:0,storm:null,glide:false};
+      built.clear();if(stormMesh){scene.remove(stormMesh);disposeTree(stormMesh);stormMesh=null;}root.classList.remove('nx-instorm');hotbarEl.hidden=true;hotbarEl.replaceChildren();
       for(const l of lights.values())scene.remove(l);lights.clear();setShadows(strongDevice);
       customButtons.forEach(b=>b.remove());customButtons.clear();customBar.hidden=true;
       projectiles.splice(0).forEach(q=>{scene.remove(q.mesh);disposeTree(q.mesh);});if(waypointBeam){scene.remove(waypointBeam);disposeTree(waypointBeam);waypointBeam=null;}mapCanvas.hidden=true;
@@ -12547,7 +12856,7 @@ body.nx-playing{overflow:hidden}
       state.pos=spawnPoint();state.respawn=null;showErrors();
       if(!state.shadowsSet&&parts.length>900)setShadows(false);
     }
-    function hurt(v){if(state.over||state.deadUntil)return;state.hp=clamp(state.hp-v,0,100);sound('hit');flash.style.transition='none';flash.style.opacity='.35';requestAnimationFrame(()=>{flash.style.transition='opacity .35s';flash.style.opacity='0';});if(state.hp<=0)die();}
+    function hurt(v,ignoreShield){if(state.over||state.deadUntil)return;if(!ignoreShield&&state.shield>0){const a=Math.min(state.shield,v);state.shield-=a;v-=a;}state.hp=clamp(state.hp-v,0,100);sound('hit');flash.style.transition='none';flash.style.opacity='.35';requestAnimationFrame(()=>{flash.style.transition='opacity .35s';flash.style.opacity='0';});if(state.hp<=0)die();}
     function die(){
       if(state.over||state.deadUntil)return;state.hp=0;state.deadUntil=runtime?runtime.time+.8:.8;runtime?.fire('die');message('Auć! Spróbuj jeszcze raz.',1.2);
     }
@@ -12564,7 +12873,8 @@ body.nx-playing{overflow:hidden}
       const w=state?.weapon;cross.hidden=(!w&&!state?.firstPerson)||state?.cam==='top'||state?.cam==='side';if(fireB)fireB.hidden=!w;
       if(!w)return;
       const make=()=>{const g=new THREE.Group(),dark=new THREE.MeshLambertMaterial({color:0x2a2d31}),metal=new THREE.MeshLambertMaterial({color:w==='sword'?0xd8dde3:0x4a5058});
-        if(w==='sword'){const blade=new THREE.Mesh(new THREE.BoxGeometry(.12,.05,1.6),metal);blade.position.z=-.95;const guard=new THREE.Mesh(new THREE.BoxGeometry(.5,.08,.08),dark);guard.position.z=-.12;const grip=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.3),new THREE.MeshLambertMaterial({color:0x6b4a22}));g.add(blade,guard,grip);}
+        if(w==='pickaxe'){const stick=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,1.4),new THREE.MeshLambertMaterial({color:0x6b4a22}));stick.position.z=-.6;const head=new THREE.Mesh(new THREE.BoxGeometry(.9,.14,.16),metal);head.position.z=-1.25;g.add(stick,head);}
+        else if(w==='sword'){const blade=new THREE.Mesh(new THREE.BoxGeometry(.12,.05,1.6),metal);blade.position.z=-.95;const guard=new THREE.Mesh(new THREE.BoxGeometry(.5,.08,.08),dark);guard.position.z=-.12;const grip=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.3),new THREE.MeshLambertMaterial({color:0x6b4a22}));g.add(blade,guard,grip);}
         else{const len={pistol:.5,rifle:1.1,shotgun:1,sniper:1.5}[w];const body=new THREE.Mesh(new THREE.BoxGeometry(.16,.2,len),dark);body.position.z=-len/2;const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,len*.5,8),metal);barrel.rotation.x=Math.PI/2;barrel.position.set(0,.04,-len-.2);const grip=new THREE.Mesh(new THREE.BoxGeometry(.12,.3,.14),dark);grip.position.set(0,-.2,-.05);grip.rotation.x=-.3;g.add(body,barrel,grip);
           if(w==='sniper'){const scope=new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.5,10),metal);scope.rotation.x=Math.PI/2;scope.position.set(0,.2,-.6);g.add(scope);}}
         return g;};
@@ -12578,7 +12888,8 @@ body.nx-playing{overflow:hidden}
     function explosion(at,r,dmg){
       const ball=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:0xffa53a,transparent:true,opacity:.85}));ball.position.set(...at);scene.add(ball);effects.push({obj:ball,until:(runtime?.time||0)+.45,grow:r});
       sound('explosion');state.shake=Math.max(state.shake,1);
-      for(const p of parts.slice()){if(p.type!=='enemy'||!p.visible||p.team==='ally')continue;const d=Math.hypot(p.pos[0]-at[0],p.pos[1]-at[1],p.pos[2]-at[2]);if(d<r)damageEnemy(p,dmg*(1-d/r*.6));}
+      for(const p of parts.slice()){const d=Math.hypot(p.pos[0]-at[0],p.pos[1]-at[1],p.pos[2]-at[2]);if(d>=r||!p.visible)continue;
+        if(p.php!=null)damagePart(p,dmg*2*(1-d/r*.6));else if(p.type==='enemy'&&p.team!=='ally')damageEnemy(p,dmg*(1-d/r*.6));}
       const pd=Math.hypot(state.pos[0]-at[0],state.pos[1]+1.5-at[1],state.pos[2]-at[2]);if(pd<r)hurt(dmg*(1-pd/r)*.5);
     }
     function killEnemy(p){if(!parts.includes(p))return;const ally=p.team==='ally',name=p.name;explosionPuff(p.pos);removePart(p);if(ally){sound('error');return;}state.kills++;sound('coin');runtime?.fire('kill',name);}
@@ -12596,6 +12907,7 @@ body.nx-playing{overflow:hidden}
       const w=WEAPONS[state.weapon];if(!w||state.fireCd>0||state.deadUntil||state.over)return;
       if(!w.melee&&state.ammo===0){sound('beep');state.fireCd=.3;message('Brak amunicji!',1);return;}
       state.fireCd=w.rate;if(!w.melee&&state.ammo>0)state.ammo--;
+      const power=RARITY[state.rarity||0][2];
       sound(w.melee?'jump':'hit');runtime?.fire('shoot');
       if(w.thrown){
         // Grenades fly in an arc and explode on impact or after two seconds.
@@ -12607,7 +12919,16 @@ body.nx-playing{overflow:hidden}
         // A swing hits every enemy within reach in front of the player (a 120° cone), not just the aim line.
         const flat=state.cam==='top'||state.cam==='side',fx=flat?state.face[0]:-Math.sin(yaw),fz=flat?state.face[1]:-Math.cos(yaw);let hitAny=false;
         for(const e of parts.slice()){if(e.type!=='enemy'||!e.visible)continue;const dx=e.pos[0]-state.pos[0],dz=e.pos[2]-state.pos[2],d=Math.hypot(dx,dz);
-          if(e.team!=='ally'&&d<=w.range+Math.max(e.size[0],e.size[2])/2&&Math.abs(e.pos[1]-state.pos[1]-1.5)<4&&(d<1||(dx*fx+dz*fz)/d>.5)){if(e.name)runtime?.fire('hit',e.name);damageEnemy(e,w.dmg);hitAny=true;}}
+          if(e.team!=='ally'&&d<=w.range+Math.max(e.size[0],e.size[2])/2&&Math.abs(e.pos[1]-state.pos[1]-1.5)<4&&(d<1||(dx*fx+dz*fz)/d>.5)){if(e.name)runtime?.fire('hit',e.name);damageEnemy(e,w.dmg*power);hitAny=true;}}
+        if(!hitAny){
+          // No enemy in reach: the swing hits the part in front (trees, walls…) – that is how a pickaxe gathers materials.
+          // From the chest in the facing direction, tilted like the camera (look down to hit a floor).
+          const cd=new THREE.Vector3();camera.getWorldDirection(cd);const dir=new THREE.Vector3(fx,clamp(cd.y,-.8,.6),fz).normalize();
+          const origin=new THREE.Vector3(state.pos[0],state.pos[1]+2.2,state.pos[2]);ray.set(origin,dir);ray.camera=camera;ray.far=w.range+.6;
+          const hit=ray.intersectObjects(parts.filter(p=>p.visible&&p.type!=='enemy'&&p.type!=='zone'&&p.type!=='coin').map(p=>p.mesh),true)[0];
+          if(hit){let m=hit.object;while(m&&!parts.some(p=>p.mesh===m))m=m.parent;const part=parts.find(p=>p.mesh===m);
+            if(part){if(part.name)runtime?.fire('hit',part.name);damagePart(part,(w.partDmg||w.dmg)*power);hitAny=true;explosionPuff(hit.point.toArray());}}
+        }
         if(hitAny){cross.classList.add('hit');setTimeout(()=>cross.classList.remove('hit'),120);}
         if(gunModel){gunModel.rotation.x=-1;setTimeout(()=>gunModel&&(gunModel.rotation.x=0),140);}
         return;
@@ -12624,7 +12945,8 @@ body.nx-playing{overflow:hidden}
         if(!hit)continue;
         let m=hit.object;while(m&&!parts.some(p=>p.mesh===m))m=m.parent;const part=parts.find(p=>p.mesh===m);if(!part)continue;
         if(part.name)runtime?.fire('hit',part.name);
-        if(part.type==='enemy'&&part.team!=='ally'){damageEnemy(part,w.dmg);hitAny=true;}
+        if(part.type==='enemy'&&part.team!=='ally'){damageEnemy(part,w.dmg*power);hitAny=true;}
+        else if(part.php!=null){damagePart(part,w.dmg*power);hitAny=true;}
       }
       if(hitAny){cross.classList.add('hit');setTimeout(()=>cross.classList.remove('hit'),120);}
       if(state.firstPerson&&viewGun){viewGun.position.z=-.38;setTimeout(()=>viewGun&&(viewGun.position.z=-.45),70);}
@@ -12709,9 +13031,12 @@ body.nx-playing{overflow:hidden}
       if(len>.1&&(state.cam==='top'||state.cam==='side')){if(!(state.cam==='top'&&state.mouseAim&&state.weapon))state.face=[vx/Math.hypot(vx,vz),vz/Math.hypot(vx,vz)];}
       if(len>.1&&!state.weapon&&!state.firstPerson&&state.cam!=='top'&&state.cam!=='side')playerObj.rotation.y=Math.atan2(vx,vz)+Math.PI;
       state.walk+=len>.1&&state.grounded?dt*9:0;
-      const v=state.vel;v[0]=vx;v[2]=vz;
+      // Gliding: slow fall and faster travel until the player lands.
+      const boost=state.glide&&!state.grounded?1.8:1;
+      const v=state.vel;v[0]=vx*boost;v[2]=vz*boost;
       if((input.jump||upJump)&&state.grounded){v[1]=state.jump;state.grounded=false;sound('jump');}
-      v[1]=Math.max(-60,v[1]-state.gravity*dt);
+      v[1]=Math.max(state.glide?-6:-60,v[1]-state.gravity*dt);
+      const onRamp=state.ground?.type==='ramp'?state.ground:null;
       const solids=parts.filter(p=>p.visible&&SOLID.has(p.type));
       pos=[...state.pos];
       for(const axis of[0,2,1]){
@@ -12732,6 +13057,12 @@ body.nx-playing{overflow:hidden}
         }
         if(axis===1&&v[1]!==0){state.grounded=false;state.ground=null;}
       }
+      // Ramps: stand on the sloped surface (players stick to it while walking down).
+      for(const r of parts){
+        if(r.type!=='ramp'||!r.visible||v[1]>.01)continue;const sh=rampHeight(r,pos[0],pos[2]);if(sh===null)continue;
+        if(pos[1]<=sh+(onRamp===r?.7:.25)&&pos[1]>=sh-1.8){pos[1]=sh;v[1]=0;state.grounded=true;state.ground=r;}
+      }
+      if(state.glide&&state.grounded){state.glide=false;runtime?.fire('land');}
       state.pos=pos;
       if(pos[1]<minY-30){die();return;}
       }
@@ -12842,6 +13173,15 @@ body.nx-playing{overflow:hidden}
     }
     function sideSystems(dt){
       ballPhysics(dt);
+      // Storm: a shrinking safe circle; outside it the player loses health every second (shields do not help).
+      const st=state.storm;
+      if(st){
+        if(st.to){st.t=Math.min(st.dur,st.t+dt);const k=st.t/st.dur;st.x=st.from[0]+(st.to[0]-st.from[0])*k;st.z=st.from[1]+(st.to[1]-st.from[1])*k;st.r=st.from[2]+(st.to[2]-st.from[2])*k;if(st.t>=st.dur)st.to=null;}
+        if(!stormMesh){stormMesh=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,72,1,true),new THREE.MeshBasicMaterial({color:0xa855f7,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}));scene.add(stormMesh);}
+        stormMesh.scale.set(st.r,400,st.r);stormMesh.position.set(st.x,120,st.z);
+        const out=api.inStorm();root.classList.toggle('nx-instorm',out&&!state.deadUntil);
+        st.tick-=dt;if(st.tick<=0){st.tick=1;if(out&&st.dmg>0&&!state.deadUntil&&!state.over){hurt(st.dmg,true);}}
+      }
       for(let i=projectiles.length-1;i>=0;i--){const q=projectiles[i];q.t+=dt;q.vel[1]-=25*dt;for(let a=0;a<3;a++)q.pos[a]+=q.vel[a]*dt;q.mesh.position.set(...q.pos);
         const hitSolid=parts.some(p=>p.visible&&SOLID.has(p.type)&&Math.abs(q.pos[0]-p.pos[0])<p.size[0]/2&&Math.abs(q.pos[1]-p.pos[1])<p.size[1]/2+.2&&Math.abs(q.pos[2]-p.pos[2])<p.size[2]/2);
         const hitEnemy=parts.some(p=>p.type==='enemy'&&p.visible&&p.team!=='ally'&&Math.hypot(q.pos[0]-p.pos[0],q.pos[1]-p.pos[1],q.pos[2]-p.pos[2])<1.6);
@@ -12857,6 +13197,8 @@ body.nx-playing{overflow:hidden}
       for(const q of parts){if(!q.visible)continue;const [x,z]=m(q.pos[0],q.pos[2]);if(Math.abs(x)>R*1.6&&Math.abs(z)>R*1.6)continue;
         if(q.type==='block'||q.type==='glass'){if(q.size[1]<1.2)continue;ctx.fillStyle='#64748b';ctx.fillRect(x-q.size[0]*sc/2,z-q.size[2]*sc/2,q.size[0]*sc,q.size[2]*sc);}
         else{const col={enemy:q.team==='ally'?'#22c55e':'#ef4444',car:'#60a5fa',npc:'#facc15',coin:'#fbbf24',finish:'#ffffff',checkpoint:'#c084fc',ball:'#ffffff'}[q.type];if(!col)continue;ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,z,q.type==='car'?4.5:3.5,0,Math.PI*2);ctx.fill();}}
+      if(state.storm){const s=state.storm,[x,z]=m(s.x,s.z);ctx.strokeStyle='#c084fc';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,z,s.r*sc,0,Math.PI*2);ctx.stroke();
+        if(s.to){const [tx,tz]=m(s.to[0],s.to[1]);ctx.strokeStyle='#ffffffaa';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(tx,tz,s.to[2]*sc,0,Math.PI*2);ctx.stroke();}}
       const wp=waypointPos();if(wp){let [x,z]=m(wp[0],wp[2]);const d=Math.hypot(x,z);if(d>R-8){x*=(R-8)/d;z*=(R-8)/d;}ctx.fillStyle='#ffc83d';ctx.beginPath();ctx.arc(x,z,6,0,Math.PI*2);ctx.fill();}
       ctx.restore();ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(R,R-8);ctx.lineTo(R-6,R+6);ctx.lineTo(R+6,R+6);ctx.closePath();ctx.fill();
     }
@@ -12896,7 +13238,9 @@ body.nx-playing{overflow:hidden}
       for(let i=effects.length-1;i>=0;i--){const fx=effects[i];if(fx.vel){fx.vel[1]-=22/60;fx.obj.position.x+=fx.vel[0]/60;fx.obj.position.y+=fx.vel[1]/60;fx.obj.position.z+=fx.vel[2]/60;fx.obj.rotation.x+=.2;fx.obj.material.opacity=Math.max(0,(fx.until-now)/.6);}else if(fx.grow)fx.obj.scale.setScalar(Math.min(fx.grow,fx.obj.scale.x+fx.grow*.15));if(fx.obj.material&&!fx.vel)fx.obj.material.opacity*=.9;if(now>=fx.until){scene.remove(fx.obj);disposeTree(fx.obj);effects.splice(i,1);}}
       for(const q of parts)if(q.bar){q.mesh.getWorldQuaternion(tmpQ).invert();q.bar.quaternion.copy(tmpQ).multiply(camera.quaternion);}
       hpBar.style.width=state.hp+'%';coinsPill.textContent='Monety: '+state.coins;scorePill.textContent='Wynik: '+NexusScript.show(state.score);scorePill.hidden=!state.scoreShown;
-      ammoPill.hidden=!state.weapon;if(state.weapon)ammoPill.textContent=WEAPONS[state.weapon].name+(WEAPONS[state.weapon].melee||state.ammo<0?'':' · '+state.ammo);
+      shieldBox.hidden=!state.shieldShown;shieldBar.style.width=state.shield+'%';
+      ammoPill.hidden=!state.weapon;if(state.weapon){const ra=RARITY[state.rarity||0];ammoPill.textContent=WEAPONS[state.weapon].name+(state.rarity?' '+'★'.repeat(state.rarity+1):'')+(WEAPONS[state.weapon].melee||state.ammo<0?'':' · '+state.ammo);ammoPill.style.boxShadow=state.rarity?'inset 0 -3px 0 '+ra[1]:'';}
+      if(glider)glider.visible=state.glide&&!state.grounded;
       timerPill.hidden=!state.timerOn;if(state.timerOn){const t=Math.ceil(state.timer);timerPill.textContent='Czas '+Math.floor(t/60)+':'+String(t%60).padStart(2,'0');}
       killsPill.hidden=!state.kills;killsPill.textContent='Pokonani: '+state.kills;
       bagPill.hidden=!state.items.size;if(state.items.size)bagPill.textContent='Plecak: '+[...state.items].map(([k,v])=>v>1?k+' ×'+v:k).join(', ');
@@ -12933,6 +13277,7 @@ body.nx-playing{overflow:hidden}
   function count(t,re,def,lo,hi){const m=t.match(new RegExp('(\\d+)\\s*(?:'+re.source+')'))||t.match(new RegExp('(?:'+re.source+')\\D{0,12}(\\d+)'));const n=m?parseInt(m[1],10):def;return Math.max(lo,Math.min(hi,n));}
   function generate(description){
     const t=String(description||'').toLowerCase();
+    if(/fortnite|battle.?royale|royale|\bbr\b|budowani[ea]/.test(t))return battleRoyale(t,description);
     if(/\b2d\b|platformów|platformow|mario|z boku|side.?scroll/.test(t))return platformer(t,description);
     if(/piłk|pilk|futbol|football|soccer|bramk|rocket league|koszyk/.test(t))return football(t,description);
     if(/wyścig|wyscig|rajd|formuł|formul|gokart/.test(t))return race(t,description);
@@ -13104,6 +13449,13 @@ body.nx-playing{overflow:hidden}
     add('when timeup {\n  lose("Koniec czasu! Spróbuj szybciej.")\n}');
     return L.join('\n')+'\n';
   }
+  // Battle Royale in the style of Fortnite: bus drop and glider, loot with rarities, building on a grid,
+  // gathering materials with a pickaxe, shield potions, a shrinking storm and 15 bots (NexusScript 2.1).
+  function battleRoyale(t,description){
+    const L=[];header(L,'Battle Royale',description);
+    return L.join('\n')+'\n'+BATTLE_ROYALE;
+  }
+  const BATTLE_ROYALE="// Sterowanie: WASD ruch · SPACJA skok z autobusu i skok · klik/F strzał\n// 1-5 sloty, Q kilof · budowanie: Z ściana, X podłoga, C rampa, V dach, R zmiana materiału\nskyGradient(\"#38bdf8\", \"#fde68a\")\nfog(260)\nspawn(\"block\", 0, -0.5, 0, 260, 1, 260, \"#4ade80\", \"Wyspa\")\nmaterial(\"Wyspa\", \"grass\")\nspawn(\"block\", 0, -1.6, 0, 272, 1, 272, \"#e6cf9b\", \"Plaza\")\nmaterial(\"Plaza\", \"sand\")\nspawn(\"glass\", 0, -2.2, 0, 700, 0.4, 700, \"#0ea5e9\", \"Ocean\")\nspawn(\"spawn\", -120, 110, -60, 8, 1, 14, \"#2563eb\", \"Autobus\")\nlabel(\"Autobus\", \"AUTOBUS BOJOWY – SPACJA: skacz!\")\n\nvar RZ = [\"Zwykły\", \"Niezwykły\", \"Rzadki\", \"Epicki\", \"Legendarny\"]\nvar KOL = [\"#9ca3af\", \"#22c55e\", \"#3b82f6\", \"#a855f7\", \"#f59e0b\"]\nvar BRONIE = [[\"Pistolet\", \"pistol\"], [\"Shotgun\", \"shotgun\"], [\"Karabin\", \"rifle\"], [\"Karabin snajperski\", \"sniper\"], [\"Granat\", \"grenade\"]]\nvar FAZY = [[0, 0, 160], [12, -8, 85], [-10, 10, 52], [6, 4, 26], [0, 0, 6]]\nvar drewno = 100\nvar kamien = 0\nvar metal = 0\nvar mat = \"wood\"\nvar sloty = [[\"Kilof\", \"pickaxe\", 0, 0]]\nvar wybrany = 0\nvar wAutobusie = true\nvar faza = 0\nvar nr = 0\nvar lup = {}\nvar skrzynie = {}\nvar tarcze = {}\nvar surowce = {}\nvar liscie = {}\n\n// ---------- mapa ----------\nfunc dom(x, z, kolor) {\n  var sciany = [[x, 2, z + 5, 10, 4, 0.4], [x - 5, 2, z, 0.4, 4, 10], [x + 5, 2, z, 0.4, 4, 10], [x - 3.5, 2, z - 5, 3, 4, 0.4], [x + 3.5, 2, z - 5, 3, 4, 0.4]]\n  for s in sciany {\n    var n = spawn(\"block\", s[0], s[1], s[2], s[3], s[4], s[5], kolor)\n    material(n, \"wood\")\n    setPartHealth(n, 150)\n    surowce[n] = \"drewno\"\n  }\n  var dach = spawn(\"block\", x, 4.2, z, 11, 0.4, 11, \"#b91c1c\")\n  setPartHealth(dach, 150)\n  surowce[dach] = \"drewno\"\n  skrzynia(x + 2, z + 2)\n}\nfunc drzewo(x, z) {\n  nr += 1\n  var pien = spawn(\"block\", x, 2.5, z, 1.2, 5, 1.2, \"#7c4a1e\", \"Drzewo{nr}\")\n  material(pien, \"wood\")\n  setPartHealth(pien, 100)\n  surowce[pien] = \"drewno\"\n  liscie[pien] = spawn(\"block\", x, 6, z, 5, 3, 5, \"#15803d\")\n}\nfunc skala(x, z) {\n  var n = spawn(\"block\", x, 1, z, random(3, 5), 2, random(3, 5), \"#6b7280\")\n  material(n, \"stone\")\n  setPartHealth(n, 150)\n  surowce[n] = \"kamień\"\n}\nfunc kontener(x, z) {\n  var n = spawn(\"block\", x, 1.5, z, 6, 3, 2.6, pick([\"#dc2626\", \"#2563eb\", \"#16a34a\"]))\n  material(n, \"metal\")\n  setPartHealth(n, 250)\n  surowce[n] = \"metal\"\n}\nfunc skrzynia(x, z) {\n  nr += 1\n  var n = spawn(\"block\", x, 0.6, z, 1.6, 1.2, 1, \"#facc15\", \"Skrzynia{nr}\")\n  glow(n, 1.2)\n  label(n, \"Skrzynia\")\n  skrzynie[n] = true\n}\nfunc upusc(x, z) {\n  nr += 1\n  var k = random(0, 4)\n  var r = random(0, 100) < 65 ? random(0, 2) : random(2, 4)\n  var n = spawn(\"block\", x, 0.4, z, 1, 0.6, 1, KOL[r], \"Lup{nr}\")\n  glow(n, 1.6)\n  label(n, \"{RZ[r]} {BRONIE[k][0]}\")\n  lup[n] = [k, r]\n}\nfunc tarcza(x, z) {\n  nr += 1\n  var n = spawn(\"block\", x, 0.5, z, 0.7, 0.9, 0.7, \"#38bdf8\", \"Tarcza{nr}\")\n  glow(n, 2)\n  label(n, \"Mikstura tarczy\")\n  tarcze[n] = true\n}\n\nvar domy = [[60, -40], [75, -15], [90, 20], [-40, 70], [-70, 40], [30, 85], [-90, -60], [10, -80]]\nfor d in domy {\n  dom(d[0], d[1], pick([\"#fde68a\", \"#fbcfe8\", \"#bbf7d0\", \"#bfdbfe\"]))\n}\nrepeat 28 {\n  drzewo(random(-120, 120), random(-120, 120))\n}\nrepeat 10 {\n  skala(random(-115, 115), random(-115, 115))\n}\nfor z in [-30, 0, 30] {\n  kontener(-25, z)\n}\nrepeat 10 {\n  skrzynia(random(-110, 110), random(-110, 110))\n}\nrepeat 24 {\n  upusc(random(-115, 115), random(-115, 115))\n}\nrepeat 8 {\n  tarcza(random(-110, 110), random(-110, 110))\n}\nvar nicki = [\"Ninja\", \"Skiller\", \"Cyber\", \"PixelPro\", \"Drift\", \"Kometa\", \"Turbo\", \"Cobra\", \"Mroczny\", \"Szybki\"]\nfor i in range(1, 16) {\n  var w = spawn(\"enemy\", random(-110, 110), 1.5, random(-110, 110), 2, 3, 2, KOL[random(0, 4)], \"Bot{i}\")\n  enemyMode(w, pick([\"shooter\", \"shooter\", \"chase\", \"patrol\"]))\n  setHealth(w, 100)\n  setEnemyDamage(w, random(8, 13))\n  label(w, pick(nicki))\n}\n\n// ---------- ekwipunek ----------\nfunc ileMaterialu() {\n  return mat == \"wood\" ? drewno : mat == \"stone\" ? kamien : metal\n}\nfunc odswiez() {\n  var pasek = map(sloty, func(s, i) {\n    return [\"{i + 1}. {s[0]}\", s[1] == \"pickaxe\" ? \"#e5e7eb\" : KOL[s[2]]]\n  })\n  hotbar(pasek, wybrany)\n  var nazwa = mat == \"wood\" ? \"drewno\" : mat == \"stone\" ? \"kamień\" : \"metal\"\n  hint(\"Drewno {drewno} · Kamień {kamien} · Metal {metal} · buduję: {nazwa} · graczy: {count('enemy') + 1}\")\n}\nfunc wybierz(i) {\n  if i >= len(sloty) {\n    return null\n  }\n  var stary = sloty[wybrany]\n  if stary[1] != \"pickaxe\" {\n    stary[3] = player.ammo\n  }\n  wybrany = i\n  var s = sloty[i]\n  giveWeapon(s[1], s[2])\n  if s[1] != \"pickaxe\" {\n    setAmmo(s[3])\n  }\n  odswiez()\n}\nfunc dajBron(k, r) {\n  var b = BRONIE[k]\n  var amunicja = b[1] == \"grenade\" ? 3 + r : 30 + r * 15\n  for i, s in sloty {\n    if s[1] == b[1] {\n      s[2] = max(s[2], r)\n      if i == wybrany {\n        var razem = player.ammo + amunicja\n        giveWeapon(s[1], s[2])\n        setAmmo(razem)\n      } else {\n        s[3] += amunicja\n      }\n      say(\"+{amunicja} amunicji: {b[0]}\", 1.5)\n      odswiez()\n      return null\n    }\n  }\n  if len(sloty) < 5 {\n    push(sloty, [b[0], b[1], r, amunicja])\n    wybierz(len(sloty) - 1)\n  } else {\n    var miejsce = wybrany == 0 ? 4 : wybrany\n    sloty[miejsce] = [b[0], b[1], r, amunicja]\n    wybrany = 0\n    wybierz(miejsce)\n  }\n  say(\"{RZ[r]} {b[0]}!\", 2)\n}\n\n// ---------- budowanie ----------\nfunc buduj(rodzaj) {\n  if wAutobusie {\n    return null\n  }\n  if ileMaterialu() < 10 {\n    say(\"Za mało materiału – zbieraj kilofem (Q)\", 1.5)\n    return null\n  }\n  var b = build(rodzaj, mat)\n  if b != null {\n    if mat == \"wood\" { drewno -= 10 } else if mat == \"stone\" { kamien -= 10 } else { metal -= 10 }\n    odswiez()\n  }\n}\nwhen key \"Z\" {\n  buduj(\"wall\")\n}\nwhen key \"X\" {\n  buduj(\"floor\")\n}\nwhen key \"C\" {\n  buduj(\"ramp\")\n}\nwhen key \"V\" {\n  buduj(\"roof\")\n}\nwhen key \"R\" {\n  mat = mat == \"wood\" ? \"stone\" : mat == \"stone\" ? \"metal\" : \"wood\"\n  odswiez()\n}\nwhen button \"Ściana\" {\n  buduj(\"wall\")\n}\nwhen button \"Podłoga\" {\n  buduj(\"floor\")\n}\nwhen button \"Rampa\" {\n  buduj(\"ramp\")\n}\nwhen button \"Dach\" {\n  buduj(\"roof\")\n}\nwhen button \"Materiał\" {\n  mat = mat == \"wood\" ? \"stone\" : mat == \"stone\" ? \"metal\" : \"wood\"\n  odswiez()\n}\nwhen button \"Broń\" {\n  wybierz(wybrany + 1 < len(sloty) ? wybrany + 1 : 0)\n}\nwhen key \"Q\" {\n  wybierz(0)\n}\nwhen key \"1\" {\n  wybierz(0)\n}\nwhen key \"2\" {\n  wybierz(1)\n}\nwhen key \"3\" {\n  wybierz(2)\n}\nwhen key \"4\" {\n  wybierz(3)\n}\nwhen key \"5\" {\n  wybierz(4)\n}\n\n// ---------- zbieranie surowców kilofem ----------\nwhen hit {\n  if player.weapon == \"pickaxe\" and hasKey(surowce, target) {\n    var co = surowce[target]\n    if co == \"drewno\" { drewno += 12 } else if co == \"kamień\" { kamien += 10 } else { metal += 8 }\n    odswiez()\n  }\n}\nwhen destroy {\n  if hasKey(liscie, target) {\n    remove(liscie[target])\n    drewno += 25\n    odswiez()\n  }\n}\n\n// ---------- autobus, skok i lądowanie ----------\nfunc skocz() {\n  if not wAutobusie {\n    return null\n  }\n  wAutobusie = false\n  teleport(player.x, 100, player.z)\n  glide(true)\n  say(\"Lecisz! Steruj WASD i wyląduj przy domach\", 3)\n}\nwhen start {\n  button(\"Ściana\")\n  button(\"Podłoga\")\n  button(\"Rampa\")\n  button(\"Dach\")\n  button(\"Materiał\")\n  button(\"Broń\")\n  minimap(true)\n  storm(0, 0, 160)\n  stormDamage(1)\n  odswiez()\n  say(\"Autobus leci nad wyspą – naciśnij SPACJĘ, aby skoczyć!\", 5)\n  move(\"Autobus\", 120, 110, 60, 28)\n}\nwhen start {\n  wait(28)\n  skocz()\n  remove(\"Autobus\")\n}\nwhen key \"space\" {\n  skocz()\n}\nwhen land {\n  giveWeapon(\"pickaxe\")\n  odswiez()\n  say(\"Wylądowałeś! Szukaj broni i skrzyń, zbieraj materiały kilofem\", 4)\n}\n\n// ---------- podnoszenie łupu ----------\nwhen every 0.25 {\n  if wAutobusie {\n    return null\n  }\n  for n, b in lup {\n    if exists(n) and distance(n) < 2.4 {\n      dajBron(b[0], b[1])\n      remove(n)\n      removeKey(lup, n)\n    }\n  }\n  for n in keys(skrzynie) {\n    if exists(n) and distance(n) < 2.6 {\n      upusc(getX(n) - 1.2, getZ(n) - 1.5)\n      upusc(getX(n) + 1.2, getZ(n) - 1.5)\n      drewno += 20\n      particles(getX(n), 1.5, getZ(n), \"#facc15\", 25)\n      sound(\"powerup\")\n      remove(n)\n      removeKey(skrzynie, n)\n      odswiez()\n    }\n  }\n  for n in keys(tarcze) {\n    if exists(n) and distance(n) < 2.2 {\n      addShield(50)\n      say(\"+50 tarczy\", 1.5)\n      sound(\"powerup\")\n      remove(n)\n      removeKey(tarcze, n)\n    }\n  }\n}\n\n// ---------- burza ----------\nwhen every 60 {\n  if faza + 1 < len(FAZY) {\n    faza += 1\n    var f = FAZY[faza]\n    stormShrink(f[0], f[1], f[2], 35)\n    stormDamage(faza * 2)\n    say(\"Burza się zmniejsza! Uciekaj do bezpiecznej strefy\", 3)\n    sound(\"beep\")\n  }\n}\nwhen every 1 {\n  odswiez()\n}\n\n// ---------- walka ----------\nwhen kill {\n  addScore(100)\n  upusc(player.x + 2, player.z + 2)\n  heal(15)\n  if count(\"enemy\") == 0 {\n    win(\"VICTORY ROYALE! Eliminacje: {player.kills}\")\n  } else {\n    say(\"Eliminacja! Zostało graczy: {count('enemy') + 1}\", 2)\n  }\n}\nwhen die {\n  lose(\"Wyeliminowany! Miejsce #{count('enemy') + 1} · eliminacje: {player.kills}\")\n}\nwhen win {\n  particles(player.x, player.y + 2, player.z, \"#facc15\", 80)\n}\n";
   // Football: a pitch with goals (zones), a ball, bots that play it and a score to 3 (NexusScript 1.4).
   function football(t,description){
     const L=[],add=s=>L.push(s);header(L,'Gra w piłkę',description);
@@ -13312,8 +13664,8 @@ body.nx-playing{overflow:hidden}
   const section=$('view-studio');if(!section)return;
   const REFERENCE=($('nexusReference')?.textContent||'').trim();
   const storeKey='blox_nexus_v1_'+(typeof myPlayerId!=='undefined'?myPlayerId:'local');
-  const TOOLS=[['select','Wybierz','#ffffff'],['block','Blok','#4eae79'],['glass','Szkło','#9fd8ff'],['lava','Lawa','#ff5a2a'],['coin','Moneta','#f5c542'],['spawn','Start','#4a9eff'],['finish','Meta','#dddddd'],['checkpoint','Checkpoint','#b47cff'],['spring','Trampolina','#ff9d3c'],['enemy','Wróg','#e0383b'],['ammo','Amunicja','#6b7d3a'],['health','Apteczka','#f4f4f4'],['npc','NPC','#3b82f6'],['car','Auto','#2563eb'],['ball','Piłka','#f8fafc'],['zone','Strefa','#facc15'],['erase','Gumka','#555555']];
-  const SIZE={block:[4,1,4],glass:[4,1,4],lava:[4,1,4],coin:[1,1,1],spawn:[6,1,6],finish:[6,1,6],checkpoint:[4,1,4],spring:[3,1,3],enemy:[2,2,2],ammo:[1.2,1,1.2],health:[1.2,1,1.2],npc:[1.5,3,1.5],car:[2.4,1.4,4.4],ball:[1.2,1.2,1.2],zone:[6,4,6]};
+  const TOOLS=[['select','Wybierz','#ffffff'],['block','Blok','#4eae79'],['glass','Szkło','#9fd8ff'],['lava','Lawa','#ff5a2a'],['coin','Moneta','#f5c542'],['spawn','Start','#4a9eff'],['finish','Meta','#dddddd'],['checkpoint','Checkpoint','#b47cff'],['spring','Trampolina','#ff9d3c'],['enemy','Wróg','#e0383b'],['ammo','Amunicja','#6b7d3a'],['health','Apteczka','#f4f4f4'],['npc','NPC','#3b82f6'],['car','Auto','#2563eb'],['ball','Piłka','#f8fafc'],['zone','Strefa','#facc15'],['ramp','Rampa','#a16207'],['erase','Gumka','#555555']];
+  const SIZE={block:[4,1,4],glass:[4,1,4],lava:[4,1,4],coin:[1,1,1],spawn:[6,1,6],finish:[6,1,6],checkpoint:[4,1,4],spring:[3,1,3],enemy:[2,2,2],ammo:[1.2,1,1.2],health:[1.2,1,1.2],npc:[1.5,3,1.5],car:[2.4,1.4,4.4],ball:[1.2,1.2,1.2],zone:[6,4,6],ramp:[4,4,4]};
   const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
   const clone=v=>JSON.parse(JSON.stringify(v));
   let projects=[],current=null,tool='block',selected=null,undo=[],redo=[],saveTimer=0,showScriptParts=true,playing=null;

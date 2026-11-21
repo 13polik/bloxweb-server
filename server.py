@@ -385,7 +385,7 @@ def relations(uid):
 
 
 # ---------- Player-made games (Studio 3D + NexusScript) ----------
-PART_TYPES = {"block", "lava", "coin", "spawn", "finish", "checkpoint", "spring", "enemy", "glass", "ammo", "health", "npc", "car", "ball", "zone"}
+PART_TYPES = {"block", "lava", "coin", "spawn", "finish", "checkpoint", "spring", "enemy", "glass", "ammo", "health", "npc", "car", "ball", "zone", "ramp"}
 HEX = re.compile(r"#[0-9a-fA-F]{6}")
 # Short stems of common Polish/English swear words; titles, descriptions,
 # part names and script text are all checked because other children see them.
@@ -432,8 +432,9 @@ def game_data(value):
             part["r"] = round(number(raw.get("r"), 0, -360, 360), 1)
         parts.append(part)
     script = str(value.get("script") or "")
-    if len(script) > 20000:
-        fail("Skrypt NexusScript może mieć najwyżej 20 000 znaków.")
+    # Big games are welcome; the cap only keeps a single upload from overloading the server.
+    if len(script) > 500000:
+        fail("Skrypt NexusScript może mieć najwyżej 500 000 znaków.")
     return dict(format="bloxweb-nexus", version=1, settings=dict(
         speed=number(settings.get("speed"), 8, 4, 16), jump=number(settings.get("jump"), 12, 6, 22),
         gravity=number(settings.get("gravity"), 30, 10, 45), sky=sky), parts=parts, script=script)
@@ -1222,7 +1223,7 @@ async def homepage():
 async def api(operation: str, request: Request):
     raw = await request.body()
     # A published Studio game (parts + NexusScript) may be larger than other requests.
-    if len(raw) > (220000 if operation in ("games_publish", "projects_save") else 40000):
+    if len(raw) > (1500000 if operation in ("games_publish", "projects_save") else 40000):
         fail("Żądanie jest zbyt duże.", 413)
     try:
         body = json.loads(raw or "{}")
